@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mes Horaires</title>
+    <!-- Lien vers le manifest pour la PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    
+    <!-- Tailwind CSS pour un design rapide sans fichier CSS externe -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Chart.js pour le graphique -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 p-4 md:p-8 max-w-md mx-auto">
+
+    <h1 class="text-2xl font-bold mb-6 text-center text-blue-600">Pointage PWA</h1>
+
+    <!-- Module de Connexion (Obligatoire pour la sécurité RLS) -->
+    <div id="auth-section" class="bg-white p-6 rounded-lg shadow-md mb-6">
+        <h2 class="text-lg font-semibold mb-4">Connexion</h2>
+        <input type="email" id="email" placeholder="Email" class="w-full p-2 border rounded mb-3">
+        <input type="password" id="password" placeholder="Mot de passe" class="w-full p-2 border rounded mb-3">
+        <button onclick="login()" class="w-full bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700">Se connecter</button>
+    </div>
+
+    <!-- Interface principale (Cachée tant que non connecté) -->
+    <div id="app-section" class="hidden">
+        <button onclick="logout()" class="text-sm text-red-500 mb-6 underline">Se déconnecter</button>
+
+        <div class="grid grid-cols-2 gap-4 mb-8">
+            <button onclick="pointer('arrivee')" class="bg-green-500 text-white font-bold py-4 rounded-lg shadow active:scale-95 transition">Arrivée</button>
+            <button onclick="pointer('depart')" class="bg-red-500 text-white font-bold py-4 rounded-lg shadow active:scale-95 transition">Départ</button>
+            <button onclick="pointer('debut_pause')" class="bg-yellow-500 text-white font-bold py-4 rounded-lg shadow active:scale-95 transition">Début Pause</button>
+            <button onclick="pointer('fin_pause')" class="bg-blue-400 text-white font-bold py-4 rounded-lg shadow active:scale-95 transition">Fin Pause</button>
+        </div>
+
+        <!-- Graphique -->
+        <div class="bg-white p-4 rounded-lg shadow-md">
+            <h3 class="font-semibold mb-2 text-center">Aperçu de la semaine</h3>
+            <canvas id="myChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // 1. Initialisation de Supabase
+        const supabaseUrl = 'https://rxqtsguwoqeojsnaagxb.supabase.co/rest/v1/';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4cXRzZ3V3b3Flb2pzbmFhZ3hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTA4MjcsImV4cCI6MjEwMjcyNjgyN30.FTPTGSe6tqDTieqQdD-GWUqueKlEPUpw4QGiMa4U8AA';
+        const supabase = supabaseClient.createClient(supabaseUrl, supabaseKey);
+
+        let currentUser = null;
+
+        // 2. Gestion de l'authentification
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            
+            if (error) {
+                alert("Erreur de connexion : " + error.message);
+            } else {
+                currentUser = data.user;
+                document.getElementById('auth-section').classList.add('hidden');
+                document.getElementById('app-section').classList.remove('hidden');
+                initChart(); // Charger les graphiques une fois connecté
+            }
+        }
+
+        async function logout() {
+            await supabase.auth.signOut();
+            location.reload();
+        }
+
+        // Vérifier si l'utilisateur est déjà connecté au chargement
+        window.onload = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                currentUser = user;
+                document.getElementById('auth-section').classList.add('hidden');
+                document.getElementById('app-section').classList.remove('hidden');
+                initChart();
+            }
+        };
+
+        // 3. Fonction de pointage
+        async function pointer(type) {
+            if (!currentUser) return alert("Veuillez vous connecter");
+
+            const { data, error } = await supabase
+                .from('horaires')
+                .insert([{ user_id: currentUser.id, type_action: type }]);
+
+            if (error) {
+                console.error(error);
+                alert("Erreur lors du pointage !");
+            } else {
+                alert(`Pointage enregistré : ${type.replace('_', ' ')}`);
+            }
+        }
+
+        // 4. Initialisation du graphique (Exemple statique à remplacer par vos calculs SQL)
+        function initChart() {
+            const ctx = document.getElementById('myChart');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven'],
+                    datasets: [{
+                        label: 'Heures travaillées',
+                        data: [7.5, 8, 7.5, 8.5, 7], // Ici, il faudra récupérer la somme depuis Supabase
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 4
+                    }]
+                },
+                options: { scales: { y: { beginAtZero: true, max: 10 } } }
+            });
+        }
+
+        // 5. Enregistrement du Service Worker pour la PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(() => console.log('Service Worker enregistré !'))
+                .catch(err => console.error('Erreur Service Worker', err));
+        }
+    </script>
+</body>
+</html>

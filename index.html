@@ -3,11 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mes Horaires</title>
+    <title>Mes Horaires & Planning</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffffff">
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- FullCalendar JS & CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+
+    <style>
+        /* Personnalisation du calendrier pour coller au design Tailwind */
+        .fc { font-family: inherit; }
+        .fc-button-primary { background-color: #14b8a6 !important; border-color: #14b8a6 !important; }
+        .fc-button-primary:hover { background-color: #0d9488 !important; border-color: #0d9488 !important; }
+        .fc-button-active { background-color: #0f766e !important; }
+    </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-2 md:p-6 font-sans">
 
@@ -19,166 +32,304 @@
         <button onclick="login()" class="w-full bg-teal-500 text-white font-bold py-3 rounded-xl hover:bg-teal-600 transition shadow-lg shadow-teal-500/30">Se connecter</button>
     </div>
 
-    <!-- INTERFACE PRINCIPALE (Inspirée du mockup) -->
-    <div id="app-section" class="hidden w-full max-w-4xl bg-white md:rounded-3xl shadow-2xl flex flex-col md:flex-row overflow-hidden min-h-[80vh]">
+    <!-- INTERFACE PRINCIPALE -->
+    <div id="app-section" class="hidden w-full max-w-5xl bg-white md:rounded-3xl shadow-2xl flex flex-col md:flex-row overflow-hidden min-h-[85vh]">
         
-        <!-- BARRE LATERALE GAUCHE -->
-        <div class="md:w-1/3 bg-gray-50 border-r border-gray-200 p-6 flex flex-col items-center">
-            <!-- Logo -->
-            <div class="text-teal-500 font-bold text-xl flex items-center gap-2 mb-8">
+        <!-- BARRE LATERALE (MENU) -->
+        <div class="md:w-1/4 bg-gray-50 border-r border-gray-200 p-6 flex flex-col">
+            <div class="text-teal-500 font-bold text-xl flex items-center gap-2 mb-8 justify-center">
                 <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path></svg>
-                POINTAGE
+                MON SIRH
             </div>
 
-            <!-- Date et Heure en direct -->
-            <div class="text-center mb-8">
-                <div id="date-display" class="text-gray-500 text-sm font-medium capitalize">Chargement...</div>
-                <div id="time-display" class="text-4xl font-bold text-gray-800 tracking-tight mt-1">00:00</div>
-            </div>
-
-            <!-- Profil Utilisateur -->
-            <div class="flex flex-col items-center mb-10">
-                <div class="w-20 h-20 bg-teal-100 rounded-full flex items-center justify-center text-teal-600 font-bold text-3xl mb-3 shadow-inner">
-                    T
-                </div>
-                <div class="font-bold text-gray-800 text-lg">Tom</div>
+            <div class="flex flex-col items-center mb-8">
+                <div class="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center text-teal-600 font-bold text-2xl mb-2">T</div>
+                <div class="font-bold text-gray-800">Tom</div>
                 <button onclick="logout()" class="text-xs text-red-400 hover:text-red-600 mt-1 underline">Déconnexion</button>
             </div>
 
-            <!-- Compteurs -->
-            <div class="w-full space-y-6">
-                <div>
-                    <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 text-center">Total du jour</div>
-                    <div class="text-2xl font-bold text-gray-800 text-center">--:--</div>
-                </div>
-                <div class="border-t border-gray-200 pt-6">
-                    <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 text-center">Total de la semaine</div>
-                    <div class="text-2xl font-bold text-gray-800 text-center">--:--</div>
-                </div>
+            <!-- Navigation -->
+            <nav class="flex flex-col gap-2 mb-8">
+                <button onclick="switchTab('pointage')" id="btn-pointage" class="flex items-center gap-3 p-3 rounded-xl bg-teal-50 text-teal-700 font-medium transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Pointage
+                </button>
+                <button onclick="switchTab('planning')" id="btn-planning" class="flex items-center gap-3 p-3 rounded-xl text-gray-600 hover:bg-gray-100 font-medium transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    Planning & Congés
+                </button>
+            </nav>
+
+            <div class="mt-auto pt-6 border-t border-gray-200">
+                <div id="date-display" class="text-gray-500 text-sm font-medium capitalize text-center"></div>
+                <div id="time-display" class="text-3xl font-bold text-gray-800 tracking-tight mt-1 text-center"></div>
             </div>
         </div>
 
-        <!-- ZONE CENTRALE DROITE -->
-        <div class="md:w-2/3 flex flex-col p-4 md:p-8">
+        <!-- ZONE DROITE : VUES DYNAMIQUES -->
+        <div class="md:w-3/4 flex flex-col p-4 md:p-8 relative">
             
-            <!-- Statut en haut -->
-            <div class="flex flex-col items-center mt-2 mb-8">
-                <div class="w-14 h-14 rounded-full border-2 border-green-500 text-green-500 flex items-center justify-center mb-3">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            <!-- VUE 1 : POINTAGE (Design précédent) -->
+            <div id="view-pointage" class="flex-1 flex flex-col">
+                <div class="flex flex-col items-center mt-2 mb-8">
+                    <div class="w-14 h-14 rounded-full border-2 border-green-500 text-green-500 flex items-center justify-center mb-3">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    </div>
+                    <h2 class="text-2xl font-medium text-gray-800">Vous êtes en poste</h2>
+                    <span class="text-sm text-gray-500 mt-1">Ville de Lille</span>
+                    <div class="text-4xl font-light text-gray-800 mt-3">0:00:00</div>
                 </div>
-                <h2 class="text-2xl font-medium text-gray-800">Vous êtes en poste</h2>
-                <span class="text-sm text-gray-500 mt-1">à Ville de Lille</span>
-                <!-- Chrono Actif -->
-                <div class="text-4xl font-light text-gray-800 mt-3">0:00:00</div>
+
+                <div class="flex-1 overflow-y-auto mb-8 px-2 space-y-4" id="historique-jour">
+                    <!-- Les pointages apparaîtront ici -->
+                    <p class="text-center text-gray-400 text-sm mt-10">Aucun pointage aujourd'hui.</p>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3 md:gap-4 mt-auto">
+                    <button onclick="pointer('arrivee')" class="bg-teal-500 hover:bg-teal-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md active:scale-95">
+                        <svg class="w-6 h-6 md:w-8 md:h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
+                        <span class="text-sm md:text-base font-medium">Arrivée</span>
+                    </button>
+                    <button onclick="pointer('pause')" class="bg-orange-500 hover:bg-orange-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md active:scale-95">
+                        <svg class="w-6 h-6 md:w-8 md:h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 15.546c-.523 0-1.046.151-1.5.454a2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.701 2.701 0 00-1.5-.454M9 6v2m3-2v2m3-2v2M9 3h.01M12 3h.01M15 3h.01M21 21v-7a2 2 0 00-2-2H5a2 2 0 00-2 2v7h18zm-3-9v-2a2 2 0 00-2-2H8a2 2 0 00-2 2v2h12z"></path></svg>
+                        <span class="text-sm md:text-base font-medium">Pause</span>
+                    </button>
+                    <button onclick="pointer('depart')" class="bg-slate-500 hover:bg-slate-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md active:scale-95">
+                        <svg class="w-6 h-6 md:w-8 md:h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                        <span class="text-sm md:text-base font-medium">Départ</span>
+                    </button>
+                </div>
             </div>
 
-            <!-- Historique des actions du jour -->
-            <div class="flex-1 overflow-y-auto mb-8 px-2 space-y-4">
-                <!-- Ces lignes sont statiques pour le design, nous les rendrons dynamiques plus tard -->
-                <div class="flex justify-between items-center py-3 border-b border-gray-100">
-                    <div>
-                        <div class="font-medium text-teal-600">Arrivée</div>
-                        <div class="text-xs text-gray-400">Prise de poste</div>
+            <!-- VUE 2 : PLANNING & CONGÉS -->
+            <div id="view-planning" class="hidden flex-1 flex flex-col h-full">
+                <!-- Compteurs -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                        <div class="text-xs text-gray-500 font-bold uppercase mb-1">Heures Sup</div>
+                        <div class="text-xl font-bold text-teal-600">+02h30</div>
                     </div>
-                    <div class="text-gray-600 font-medium">08:30</div>
+                    <div class="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                        <div class="text-xs text-gray-500 font-bold uppercase mb-1">CP Restants</div>
+                        <div class="text-xl font-bold text-gray-800">22 j</div>
+                    </div>
+                    <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 relative">
+                        <!-- Alerte RTT obligatoire du mois -->
+                        <div class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full animate-pulse">1 à poser !</div>
+                        <div class="text-xs text-blue-600 font-bold uppercase mb-1">RTT Restants</div>
+                        <div class="text-xl font-bold text-blue-800">14 j</div>
+                    </div>
+                    <div class="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                        <div class="text-xs text-purple-600 font-bold uppercase mb-1">Fractionnement</div>
+                        <div class="text-xl font-bold text-purple-800" id="compteur-fractionnement">+0 j</div>
+                    </div>
                 </div>
-                <div class="flex justify-between items-center py-3 border-b border-gray-100">
-                    <div>
-                        <div class="font-medium text-orange-500">Début de pause</div>
-                        <div class="text-xs text-gray-400">Repas</div>
-                    </div>
-                    <div class="text-gray-600 font-medium">12:15</div>
+
+                <button onclick="ouvrirModal()" class="w-full bg-slate-800 text-white font-bold py-3 rounded-xl mb-6 shadow-md hover:bg-slate-700 transition">
+                    + Déclarer une absence
+                </button>
+
+                <!-- Calendrier -->
+                <div id="calendar" class="flex-1 min-h-[400px]"></div>
+            </div>
+            
+        </div>
+    </div>
+
+    <!-- MODAL AJOUT ABSENCE (Cachée par défaut) -->
+    <div id="modal-absence" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <h3 class="text-xl font-bold mb-4">Nouvelle absence</h3>
+            <select id="type_absence" class="w-full p-3 border border-gray-300 rounded-xl mb-4">
+                <option value="RTT">RTT</option>
+                <option value="CP">Congé Payé</option>
+                <option value="Maladie">Arrêt Maladie</option>
+                <option value="Formation">Formation</option>
+                <option value="Exceptionnel">Congé Exceptionnel</option>
+            </select>
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label class="text-xs text-gray-500 font-bold">Du</label>
+                    <input type="date" id="date_debut" class="w-full p-2 border border-gray-300 rounded-xl mt-1">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500 font-bold">Au</label>
+                    <input type="date" id="date_fin" class="w-full p-2 border border-gray-300 rounded-xl mt-1">
                 </div>
             </div>
-
-            <!-- Boutons d'action (En bas) -->
-            <div class="grid grid-cols-3 gap-3 md:gap-4 mt-auto">
-                <button onclick="pointer('arrivee')" class="bg-teal-500 hover:bg-teal-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md active:scale-95">
-                    <svg class="w-6 h-6 md:w-8 md:h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
-                    <span class="text-sm md:text-base font-medium">Arrivée</span>
-                </button>
-                <button onclick="pointer('pause')" class="bg-orange-500 hover:bg-orange-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md active:scale-95">
-                    <svg class="w-6 h-6 md:w-8 md:h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 15.546c-.523 0-1.046.151-1.5.454a2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.701 2.701 0 00-1.5-.454M9 6v2m3-2v2m3-2v2M9 3h.01M12 3h.01M15 3h.01M21 21v-7a2 2 0 00-2-2H5a2 2 0 00-2 2v7h18zm-3-9v-2a2 2 0 00-2-2H8a2 2 0 00-2 2v2h12z"></path></svg>
-                    <span class="text-sm md:text-base font-medium">Pause</span>
-                </button>
-                <button onclick="pointer('depart')" class="bg-slate-500 hover:bg-slate-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md active:scale-95">
-                    <svg class="w-6 h-6 md:w-8 md:h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                    <span class="text-sm md:text-base font-medium">Départ</span>
-                </button>
+            <div class="flex gap-3">
+                <button onclick="fermerModal()" class="flex-1 bg-gray-200 text-gray-800 font-bold py-3 rounded-xl">Annuler</button>
+                <button onclick="sauvegarderAbsence()" class="flex-1 bg-teal-500 text-white font-bold py-3 rounded-xl">Valider</button>
             </div>
         </div>
     </div>
 
     <script>
-        // --- 1. HORLOGE EN TEMPS REEL ---
-        function updateClock() {
-            const now = new Date();
-            // Format de l'heure (ex: 14:30)
-            const timeString = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-            // Format de la date (ex: Lundi, 1 mai)
-            const dateString = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-            
-            document.getElementById('time-display').textContent = timeString;
-            document.getElementById('date-display').textContent = dateString;
-        }
-        setInterval(updateClock, 1000); // Met à jour chaque seconde
-        updateClock(); // Lancement immédiat
-
-        // --- 2. CONFIGURATION SUPABASE ---
+        // --- CONFIGURATION ---
         const supabaseUrl = 'https://rxqtsguwoqeojsnaagxb.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4cXRzZ3V3b3Flb2pzbmFhZ3hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTA4MjcsImV4cCI6MjEwMjcyNjgyN30.FTPTGSe6tqDTieqQdD-GWUqueKlEPUpw4QGiMa4U8AA';
      
-        
         const supaClient = window.supabase.createClient(supabaseUrl, supabaseKey);
         let currentUser = null;
+        let calendar = null;
 
-        // --- 3. AUTHENTIFICATION ---
+        // --- HORLOGE ---
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('time-display').textContent = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('date-display').textContent = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+        }
+        setInterval(updateClock, 1000); updateClock();
+
+        // --- AUTHENTIFICATION ---
         window.login = async function() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const { data, error } = await supaClient.auth.signInWithPassword({ email, password });
-            
-            if (error) {
-                alert("Erreur : " + error.message);
-            } else {
-                currentUser = data.user;
-                document.getElementById('auth-section').classList.add('hidden');
-                document.getElementById('app-section').classList.remove('hidden');
-                document.getElementById('app-section').classList.add('flex');
-            }
+            if (!error) initialiserApp(data.user);
         };
 
-        window.logout = async function() {
-            await supaClient.auth.signOut();
-            location.reload();
-        };
+        window.logout = async function() { await supaClient.auth.signOut(); location.reload(); };
 
         window.onload = async () => {
             const { data: { user } } = await supaClient.auth.getUser();
-            if (user) {
-                currentUser = user;
-                document.getElementById('auth-section').classList.add('hidden');
-                document.getElementById('app-section').classList.remove('hidden');
-                document.getElementById('app-section').classList.add('flex');
+            if (user) initialiserApp(user);
+        };
+
+        function initialiserApp(user) {
+            currentUser = user;
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('app-section').classList.remove('hidden');
+            document.getElementById('app-section').classList.add('flex');
+            initCalendar();
+        }
+
+        // --- NAVIGATION ONGLETS ---
+        window.switchTab = function(tabName) {
+            const btnPointage = document.getElementById('btn-pointage');
+            const btnPlanning = document.getElementById('btn-planning');
+            const viewPointage = document.getElementById('view-pointage');
+            const viewPlanning = document.getElementById('view-planning');
+
+            // Reset styles
+            btnPointage.className = 'flex items-center gap-3 p-3 rounded-xl text-gray-600 hover:bg-gray-100 font-medium transition';
+            btnPlanning.className = 'flex items-center gap-3 p-3 rounded-xl text-gray-600 hover:bg-gray-100 font-medium transition';
+            viewPointage.classList.add('hidden');
+            viewPlanning.classList.add('hidden');
+
+            // Activer l'onglet choisi
+            if (tabName === 'pointage') {
+                btnPointage.className = 'flex items-center gap-3 p-3 rounded-xl bg-teal-50 text-teal-700 font-medium transition';
+                viewPointage.classList.remove('hidden');
+                viewPointage.classList.add('flex');
+            } else {
+                btnPlanning.className = 'flex items-center gap-3 p-3 rounded-xl bg-teal-50 text-teal-700 font-medium transition';
+                viewPlanning.classList.remove('hidden');
+                viewPlanning.classList.add('flex');
+                if (calendar) calendar.render(); // Force le calendrier à s'afficher correctement après le display:block
             }
         };
 
-        // --- 4. POINTAGE ---
+        // --- POINTAGE (Simple) ---
         window.pointer = async function(type) {
             if (!currentUser) return;
+            const { error } = await supaClient.from('pointages').insert([{ user_id: currentUser.id, type_action: type }]);
+            if (!error) alert("Pointage enregistré !");
+        };
 
-            const { data, error } = await supaClient
-                .from('pointages')
-                .insert([{ user_id: currentUser.id, type_action: type }]);
+        // --- PLANNING & CONGÉS ---
+        function initCalendar() {
+            const calendarEl = document.getElementById('calendar');
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                locale: 'fr',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+                buttonText: { today: "Aujourd'hui", month: 'Mois', week: 'Semaine', day: 'Jour' },
+                events: chargerEvenementsCalendrier
+            });
+            // N'est rendu que lorsqu'on clique sur l'onglet (géré dans switchTab)
+        }
+
+        async function chargerEvenementsCalendrier(info, successCallback, failureCallback) {
+            // Ici, nous récupérons les congés depuis Supabase
+            const { data, error } = await supaClient.from('absences').select('*').eq('user_id', currentUser.id);
+            if (error) { failureCallback(error); return; }
+
+            const events = data.map(abs => {
+                // Couleurs différentes selon le type
+                let color = '#3b82f6'; // RTT: Bleu
+                if(abs.type_absence === 'CP') color = '#14b8a6'; // Vert
+                if(abs.type_absence === 'Maladie') color = '#ef4444'; // Rouge
+                
+                return {
+                    title: abs.type_absence,
+                    start: abs.date_debut,
+                    end: new Date(new Date(abs.date_fin).getTime() + 86400000).toISOString().split('T')[0], // Ajoute 1j pour FullCalendar (exclusif)
+                    backgroundColor: color,
+                    borderColor: color
+                };
+            });
+            
+            // On en profite pour calculer les jours de fractionnement à la volée !
+            calculerFractionnement(data);
+            
+            successCallback(events);
+        }
+
+        // --- GESTION DES MODALES ---
+        window.ouvrirModal = () => document.getElementById('modal-absence').classList.remove('hidden');
+        window.fermerModal = () => document.getElementById('modal-absence').classList.add('hidden');
+
+        window.sauvegarderAbsence = async () => {
+            const type = document.getElementById('type_absence').value;
+            const debut = document.getElementById('date_debut').value;
+            const fin = document.getElementById('date_fin').value;
+
+            if(!debut || !fin) return alert("Veuillez sélectionner les dates.");
+
+            const { error } = await supaClient.from('absences').insert([{ 
+                user_id: currentUser.id, type_absence: type, date_debut: debut, date_fin: fin 
+            }]);
 
             if (error) {
-                alert("Erreur lors du pointage !");
+                alert("Erreur lors de l'enregistrement.");
             } else {
-                // Petit effet visuel pour confirmer
-                const actions = { 'arrivee': 'Arrivée', 'pause': 'Pause', 'depart': 'Départ' };
-                alert(`✅ Pointage enregistré : ${actions[type]}`);
+                fermerModal();
+                calendar.refetchEvents(); // Met à jour le calendrier !
             }
         };
+
+        // --- LOGIQUE METIER : JOURS DE FRACTIONNEMENT ---
+        function calculerFractionnement(absences) {
+            let joursNovFev = 0;
+            
+            // Pour chaque congé, on vérifie s'il tombe entre le 1er Novembre et le 28/29 Février
+            absences.forEach(abs => {
+                if(abs.type_absence === 'CP') {
+                    let d = new Date(abs.date_debut);
+                    let f = new Date(abs.date_fin);
+                    // Boucle sur chaque jour du congé
+                    for (let j = new Date(d); j <= f; j.setDate(j.getDate() + 1)) {
+                        let mois = j.getMonth(); // 0 = Janvier, 1 = Février ... 10 = Nov, 11 = Dec
+                        // Si le mois est Nov, Dec, Jan, Fev (10, 11, 0, 1)
+                        if([10, 11, 0, 1].includes(mois)) {
+                            joursNovFev++;
+                        }
+                    }
+                }
+            });
+
+            // Application de votre règle personnalisée : +1 pour 6 jours, +2 pour 8 jours
+            let fractionnement = 0;
+            if (joursNovFev >= 8) fractionnement = 2;
+            else if (joursNovFev >= 6) fractionnement = 1;
+
+            document.getElementById('compteur-fractionnement').textContent = `+${fractionnement} j`;
+        }
     </script>
 </body>
 </html>

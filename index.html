@@ -17,10 +17,7 @@
         .fc-button-primary:hover { background-color: #0d9488 !important; border-color: #0d9488 !important; }
         .fc-button-active { background-color: #0f766e !important; }
         
-        @keyframes slideIn {
-            from { transform: translateY(20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
+        @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .animate-slide-in { animation: slideIn 0.3s ease-out; }
         
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
@@ -62,11 +59,8 @@
         
         <!-- BARRE LATERALE (MENU) -->
         <div class="md:w-72 bg-gray-50 border-r border-gray-200 p-6 flex flex-col">
-            
             <div class="flex items-center gap-3 mb-8">
-                <div id="user-initials" class="w-12 h-12 bg-teal-500 rounded-xl flex items-center justify-center text-white text-2xl font-bold">
-                    --
-                </div>
+                <div id="user-initials" class="w-12 h-12 bg-teal-500 rounded-xl flex items-center justify-center text-white text-2xl font-bold">--</div>
                 <div>
                     <div id="user-name" class="font-bold text-gray-800">Chargement...</div>
                     <div id="user-email" class="text-xs text-gray-500">...</div>
@@ -109,7 +103,6 @@
                     <span class="text-sm text-gray-500">Aujourd'hui</span>
                 </div>
 
-                <!-- STATISTIQUES -->
                 <div class="grid grid-cols-3 gap-4 mb-6">
                     <div class="bg-teal-50 p-4 rounded-xl text-center">
                         <div class="text-2xl font-bold text-teal-600" id="stat-heures">0h00</div>
@@ -125,12 +118,10 @@
                     </div>
                 </div>
 
-                <!-- HISTORIQUE -->
                 <div class="flex-1 overflow-y-auto custom-scrollbar mb-6 px-2 space-y-2 border-t border-b border-gray-100 py-4" id="historique-jour">
                     <div class="flex justify-center items-center h-full text-gray-400">Chargement de l'historique...</div>
                 </div>
 
-                <!-- BOUTONS D'ACTION -->
                 <div class="grid grid-cols-3 gap-3 md:gap-4 mt-auto">
                     <button onclick="pointer('arrivee')" class="btn-primary bg-teal-500 hover:bg-teal-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md">
                         <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
@@ -160,12 +151,11 @@
                             + Déclarer une absence
                         </button>
                         <button onclick="ouvrirModalParametres()" class="text-sm text-teal-600 hover:underline flex items-center gap-1 py-2.5 px-4">
-                            ⚙️ Paramètres
+                            ⚙️ Mes soldes
                         </button>
                     </div>
                 </div>
 
-                <!-- COMPTEURS PLANNING -->
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     <div class="bg-gradient-to-br from-teal-50 to-teal-100 p-4 rounded-xl border border-teal-200">
                         <div class="text-xs text-teal-600 font-bold uppercase mb-1">Heures Sup</div>
@@ -204,14 +194,8 @@
                 <option value="Autre">Autre</option>
             </select>
             <div class="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                    <label class="text-xs font-bold text-gray-500">Du</label>
-                    <input type="date" id="date_debut" class="w-full p-2 border rounded-xl mt-1">
-                </div>
-                <div>
-                    <label class="text-xs font-bold text-gray-500">Au</label>
-                    <input type="date" id="date_fin" class="w-full p-2 border rounded-xl mt-1">
-                </div>
+                <div><label class="text-xs font-bold text-gray-500">Du</label><input type="date" id="date_debut" class="w-full p-2 border rounded-xl mt-1"></div>
+                <div><label class="text-xs font-bold text-gray-500">Au</label><input type="date" id="date_fin" class="w-full p-2 border rounded-xl mt-1"></div>
             </div>
             <div class="flex gap-3">
                 <button onclick="fermerModalAbsence()" class="flex-1 bg-gray-200 font-bold py-3 rounded-xl hover:bg-gray-300">Annuler</button>
@@ -223,7 +207,7 @@
     <!-- MODAL : PARAMETRES -->
     <div id="modal-parametres" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-slide-in">
-            <h3 class="text-xl font-bold mb-4">Mes Soldes (Acquis)</h3>
+            <h3 class="text-xl font-bold mb-4">Mes Soldes de départ</h3>
             <div class="mb-4">
                 <label class="text-xs font-bold text-gray-500 mb-1 block">Nombre de CP total</label>
                 <input type="number" id="input_cp" class="w-full p-3 border rounded-xl" value="25">
@@ -240,7 +224,7 @@
     </div>
 
     <!-- TOAST NOTIFICATION -->
-    <div id="toast" class="hidden fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg animate-slide-in z-50">
+    <div id="toast" class="hidden fixed bottom-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-xl shadow-lg animate-slide-in z-50">
         Opération réussie !
     </div>
 
@@ -253,28 +237,20 @@
         
         let currentUser = null;
         let calendar = null;
-        let currentPointages = [];
 
-        // --- GESTION DE L'HORLOGE ET NOTIFICATIONS ---
+        // Horloge et Toast
         function updateClock() {
             const now = new Date();
-            document.getElementById('time-display').textContent = now.toLocaleTimeString('fr-FR', { 
-                hour: '2-digit', minute: '2-digit', second: '2-digit' 
-            });
-            document.getElementById('date-display').textContent = now.toLocaleDateString('fr-FR', { 
-                weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' 
-            });
+            document.getElementById('time-display').textContent = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            document.getElementById('date-display').textContent = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
         }
-        setInterval(updateClock, 1000);
-        updateClock();
+        setInterval(updateClock, 1000); updateClock();
 
-        function showToast(message) {
+        function showToast(message, isError = false) {
             const toast = document.getElementById('toast');
             toast.textContent = message;
-            toast.classList.remove('hidden');
-            setTimeout(() => {
-                toast.classList.add('hidden');
-            }, 3000);
+            toast.className = `fixed bottom-4 right-4 text-white px-6 py-3 rounded-xl shadow-lg animate-slide-in z-50 ${isError ? 'bg-red-500' : 'bg-teal-500'}`;
+            setTimeout(() => toast.classList.add('hidden'), 3000);
         }
 
         // --- 2. AUTHENTIFICATION ---
@@ -286,33 +262,22 @@
                 if (error) throw error;
                 initialiserApp(data.user);
                 showToast('Connexion réussie !');
-            } catch (error) {
-                alert('Erreur de connexion : ' + error.message);
-            }
+            } catch (error) { alert('Erreur de connexion : ' + error.message); }
         };
 
-        window.logout = async function() {
-            await supaClient.auth.signOut();
-            location.reload();
-        };
+        window.logout = async function() { await supaClient.auth.signOut(); location.reload(); };
 
         window.onload = async () => {
             const { data: { user } } = await supaClient.auth.getUser();
-            if (user) {
-                initialiserApp(user);
-            }
+            if (user) initialiserApp(user);
         };
 
         function initialiserApp(user) {
             currentUser = user;
-            
-            // Affichage du profil utilisateur
-            const initials = user.email.substring(0, 2).toUpperCase();
-            document.getElementById('user-initials').textContent = initials;
+            document.getElementById('user-initials').textContent = user.email.substring(0, 2).toUpperCase();
             document.getElementById('user-name').textContent = user.email.split('@')[0];
             document.getElementById('user-email').textContent = user.email;
             
-            // Basculer l'affichage
             document.getElementById('auth-section').classList.add('hidden');
             document.getElementById('app-section').classList.remove('hidden');
             document.getElementById('app-section').classList.add('flex');
@@ -321,37 +286,24 @@
             initCalendar();
         }
 
-        // --- 3. POINTAGES, HISTORIQUE ET MODIFICATION ---
+        // --- 3. POINTAGES : AJOUT, MODIFICATION, SUPPRESSION ---
         async function chargerHistoriqueJour() {
-            const debutJour = new Date();
-            debutJour.setHours(0, 0, 0, 0);
+            const debutJour = new Date(); debutJour.setHours(0, 0, 0, 0);
 
-            const { data, error } = await supaClient
-                .from('pointages')
-                .select('*')
-                .eq('user_id', currentUser.id)
-                .gte('timestamp', debutJour.toISOString())
-                .order('timestamp', { ascending: true });
+            const { data, error } = await supaClient.from('pointages').select('*')
+                .eq('user_id', currentUser.id).gte('timestamp', debutJour.toISOString()).order('timestamp', { ascending: true });
             
-            if (error) {
-                console.error(error);
-                return;
-            }
+            if (error) return console.error(error);
 
-            currentPointages = data || [];
             const conteneur = document.getElementById('historique-jour');
             conteneur.innerHTML = '';
 
-            if(currentPointages.length > 0) {
-                calculerStatistiques(currentPointages);
+            if(data && data.length > 0) {
+                calculerStatistiques(data);
                 
-                currentPointages.forEach(p => {
+                data.forEach(p => {
                     const heure = new Date(p.timestamp).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
-                    
-                    let label = p.type_action;
-                    let icon = '';
-                    let couleur = "text-gray-800";
-                    let bg = "bg-gray-50";
+                    let label = p.type_action; let icon = ''; let couleur = "text-gray-800"; let bg = "bg-gray-50";
 
                     if(label === 'arrivee') { label = "Prise de poste"; couleur = "text-teal-600"; icon = '🟢'; bg = "bg-teal-50"; }
                     if(label === 'pause') { label = "Pause"; couleur = "text-orange-500"; icon = '⏸️'; bg = "bg-orange-50"; }
@@ -359,12 +311,11 @@
 
                     conteneur.innerHTML += `
                         <div class="flex justify-between items-center py-3 px-4 border-b border-gray-100 ${bg} rounded-lg animate-slide-in">
-                            <div class="font-medium ${couleur} capitalize flex items-center gap-2">
-                                <span>${icon}</span> ${label}
-                            </div>
+                            <div class="font-medium ${couleur} capitalize flex items-center gap-2"><span>${icon}</span> ${label}</div>
                             <div class="flex items-center gap-3">
                                 <div class="text-gray-500 text-sm font-mono">${heure}</div>
-                                <button onclick="modifierPointage('${p.id}', '${p.timestamp}')" class="text-gray-400 hover:text-teal-600 transition" title="Modifier l'heure">✏️</button>
+                                <button onclick="modifierPointage('${p.id}', '${p.timestamp}')" class="text-blue-500 hover:text-blue-700 transition" title="Modifier l'heure">✏️</button>
+                                <button onclick="supprimerPointage('${p.id}')" class="text-red-400 hover:text-red-600 transition" title="Supprimer">🗑️</button>
                             </div>
                         </div>`;
                 });
@@ -376,44 +327,14 @@
             }
         }
 
-        function formaterDuree(diffMs) {
-            const totalMinutes = Math.floor(diffMs / 60000);
-            const heures = Math.floor(totalMinutes / 60);
-            const minutes = totalMinutes % 60;
-            return `${heures}h${minutes.toString().padStart(2, '0')}`;
-        }
-
-        function calculerStatistiques(pointages) {
-            let arrivee = null;
-            let depart = null;
-            let pauses = 0;
-            let statut = '--';
-
-            pointages.forEach(p => {
-                if (p.type_action === 'arrivee') { arrivee = new Date(p.timestamp); statut = 'En poste'; }
-                if (p.type_action === 'pause') { pauses++; }
-                if (p.type_action === 'depart') { depart = new Date(p.timestamp); statut = 'Terminé'; }
-            });
-            
-            if (arrivee && depart) {
-                document.getElementById('stat-heures').textContent = formaterDuree(depart - arrivee);
-            } else if (arrivee && !depart) {
-                document.getElementById('stat-heures').textContent = formaterDuree(new Date() - arrivee);
-            }
-            
-            document.getElementById('stat-pauses').textContent = pauses;
-            document.getElementById('stat-statut').textContent = statut;
-        }
-
         window.pointer = async function(type) {
             if (!currentUser) return;
             try {
-                await supaClient.from('pointages').insert([{ user_id: currentUser.id, type_action: type }]);
+                const { error } = await supaClient.from('pointages').insert([{ user_id: currentUser.id, type_action: type }]);
+                if (error) throw error;
                 chargerHistoriqueJour();
                 showToast('Pointage enregistré');
-            } catch (error) {
-                alert('Erreur : ' + error.message);
-            }
+            } catch (error) { showToast('Erreur : ' + error.message, true); }
         };
 
         window.modifierPointage = async function(id, ancienneDateStr) {
@@ -429,43 +350,64 @@
             const nouvelleDate = new Date(ancienneDateStr);
             nouvelleDate.setHours(h, m, 0, 0);
 
-            const { error } = await supaClient.from('pointages').update({ timestamp: nouvelleDate.toISOString() }).eq('id', id);
-            
-            if (!error) {
+            try {
+                const { error } = await supaClient.from('pointages').update({ timestamp: nouvelleDate.toISOString() }).eq('id', id);
+                if (error) throw error;
                 chargerHistoriqueJour();
                 showToast("Heure modifiée !");
-            }
+            } catch (error) { showToast("Erreur modification : " + error.message, true); }
         };
+
+        window.supprimerPointage = async function(id) {
+            if(!confirm("Voulez-vous vraiment supprimer ce pointage ?")) return;
+            try {
+                const { error } = await supaClient.from('pointages').delete().eq('id', id);
+                if (error) throw error;
+                chargerHistoriqueJour();
+                showToast("Pointage supprimé !");
+            } catch (error) { showToast("Erreur suppression : " + error.message, true); }
+        };
+
+        function formaterDuree(diffMs) {
+            const totalMinutes = Math.floor(diffMs / 60000);
+            const heures = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            return `${heures}h${minutes.toString().padStart(2, '0')}`;
+        }
+
+        function calculerStatistiques(pointages) {
+            let arrivee = null; let depart = null; let pauses = 0; let statut = '--';
+            pointages.forEach(p => {
+                if (p.type_action === 'arrivee') { arrivee = new Date(p.timestamp); statut = 'En poste'; }
+                if (p.type_action === 'pause') { pauses++; }
+                if (p.type_action === 'depart') { depart = new Date(p.timestamp); statut = 'Terminé'; }
+            });
+            
+            if (arrivee && depart) document.getElementById('stat-heures').textContent = formaterDuree(depart - arrivee);
+            else if (arrivee && !depart) document.getElementById('stat-heures').textContent = formaterDuree(new Date() - arrivee);
+            
+            document.getElementById('stat-pauses').textContent = pauses;
+            document.getElementById('stat-statut').textContent = statut;
+        }
 
         // --- 4. SOLDES & ABSENCES ---
         async function chargerSoldesEtCalculs(absencesVues) {
-            // .maybeSingle() évite l'erreur fatale si la table est vide pour cet utilisateur
             let { data: params } = await supaClient.from('parametres').select('*').eq('user_id', currentUser.id).maybeSingle();
-            
-            if(!params) {
-                params = { cp_initial: 25, rtt_initial: 15 };
-            }
+            if(!params) params = { cp_initial: 25, rtt_initial: 15 };
 
-            let cpConsommes = 0;
-            let rttConsommes = 0;
-            let joursNovFev = 0;
+            let cpConsommes = 0; let rttConsommes = 0; let joursNovFev = 0;
 
             absencesVues.forEach(abs => {
-                const debut = new Date(abs.date_debut);
-                const fin = new Date(abs.date_fin);
+                const debut = new Date(abs.date_debut); const fin = new Date(abs.date_fin);
                 const diffJours = Math.round((fin - debut) / (1000 * 60 * 60 * 24)) + 1; 
 
                 if(abs.type_absence === 'CP') {
                     cpConsommes += diffJours;
                     for (let j = new Date(debut); j <= fin; j.setDate(j.getDate() + 1)) {
-                        if([10, 11, 0, 1].includes(j.getMonth())) {
-                            joursNovFev++;
-                        }
+                        if([10, 11, 0, 1].includes(j.getMonth())) joursNovFev++;
                     }
                 }
-                if(abs.type_absence === 'RTT') {
-                    rttConsommes += diffJours;
-                }
+                if(abs.type_absence === 'RTT') rttConsommes += diffJours;
             });
 
             const cpRestants = params.cp_initial - cpConsommes;
@@ -477,17 +419,12 @@
             if(rttRestants > 0) {
                 document.getElementById('alerte-rtt').textContent = rttRestants + ' à poser !';
                 document.getElementById('alerte-rtt').classList.remove('hidden');
-            } else {
-                document.getElementById('alerte-rtt').classList.add('hidden');
-            }
+            } else { document.getElementById('alerte-rtt').classList.add('hidden'); }
 
             let fractionnement = 0;
-            if (joursNovFev >= 8) fractionnement = 2;
-            else if (joursNovFev >= 6) fractionnement = 1;
-            
+            if (joursNovFev >= 8) fractionnement = 2; else if (joursNovFev >= 6) fractionnement = 1;
             document.getElementById('cpt-fractionnement').textContent = `+${fractionnement} j`;
             
-            // Calcul estimatif des heures sup
             const minutesSup = Math.max(0, (cpRestants * 7 * 60) - (35 * 60));
             document.getElementById('cpt-heures').textContent = formaterDuree(minutesSup * 60000);
         }
@@ -496,13 +433,8 @@
         function initCalendar() {
             const calendarEl = document.getElementById('calendar');
             calendar = new FullCalendar.Calendar(calendarEl, {
-                initialView: 'dayGridMonth',
-                locale: 'fr',
-                headerToolbar: {
-                    left: 'prev,next today',
-                    center: 'title',
-                    right: 'dayGridMonth,timeGridWeek'
-                },
+                initialView: 'dayGridMonth', locale: 'fr',
+                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
                 events: async function(info, successCallback, failureCallback) {
                     const { data, error } = await supaClient.from('absences').select('*').eq('user_id', currentUser.id);
                     if (error) return failureCallback(error);
@@ -515,14 +447,7 @@
                         if(abs.type_absence === 'Maladie') color = '#ef4444';
                         if(abs.type_absence === 'RTT') color = '#8b5cf6';
                         if(abs.type_absence === 'Formation') color = '#f59e0b';
-                        
-                        return {
-                            title: abs.type_absence,
-                            start: abs.date_debut,
-                            end: new Date(new Date(abs.date_fin).getTime() + 86400000).toISOString().split('T')[0],
-                            backgroundColor: color,
-                            borderColor: color
-                        };
+                        return { title: abs.type_absence, start: abs.date_debut, end: new Date(new Date(abs.date_fin).getTime() + 86400000).toISOString().split('T')[0], backgroundColor: color, borderColor: color };
                     });
                     successCallback(events);
                 }
@@ -530,94 +455,57 @@
         }
 
         window.switchTab = function(tabName) {
-            document.getElementById('view-pointage').classList.remove('flex');
-            document.getElementById('view-pointage').classList.add('hidden');
-            
-            document.getElementById('view-planning').classList.remove('flex');
-            document.getElementById('view-planning').classList.add('hidden');
-            
-            document.getElementById('btn-pointage').classList.remove('bg-teal-50', 'text-teal-700');
-            document.getElementById('btn-planning').classList.remove('bg-teal-50', 'text-teal-700');
+            document.getElementById('view-pointage').classList.add('hidden'); document.getElementById('view-pointage').classList.remove('flex');
+            document.getElementById('view-planning').classList.add('hidden'); document.getElementById('view-planning').classList.remove('flex');
+            document.getElementById('btn-pointage').classList.remove('bg-teal-50', 'text-teal-700'); document.getElementById('btn-planning').classList.remove('bg-teal-50', 'text-teal-700');
 
             if (tabName === 'pointage') {
-                document.getElementById('view-pointage').classList.remove('hidden');
-                document.getElementById('view-pointage').classList.add('flex');
+                document.getElementById('view-pointage').classList.remove('hidden'); document.getElementById('view-pointage').classList.add('flex');
                 document.getElementById('btn-pointage').classList.add('bg-teal-50', 'text-teal-700');
                 chargerHistoriqueJour();
             } else {
-                document.getElementById('view-planning').classList.remove('hidden');
-                document.getElementById('view-planning').classList.add('flex');
+                document.getElementById('view-planning').classList.remove('hidden'); document.getElementById('view-planning').classList.add('flex');
                 document.getElementById('btn-planning').classList.add('bg-teal-50', 'text-teal-700');
                 if(calendar) calendar.render();
             }
         };
 
-        // --- 6. MODALES ET SAUVEGARDES ---
+        // --- 6. MODALES ---
         window.ouvrirModalAbsence = () => {
             document.getElementById('modal-absence').classList.remove('hidden');
             const today = new Date().toISOString().split('T')[0];
-            document.getElementById('date_debut').value = today;
-            document.getElementById('date_fin').value = today;
+            document.getElementById('date_debut').value = today; document.getElementById('date_fin').value = today;
         };
-        
-        window.fermerModalAbsence = () => {
-            document.getElementById('modal-absence').classList.add('hidden');
-        };
+        window.fermerModalAbsence = () => document.getElementById('modal-absence').classList.add('hidden');
         
         window.sauvegarderAbsence = async () => {
             const type = document.getElementById('type_absence').value;
-            const dateDebut = document.getElementById('date_debut').value;
-            const dateFin = document.getElementById('date_fin').value;
-            
+            const dateDebut = document.getElementById('date_debut').value; const dateFin = document.getElementById('date_fin').value;
             if (!dateDebut || !dateFin) return alert('Veuillez sélectionner les dates');
             
             try {
-                await supaClient.from('absences').insert([{ 
-                    user_id: currentUser.id, 
-                    type_absence: type, 
-                    date_debut: dateDebut, 
-                    date_fin: dateFin 
-                }]);
-                fermerModalAbsence();
-                calendar.refetchEvents();
-                showToast('Absence déclarée !');
-            } catch (error) {
-                alert('Erreur : ' + error.message);
-            }
+                const { error } = await supaClient.from('absences').insert([{ user_id: currentUser.id, type_absence: type, date_debut: dateDebut, date_fin: dateFin }]);
+                if (error) throw error;
+                fermerModalAbsence(); calendar.refetchEvents(); showToast('Absence déclarée !');
+            } catch (error) { showToast('Erreur ajout absence : ' + error.message, true); }
         };
 
         window.ouvrirModalParametres = async () => {
             const { data } = await supaClient.from('parametres').select('*').eq('user_id', currentUser.id).maybeSingle();
-            if(data) {
-                document.getElementById('input_cp').value = data.cp_initial;
-                document.getElementById('input_rtt').value = data.rtt_initial;
-            }
+            if(data) { document.getElementById('input_cp').value = data.cp_initial; document.getElementById('input_rtt').value = data.rtt_initial; }
             document.getElementById('modal-parametres').classList.remove('hidden');
         };
-        
-        window.fermerModalParametres = () => {
-            document.getElementById('modal-parametres').classList.add('hidden');
-        };
+        window.fermerModalParametres = () => document.getElementById('modal-parametres').classList.add('hidden');
         
         window.sauvegarderParametres = async () => {
-            const cp = parseInt(document.getElementById('input_cp').value);
-            const rtt = parseInt(document.getElementById('input_rtt').value);
-            
+            const cp = parseInt(document.getElementById('input_cp').value); const rtt = parseInt(document.getElementById('input_rtt').value);
             try {
-                await supaClient.from('parametres').upsert({ 
-                    user_id: currentUser.id, 
-                    cp_initial: cp, 
-                    rtt_initial: rtt 
-                });
-                fermerModalParametres();
-                calendar.refetchEvents();
-                showToast('Paramètres mis à jour !');
-            } catch (error) {
-                alert('Erreur : ' + error.message);
-            }
+                const { error } = await supaClient.from('parametres').upsert({ user_id: currentUser.id, cp_initial: cp, rtt_initial: rtt });
+                if (error) throw error;
+                fermerModalParametres(); calendar.refetchEvents(); showToast('Soldes mis à jour !');
+            } catch (error) { showToast('Erreur sauvegarde soldes : ' + error.message, true); }
         };
     </script>
 </body>
 </html>
-
 

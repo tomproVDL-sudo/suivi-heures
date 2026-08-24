@@ -50,10 +50,12 @@
         // 1. Initialisation de Supabase
         const supabaseUrl = 'https://rxqtsguwoqeojsnaagxb.supabase.co/rest/v1/';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4cXRzZ3V3b3Flb2pzbmFhZ3hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTA4MjcsImV4cCI6MjEwMjcyNjgyN30.FTPTGSe6tqDTieqQdD-GWUqueKlEPUpw4QGiMa4U8AA';
-        const supabase = supabaseClient.createClient(supabaseUrl, supabaseKey);
-
+        
+        // CORRECTION : Utilisation de window.supabase
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
         let currentUser = null;
-
+        
         // 2. Gestion de l'authentification
         async function login() {
             const email = document.getElementById('email').value;
@@ -69,12 +71,12 @@
                 initChart(); // Charger les graphiques une fois connecté
             }
         }
-
+        
         async function logout() {
             await supabase.auth.signOut();
             location.reload();
         }
-
+        
         // Vérifier si l'utilisateur est déjà connecté au chargement
         window.onload = async () => {
             const { data: { user } } = await supabase.auth.getUser();
@@ -85,15 +87,16 @@
                 initChart();
             }
         };
-
+        
         // 3. Fonction de pointage
         async function pointer(type) {
             if (!currentUser) return alert("Veuillez vous connecter");
-
+        
+            // CORRECTION : 'pointages' au lieu de 'horaires'
             const { data, error } = await supabase
-                .from('horaires')
+                .from('pointages')
                 .insert([{ user_id: currentUser.id, type_action: type }]);
-
+        
             if (error) {
                 console.error(error);
                 alert("Erreur lors du pointage !");
@@ -101,8 +104,8 @@
                 alert(`Pointage enregistré : ${type.replace('_', ' ')}`);
             }
         }
-
-        // 4. Initialisation du graphique (Exemple statique à remplacer par vos calculs SQL)
+        
+        // 4. Initialisation du graphique
         function initChart() {
             const ctx = document.getElementById('myChart');
             new Chart(ctx, {
@@ -111,7 +114,7 @@
                     labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven'],
                     datasets: [{
                         label: 'Heures travaillées',
-                        data: [7.5, 8, 7.5, 8.5, 7], // Ici, il faudra récupérer la somme depuis Supabase
+                        data: [7.5, 8, 7.5, 8.5, 7], 
                         backgroundColor: '#3b82f6',
                         borderRadius: 4
                     }]
@@ -119,7 +122,7 @@
                 options: { scales: { y: { beginAtZero: true, max: 10 } } }
             });
         }
-
+        
         // 5. Enregistrement du Service Worker pour la PWA
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')

@@ -46,21 +46,24 @@
         </div>
     </div>
 
+
     <script>
-        // 1. Initialisation de Supabase
+        // 1. Initialisation
+        // ATTENTION : Conservez bien les guillemets simples ' autour des valeurs
         const supabaseUrl = 'https://rxqtsguwoqeojsnaagxb.supabase.co/rest/v1/';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4cXRzZ3V3b3Flb2pzbmFhZ3hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTA4MjcsImV4cCI6MjEwMjcyNjgyN30.FTPTGSe6tqDTieqQdD-GWUqueKlEPUpw4QGiMa4U8AA';
         
-        // CORRECTION : Utilisation de window.supabase
-        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-        
+
+        // Utilisation d'un nom spécifique (supaClient) pour éviter les conflits
+        const supaClient = window.supabase.createClient(supabaseUrl, supabaseKey);
         let currentUser = null;
-        
-        // 2. Gestion de l'authentification
-        async function login() {
+
+        // 2. Gestion de l'authentification (Attachée à window pour être 100% trouvée par le bouton)
+        window.login = async function() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            
+            const { data, error } = await supaClient.auth.signInWithPassword({ email, password });
             
             if (error) {
                 alert("Erreur de connexion : " + error.message);
@@ -68,18 +71,18 @@
                 currentUser = data.user;
                 document.getElementById('auth-section').classList.add('hidden');
                 document.getElementById('app-section').classList.remove('hidden');
-                initChart(); // Charger les graphiques une fois connecté
+                initChart(); 
             }
-        }
-        
-        async function logout() {
-            await supabase.auth.signOut();
+        };
+
+        window.logout = async function() {
+            await supaClient.auth.signOut();
             location.reload();
-        }
-        
-        // Vérifier si l'utilisateur est déjà connecté au chargement
+        };
+
+        // Vérification automatique au chargement de la page
         window.onload = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { user } } = await supaClient.auth.getUser();
             if (user) {
                 currentUser = user;
                 document.getElementById('auth-section').classList.add('hidden');
@@ -87,25 +90,24 @@
                 initChart();
             }
         };
-        
+
         // 3. Fonction de pointage
-        async function pointer(type) {
+        window.pointer = async function(type) {
             if (!currentUser) return alert("Veuillez vous connecter");
-        
-            // CORRECTION : 'pointages' au lieu de 'horaires'
-            const { data, error } = await supabase
+
+            const { data, error } = await supaClient
                 .from('pointages')
                 .insert([{ user_id: currentUser.id, type_action: type }]);
-        
+
             if (error) {
                 console.error(error);
                 alert("Erreur lors du pointage !");
             } else {
                 alert(`Pointage enregistré : ${type.replace('_', ' ')}`);
             }
-        }
-        
-        // 4. Initialisation du graphique
+        };
+
+        // 4. Graphique
         function initChart() {
             const ctx = document.getElementById('myChart');
             new Chart(ctx, {
@@ -122,12 +124,12 @@
                 options: { scales: { y: { beginAtZero: true, max: 10 } } }
             });
         }
-        
-        // 5. Enregistrement du Service Worker pour la PWA
+
+        // 5. Service Worker (pour plus tard)
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
                 .then(() => console.log('Service Worker enregistré !'))
-                .catch(err => console.error('Erreur Service Worker', err));
+                .catch(err => console.log('Pas de Service worker pour le moment.'));
         }
     </script>
 </body>

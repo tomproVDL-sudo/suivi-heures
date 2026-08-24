@@ -12,52 +12,41 @@
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 
     <style>
-        .fc { font-family: inherit; }
+        .fc { font-family: inherit; cursor: pointer; }
         .fc-button-primary { background-color: #14b8a6 !important; border-color: #14b8a6 !important; }
         .fc-button-primary:hover { background-color: #0d9488 !important; border-color: #0d9488 !important; }
         .fc-button-active { background-color: #0f766e !important; }
+        .fc-event { transition: transform 0.2s; }
+        .fc-event:hover { transform: scale(1.02); z-index: 10; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
         
         @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .animate-slide-in { animation: slideIn 0.3s ease-out; }
-        
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #14b8a6; border-radius: 3px; }
-        
         .btn-primary { transition: all 0.2s ease; }
         .btn-primary:active { transform: scale(0.95); }
-        .btn-primary:hover { box-shadow: 0 10px 20px rgba(20, 184, 166, 0.3); }
     </style>
 </head>
 <body class="bg-gradient-to-br from-teal-50 to-gray-100 min-h-screen flex items-center justify-center p-2 md:p-6 font-sans">
 
-    <!-- ECRAN DE CONNEXION -->
+    <!-- CONNEXION -->
     <div id="auth-section" class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md animate-slide-in">
         <div class="text-center mb-8">
             <div class="text-teal-500 text-5xl mb-4">⏱️</div>
             <h2 class="text-3xl font-bold text-gray-800">Mon SIRH</h2>
-            <p class="text-gray-500 mt-2">Gestion du temps de travail</p>
         </div>
-        
         <div class="space-y-4">
-            <div>
-                <label class="text-sm font-medium text-gray-700 mb-1 block">Email</label>
-                <input type="email" id="email" placeholder="votre@email.com" class="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 transition">
-            </div>
-            <div>
-                <label class="text-sm font-medium text-gray-700 mb-1 block">Mot de passe</label>
-                <input type="password" id="password" placeholder="••••••••" class="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 transition">
-            </div>
-            <button onclick="login()" class="w-full bg-teal-500 text-white font-bold py-3 rounded-xl hover:bg-teal-600 transition shadow-lg btn-primary">
-                Se connecter
-            </button>
+            <input type="email" id="email" placeholder="Email" class="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500">
+            <input type="password" id="password" placeholder="Mot de passe" class="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500">
+            <button onclick="login()" class="w-full bg-teal-500 text-white font-bold py-3 rounded-xl hover:bg-teal-600 transition btn-primary">Se connecter</button>
         </div>
     </div>
 
-    <!-- INTERFACE PRINCIPALE -->
+    <!-- APP -->
     <div id="app-section" class="hidden w-full max-w-6xl bg-white md:rounded-3xl shadow-2xl flex-col md:flex-row overflow-hidden min-h-[90vh]">
         
-        <!-- BARRE LATERALE (MENU) -->
+        <!-- MENU -->
         <div class="md:w-72 bg-gray-50 border-r border-gray-200 p-6 flex flex-col">
             <div class="flex items-center gap-3 mb-8">
                 <div id="user-initials" class="w-12 h-12 bg-teal-500 rounded-xl flex items-center justify-center text-white text-2xl font-bold">--</div>
@@ -69,16 +58,13 @@
 
             <nav class="flex flex-col gap-2 mb-6">
                 <button onclick="switchTab('pointage')" id="btn-pointage" class="flex items-center gap-3 p-3 rounded-xl bg-teal-50 text-teal-700 font-medium transition hover:bg-teal-100">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Pointage du jour
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Pointage
                 </button>
                 <button onclick="switchTab('planning')" id="btn-planning" class="flex items-center gap-3 p-3 rounded-xl text-gray-600 hover:bg-gray-100 font-medium transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                    Planning & Congés
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg> Planning
                 </button>
                 <button onclick="logout()" class="flex items-center gap-3 p-3 rounded-xl text-red-600 hover:bg-red-50 font-medium transition mt-4">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                    Déconnexion
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg> Déconnexion
                 </button>
             </nav>
 
@@ -86,9 +72,6 @@
                 <div class="bg-white rounded-xl p-4 shadow-sm text-center">
                     <div id="date-display" class="text-gray-500 text-sm font-medium capitalize mb-1"></div>
                     <div id="time-display" class="text-4xl font-bold text-teal-600 tracking-tight"></div>
-                    <div class="mt-3 flex justify-center gap-2">
-                        <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">● En ligne</span>
-                    </div>
                 </div>
             </div>
         </div>
@@ -96,126 +79,103 @@
         <!-- ZONE DROITE -->
         <div class="flex-1 flex flex-col p-4 md:p-8 relative">
             
-            <!-- VUE 1 : POINTAGE -->
+            <!-- VUE POINTAGE -->
             <div id="view-pointage" class="flex-1 flex flex-col">
-                <div class="flex flex-col items-center mt-2 mb-6">
-                    <h2 class="text-2xl font-medium text-gray-800">Suivi d'activité</h2>
-                    <span class="text-sm text-gray-500">Aujourd'hui</span>
-                </div>
-
+                <h2 class="text-2xl font-medium text-gray-800 text-center mb-6">Suivi d'activité</h2>
+                
                 <div class="grid grid-cols-3 gap-4 mb-6">
-                    <div class="bg-teal-50 p-4 rounded-xl text-center">
-                        <div class="text-2xl font-bold text-teal-600" id="stat-heures">0h00</div>
-                        <div class="text-xs text-gray-600 mt-1">Heures travaillées</div>
-                    </div>
-                    <div class="bg-orange-50 p-4 rounded-xl text-center">
-                        <div class="text-2xl font-bold text-orange-600" id="stat-pauses">0</div>
-                        <div class="text-xs text-gray-600 mt-1">Pauses prises</div>
-                    </div>
-                    <div class="bg-blue-50 p-4 rounded-xl text-center">
-                        <div class="text-2xl font-bold text-blue-600" id="stat-statut">--</div>
-                        <div class="text-xs text-gray-600 mt-1">Statut actuel</div>
-                    </div>
+                    <div class="bg-teal-50 p-4 rounded-xl text-center"><div class="text-2xl font-bold text-teal-600" id="stat-heures">0h00</div><div class="text-xs text-gray-600">Travaillé</div></div>
+                    <div class="bg-orange-50 p-4 rounded-xl text-center"><div class="text-2xl font-bold text-orange-600" id="stat-pauses">0</div><div class="text-xs text-gray-600">Pauses</div></div>
+                    <div class="bg-blue-50 p-4 rounded-xl text-center"><div class="text-2xl font-bold text-blue-600" id="stat-statut">--</div><div class="text-xs text-gray-600">Statut</div></div>
                 </div>
 
-                <div class="flex-1 overflow-y-auto custom-scrollbar mb-6 px-2 space-y-2 border-t border-b border-gray-100 py-4" id="historique-jour">
-                    <div class="flex justify-center items-center h-full text-gray-400">Chargement de l'historique...</div>
-                </div>
+                <div class="flex-1 overflow-y-auto custom-scrollbar mb-6 px-2 space-y-2 border-t border-b border-gray-100 py-4" id="historique-jour"></div>
 
                 <div class="grid grid-cols-3 gap-3 md:gap-4 mt-auto">
-                    <button onclick="pointer('arrivee')" class="btn-primary bg-teal-500 hover:bg-teal-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md">
-                        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                        <span class="text-sm md:text-base font-medium">Arrivée</span>
-                    </button>
-                    <button onclick="pointer('pause')" class="btn-primary bg-orange-500 hover:bg-orange-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md">
-                        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        <span class="text-sm md:text-base font-medium">Pause</span>
-                    </button>
-                    <button onclick="pointer('depart')" class="btn-primary bg-slate-500 hover:bg-slate-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md">
-                        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                        <span class="text-sm md:text-base font-medium">Départ</span>
-                    </button>
+                    <button onclick="pointer('arrivee')" class="btn-primary bg-teal-500 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center shadow-md"><span class="font-medium">Arrivée</span></button>
+                    <button onclick="pointer('pause')" class="btn-primary bg-orange-500 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center shadow-md"><span class="font-medium">Pause</span></button>
+                    <button onclick="pointer('depart')" class="btn-primary bg-slate-500 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center shadow-md"><span class="font-medium">Départ</span></button>
                 </div>
             </div>
 
-            <!-- VUE 2 : PLANNING -->
+            <!-- VUE PLANNING -->
             <div id="view-planning" class="hidden flex-1 flex flex-col h-full">
-                
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-800">Mes soldes et congés</h3>
-                        <p class="text-sm text-gray-500">Gérez vos absences et visualisez votre planning</p>
-                    </div>
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-semibold text-gray-800">Mes soldes et congés</h3>
                     <div class="flex gap-2">
-                        <button onclick="ouvrirModalAbsence()" class="bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:bg-slate-700 transition">
-                            + Déclarer une absence
-                        </button>
-                        <button onclick="ouvrirModalParametres()" class="text-sm text-teal-600 hover:underline flex items-center gap-1 py-2.5 px-4">
-                            ⚙️ Mes soldes
-                        </button>
+                        <button onclick="ouvrirModalAbsence()" class="bg-slate-800 text-white font-bold py-2 px-4 rounded-xl shadow-md hover:bg-slate-700 transition">+ Déclarer</button>
+                        <button onclick="ouvrirModalParametres()" class="text-sm text-teal-600 hover:underline py-2 px-4">⚙️ Mes paramètres</button>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div class="bg-gradient-to-br from-teal-50 to-teal-100 p-4 rounded-xl border border-teal-200">
-                        <div class="text-xs text-teal-600 font-bold uppercase mb-1">Heures Sup</div>
-                        <div class="text-2xl font-bold text-teal-700" id="cpt-heures">--</div>
+                    <div class="bg-teal-50 p-4 rounded-xl border border-teal-200"><div class="text-xs text-teal-600 font-bold uppercase mb-1">Heures Sup estim.</div><div class="text-2xl font-bold text-teal-700" id="cpt-heures">--</div></div>
+                    <div class="bg-gray-50 p-4 rounded-xl border border-gray-200"><div class="text-xs text-gray-500 font-bold uppercase mb-1">CP Restants</div><div class="text-2xl font-bold text-gray-800" id="cpt-cp">-- j</div></div>
+                    <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 relative">
+                        <div class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full animate-pulse hidden" id="alerte-rtt">À poser !</div>
+                        <div class="text-xs text-blue-600 font-bold uppercase mb-1">RTT Restants</div><div class="text-2xl font-bold text-blue-800" id="cpt-rtt">-- j</div>
                     </div>
-                    <div class="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl border border-gray-200">
-                        <div class="text-xs text-gray-500 font-bold uppercase mb-1">CP Restants</div>
-                        <div class="text-2xl font-bold text-gray-800" id="cpt-cp">-- j</div>
-                    </div>
-                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 relative">
-                        <div class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full animate-pulse hidden" id="alerte-rtt">1 à poser !</div>
-                        <div class="text-xs text-blue-600 font-bold uppercase mb-1">RTT Restants</div>
-                        <div class="text-2xl font-bold text-blue-800" id="cpt-rtt">-- j</div>
-                    </div>
-                    <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200">
-                        <div class="text-xs text-purple-600 font-bold uppercase mb-1">Fractionnement</div>
-                        <div class="text-2xl font-bold text-purple-800" id="cpt-fractionnement">+0 j</div>
-                    </div>
+                    <div class="bg-purple-50 p-4 rounded-xl border border-purple-200"><div class="text-xs text-purple-600 font-bold uppercase mb-1">Fractionnement</div><div class="text-2xl font-bold text-purple-800" id="cpt-fractionnement">+0 j</div></div>
                 </div>
 
                 <div id="calendar" class="flex-1 min-h-[400px] shadow-lg rounded-xl border border-gray-200 p-2"></div>
             </div>
-            
         </div>
     </div>
 
-    <!-- MODAL : ABSENCE -->
+    <!-- MODAL : GESTION ABSENCE -->
     <div id="modal-absence" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-slide-in">
-            <h3 class="text-xl font-bold mb-4">Nouvelle absence</h3>
-            <select id="type_absence" class="w-full p-3 border border-gray-300 rounded-xl mb-4 focus:outline-none focus:ring-2 focus:ring-teal-500">
+            <h3 class="text-xl font-bold mb-4" id="titre-modal-absence">Nouvelle absence</h3>
+            <input type="hidden" id="absence_id"> <!-- Stocke l'ID si on modifie -->
+            
+            <select id="type_absence" class="w-full p-3 border border-gray-300 rounded-xl mb-4 focus:ring-2 focus:ring-teal-500">
                 <option value="RTT">RTT</option>
                 <option value="CP">Congé Payé</option>
                 <option value="Maladie">Arrêt Maladie</option>
                 <option value="Formation">Formation</option>
-                <option value="Autre">Autre</option>
             </select>
+
+            <select id="moment_absence" class="w-full p-3 border border-gray-300 rounded-xl mb-4 focus:ring-2 focus:ring-teal-500" onchange="gererAffichageDates()">
+                <option value="journee">Journée(s) entière(s)</option>
+                <option value="matin">Demi-journée (Matin)</option>
+                <option value="aprem">Demi-journée (Après-midi)</option>
+            </select>
+
             <div class="grid grid-cols-2 gap-4 mb-6">
-                <div><label class="text-xs font-bold text-gray-500">Du</label><input type="date" id="date_debut" class="w-full p-2 border rounded-xl mt-1"></div>
+                <div><label class="text-xs font-bold text-gray-500">Du</label><input type="date" id="date_debut" class="w-full p-2 border rounded-xl mt-1" onchange="synchroniserDates()"></div>
                 <div><label class="text-xs font-bold text-gray-500">Au</label><input type="date" id="date_fin" class="w-full p-2 border rounded-xl mt-1"></div>
             </div>
-            <div class="flex gap-3">
+
+            <div class="flex gap-2">
                 <button onclick="fermerModalAbsence()" class="flex-1 bg-gray-200 font-bold py-3 rounded-xl hover:bg-gray-300">Annuler</button>
-                <button onclick="sauvegarderAbsence()" class="flex-1 bg-teal-500 text-white font-bold py-3 rounded-xl hover:bg-teal-600">Valider</button>
+                <button id="btn-supprimer-absence" onclick="supprimerAbsence()" class="hidden flex-1 bg-red-100 text-red-600 font-bold py-3 rounded-xl hover:bg-red-200">Supprimer</button>
+                <button onclick="sauvegarderAbsence()" class="flex-1 bg-teal-500 text-white font-bold py-3 rounded-xl hover:bg-teal-600" id="btn-sauvegarder-absence">Valider</button>
             </div>
         </div>
     </div>
 
     <!-- MODAL : PARAMETRES -->
     <div id="modal-parametres" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-slide-in">
-            <h3 class="text-xl font-bold mb-4">Mes Soldes de départ</h3>
-            <div class="mb-4">
-                <label class="text-xs font-bold text-gray-500 mb-1 block">Nombre de CP total</label>
-                <input type="number" id="input_cp" class="w-full p-3 border rounded-xl" value="25">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-slide-in max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <h3 class="text-xl font-bold mb-4">Mes Paramètres & Soldes</h3>
+            
+            <div class="p-4 bg-gray-50 rounded-xl mb-4">
+                <h4 class="font-bold text-gray-700 mb-3 text-sm">Contrat de travail</h4>
+                <div class="mb-3">
+                    <label class="text-xs font-bold text-gray-500 block">Base horaire hebdomadaire</label>
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="input_base_horaire" class="w-full p-2 border rounded-lg" value="39"> <span class="text-gray-500 font-bold">Heures</span>
+                    </div>
+                </div>
             </div>
-            <div class="mb-6">
-                <label class="text-xs font-bold text-gray-500 mb-1 block">Nombre de RTT total</label>
-                <input type="number" id="input_rtt" class="w-full p-3 border rounded-xl" value="15">
+
+            <div class="p-4 bg-gray-50 rounded-xl mb-6">
+                <h4 class="font-bold text-gray-700 mb-3 text-sm">Soldes initiaux acquis</h4>
+                <div class="mb-3"><label class="text-xs font-bold text-gray-500 block">Congés Payés</label><input type="number" id="input_cp" class="w-full p-2 border rounded-lg" value="25"></div>
+                <div><label class="text-xs font-bold text-gray-500 block">RTT</label><input type="number" id="input_rtt" class="w-full p-2 border rounded-lg" value="15"></div>
             </div>
+
             <div class="flex gap-3">
                 <button onclick="fermerModalParametres()" class="flex-1 bg-gray-200 font-bold py-3 rounded-xl hover:bg-gray-300">Annuler</button>
                 <button onclick="sauvegarderParametres()" class="flex-1 bg-teal-500 text-white font-bold py-3 rounded-xl hover:bg-teal-600">Enregistrer</button>
@@ -223,289 +183,228 @@
         </div>
     </div>
 
-    <!-- TOAST NOTIFICATION -->
-    <div id="toast" class="hidden fixed bottom-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-xl shadow-lg animate-slide-in z-50">
-        Opération réussie !
-    </div>
+    <!-- TOAST -->
+    <div id="toast" class="hidden fixed bottom-4 right-4 text-white px-6 py-3 rounded-xl shadow-lg z-50">...</div>
 
     <script>
-        // --- 1. CONFIGURATION SUPABASE ---
+        // --- 1. CONFIGURATION ---
         const supabaseUrl = 'https://rxqtsguwoqeojsnaagxb.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4cXRzZ3V3b3Flb2pzbmFhZ3hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTA4MjcsImV4cCI6MjEwMjcyNjgyN30.FTPTGSe6tqDTieqQdD-GWUqueKlEPUpw4QGiMa4U8AA';
      
         const supaClient = window.supabase.createClient(supabaseUrl, supabaseKey);
         
-        let currentUser = null;
-        let calendar = null;
+        let currentUser = null; let calendar = null;
 
-        // Horloge et Toast
-        function updateClock() {
+        // Horloge & Toast
+        setInterval(() => {
             const now = new Date();
-            document.getElementById('time-display').textContent = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            document.getElementById('date-display').textContent = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-        }
-        setInterval(updateClock, 1000); updateClock();
+            document.getElementById('time-display').textContent = now.toLocaleTimeString('fr-FR');
+            document.getElementById('date-display').textContent = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+        }, 1000);
 
-        function showToast(message, isError = false) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.className = `fixed bottom-4 right-4 text-white px-6 py-3 rounded-xl shadow-lg animate-slide-in z-50 ${isError ? 'bg-red-500' : 'bg-teal-500'}`;
-            setTimeout(() => toast.classList.add('hidden'), 3000);
+        function showToast(msg, isError = false) {
+            const t = document.getElementById('toast');
+            t.textContent = msg; t.className = `fixed bottom-4 right-4 text-white px-6 py-3 rounded-xl shadow-lg z-50 animate-slide-in ${isError ? 'bg-red-500' : 'bg-teal-600'}`;
+            setTimeout(() => t.classList.add('hidden'), 3000);
         }
 
         // --- 2. AUTHENTIFICATION ---
         window.login = async function() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
             try {
-                const { data, error } = await supaClient.auth.signInWithPassword({ email, password });
+                const { data, error } = await supaClient.auth.signInWithPassword({ email: document.getElementById('email').value, password: document.getElementById('password').value });
                 if (error) throw error;
                 initialiserApp(data.user);
-                showToast('Connexion réussie !');
-            } catch (error) { alert('Erreur de connexion : ' + error.message); }
+            } catch (e) { showToast(e.message, true); }
         };
-
-        window.logout = async function() { await supaClient.auth.signOut(); location.reload(); };
-
-        window.onload = async () => {
-            const { data: { user } } = await supaClient.auth.getUser();
-            if (user) initialiserApp(user);
-        };
+        window.logout = async () => { await supaClient.auth.signOut(); location.reload(); };
+        window.onload = async () => { const { data: { user } } = await supaClient.auth.getUser(); if (user) initialiserApp(user); };
 
         function initialiserApp(user) {
             currentUser = user;
             document.getElementById('user-initials').textContent = user.email.substring(0, 2).toUpperCase();
             document.getElementById('user-name').textContent = user.email.split('@')[0];
             document.getElementById('user-email').textContent = user.email;
-            
             document.getElementById('auth-section').classList.add('hidden');
-            document.getElementById('app-section').classList.remove('hidden');
+            document.getElementById('app-section').classList.remove('hidden', 'flex');
             document.getElementById('app-section').classList.add('flex');
-            
-            chargerHistoriqueJour();
-            initCalendar();
+            chargerHistoriqueJour(); initCalendar();
         }
 
-        // --- 3. POINTAGES : AJOUT, MODIFICATION, SUPPRESSION ---
+        // --- 3. POINTAGES ---
         async function chargerHistoriqueJour() {
-            const debutJour = new Date(); debutJour.setHours(0, 0, 0, 0);
-
-            const { data, error } = await supaClient.from('pointages').select('*')
-                .eq('user_id', currentUser.id).gte('timestamp', debutJour.toISOString()).order('timestamp', { ascending: true });
+            const debutJour = new Date(); debutJour.setHours(0,0,0,0);
+            const { data, error } = await supaClient.from('pointages').select('*').eq('user_id', currentUser.id).gte('timestamp', debutJour.toISOString()).order('timestamp', { ascending: true });
             
-            if (error) return console.error(error);
-
-            const conteneur = document.getElementById('historique-jour');
-            conteneur.innerHTML = '';
-
+            const conteneur = document.getElementById('historique-jour'); conteneur.innerHTML = '';
             if(data && data.length > 0) {
                 calculerStatistiques(data);
-                
                 data.forEach(p => {
                     const heure = new Date(p.timestamp).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
-                    let label = p.type_action; let icon = ''; let couleur = "text-gray-800"; let bg = "bg-gray-50";
-
-                    if(label === 'arrivee') { label = "Prise de poste"; couleur = "text-teal-600"; icon = '🟢'; bg = "bg-teal-50"; }
-                    if(label === 'pause') { label = "Pause"; couleur = "text-orange-500"; icon = '⏸️'; bg = "bg-orange-50"; }
-                    if(label === 'depart') { label = "Fin de poste"; couleur = "text-slate-600"; icon = '🔴'; bg = "bg-slate-50"; }
-
-                    conteneur.innerHTML += `
-                        <div class="flex justify-between items-center py-3 px-4 border-b border-gray-100 ${bg} rounded-lg animate-slide-in">
-                            <div class="font-medium ${couleur} capitalize flex items-center gap-2"><span>${icon}</span> ${label}</div>
-                            <div class="flex items-center gap-3">
-                                <div class="text-gray-500 text-sm font-mono">${heure}</div>
-                                <button onclick="modifierPointage('${p.id}', '${p.timestamp}')" class="text-blue-500 hover:text-blue-700 transition" title="Modifier l'heure">✏️</button>
-                                <button onclick="supprimerPointage('${p.id}')" class="text-red-400 hover:text-red-600 transition" title="Supprimer">🗑️</button>
-                            </div>
-                        </div>`;
+                    let l = p.type_action; let ic = ''; let c = "text-gray-800"; let b = "bg-gray-50";
+                    if(l === 'arrivee') { l="Prise de poste"; c="text-teal-600"; ic='🟢'; b="bg-teal-50"; }
+                    if(l === 'pause') { l="Pause"; c="text-orange-500"; ic='⏸️'; b="bg-orange-50"; }
+                    if(l === 'depart') { l="Fin de poste"; c="text-slate-600"; ic='🔴'; b="bg-slate-50"; }
+                    conteneur.innerHTML += `<div class="flex justify-between items-center py-3 px-4 border-b border-gray-100 ${b} rounded-lg mb-2"><div class="font-medium ${c}"><span>${ic}</span> ${l}</div><div class="flex gap-3"><span class="text-sm font-mono">${heure}</span><button onclick="modifierPointage('${p.id}', '${p.timestamp}')" class="text-blue-500 hover:text-blue-700">✏️</button><button onclick="supprimerPointage('${p.id}')" class="text-red-400 hover:text-red-600">🗑️</button></div></div>`;
                 });
             } else {
-                conteneur.innerHTML = '<div class="flex justify-center items-center h-full text-gray-400">Aucun pointage aujourd\'hui.</div>';
-                document.getElementById('stat-heures').textContent = '0h00';
-                document.getElementById('stat-pauses').textContent = '0';
-                document.getElementById('stat-statut').textContent = '--';
+                conteneur.innerHTML = '<div class="text-center text-gray-400 py-8">Aucun pointage.</div>';
+                document.getElementById('stat-heures').textContent = '0h00'; document.getElementById('stat-pauses').textContent = '0'; document.getElementById('stat-statut').textContent = '--';
             }
         }
 
-        window.pointer = async function(type) {
-            if (!currentUser) return;
-            try {
-                const { error } = await supaClient.from('pointages').insert([{ user_id: currentUser.id, type_action: type }]);
-                if (error) throw error;
-                chargerHistoriqueJour();
-                showToast('Pointage enregistré');
-            } catch (error) { showToast('Erreur : ' + error.message, true); }
+        window.pointer = async (type) => {
+            try { await supaClient.from('pointages').insert([{ user_id: currentUser.id, type_action: type }]); chargerHistoriqueJour(); } catch(e) { showToast(e.message, true); }
         };
 
-        window.modifierPointage = async function(id, ancienneDateStr) {
-            const ancienneHeure = new Date(ancienneDateStr).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
-            const nouvelleHeure = prompt("Corrigez l'heure (format HH:MM) :", ancienneHeure);
-            
-            if (!nouvelleHeure || !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(nouvelleHeure)) {
-                if(nouvelleHeure !== null) alert("Format invalide. Utilisez bien le format HH:MM (ex: 08:30)");
-                return;
+        window.modifierPointage = async (id, ancienneDateStr) => {
+            const h = prompt("Nouvelle heure (HH:MM) :", new Date(ancienneDateStr).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}));
+            if (!h || !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(h)) return alert("Format invalide.");
+            const nd = new Date(ancienneDateStr); nd.setHours(...h.split(':'), 0, 0);
+            await supaClient.from('pointages').update({ timestamp: nd.toISOString() }).eq('id', id); chargerHistoriqueJour();
+        };
+
+        window.supprimerPointage = async (id) => {
+            if(confirm("Supprimer ce pointage ?")) { await supaClient.from('pointages').delete().eq('id', id); chargerHistoriqueJour(); }
+        };
+
+        function calculerStatistiques(pts) {
+            let arr = null, dep = null, p = 0;
+            pts.forEach(pt => { if(pt.type_action==='arrivee') arr = new Date(pt.timestamp); if(pt.type_action==='pause') p++; if(pt.type_action==='depart') dep = new Date(pt.timestamp); });
+            if (arr) {
+                let diffMs = (dep || new Date()) - arr;
+                let h = Math.floor(diffMs / 3600000); let m = Math.floor((diffMs % 3600000) / 60000);
+                document.getElementById('stat-heures').textContent = `${h}h${m.toString().padStart(2, '0')}`;
             }
+            document.getElementById('stat-pauses').textContent = p;
+            document.getElementById('stat-statut').textContent = dep ? 'Terminé' : (arr ? 'En poste' : '--');
+        }
 
-            const [h, m] = nouvelleHeure.split(':');
-            const nouvelleDate = new Date(ancienneDateStr);
-            nouvelleDate.setHours(h, m, 0, 0);
-
-            try {
-                const { error } = await supaClient.from('pointages').update({ timestamp: nouvelleDate.toISOString() }).eq('id', id);
-                if (error) throw error;
-                chargerHistoriqueJour();
-                showToast("Heure modifiée !");
-            } catch (error) { showToast("Erreur modification : " + error.message, true); }
+        // --- 4. GESTION DES ABSENCES (AVEC 1/2 JOURNEES) ---
+        window.gererAffichageDates = () => {
+            const moment = document.getElementById('moment_absence').value;
+            const dateFin = document.getElementById('date_fin');
+            if (moment !== 'journee') { dateFin.value = document.getElementById('date_debut').value; dateFin.disabled = true; dateFin.classList.add('opacity-50'); }
+            else { dateFin.disabled = false; dateFin.classList.remove('opacity-50'); }
         };
+        window.synchroniserDates = () => { if(document.getElementById('moment_absence').value !== 'journee') document.getElementById('date_fin').value = document.getElementById('date_debut').value; };
 
-        window.supprimerPointage = async function(id) {
-            if(!confirm("Voulez-vous vraiment supprimer ce pointage ?")) return;
-            try {
-                const { error } = await supaClient.from('pointages').delete().eq('id', id);
-                if (error) throw error;
-                chargerHistoriqueJour();
-                showToast("Pointage supprimé !");
-            } catch (error) { showToast("Erreur suppression : " + error.message, true); }
-        };
-
-        function formaterDuree(diffMs) {
-            const totalMinutes = Math.floor(diffMs / 60000);
-            const heures = Math.floor(totalMinutes / 60);
-            const minutes = totalMinutes % 60;
-            return `${heures}h${minutes.toString().padStart(2, '0')}`;
-        }
-
-        function calculerStatistiques(pointages) {
-            let arrivee = null; let depart = null; let pauses = 0; let statut = '--';
-            pointages.forEach(p => {
-                if (p.type_action === 'arrivee') { arrivee = new Date(p.timestamp); statut = 'En poste'; }
-                if (p.type_action === 'pause') { pauses++; }
-                if (p.type_action === 'depart') { depart = new Date(p.timestamp); statut = 'Terminé'; }
-            });
+        window.ouvrirModalAbsence = (id = null, type = 'RTT', debut = '', fin = '', moment = 'journee') => {
+            document.getElementById('absence_id').value = id || '';
+            document.getElementById('titre-modal-absence').textContent = id ? "Modifier l'absence" : "Nouvelle absence";
+            document.getElementById('btn-sauvegarder-absence').textContent = id ? "Mettre à jour" : "Valider";
+            document.getElementById('btn-supprimer-absence').classList.toggle('hidden', !id);
             
-            if (arrivee && depart) document.getElementById('stat-heures').textContent = formaterDuree(depart - arrivee);
-            else if (arrivee && !depart) document.getElementById('stat-heures').textContent = formaterDuree(new Date() - arrivee);
-            
-            document.getElementById('stat-pauses').textContent = pauses;
-            document.getElementById('stat-statut').textContent = statut;
-        }
-
-        // --- 4. SOLDES & ABSENCES ---
-        async function chargerSoldesEtCalculs(absencesVues) {
-            let { data: params } = await supaClient.from('parametres').select('*').eq('user_id', currentUser.id).maybeSingle();
-            if(!params) params = { cp_initial: 25, rtt_initial: 15 };
-
-            let cpConsommes = 0; let rttConsommes = 0; let joursNovFev = 0;
-
-            absencesVues.forEach(abs => {
-                const debut = new Date(abs.date_debut); const fin = new Date(abs.date_fin);
-                const diffJours = Math.round((fin - debut) / (1000 * 60 * 60 * 24)) + 1; 
-
-                if(abs.type_absence === 'CP') {
-                    cpConsommes += diffJours;
-                    for (let j = new Date(debut); j <= fin; j.setDate(j.getDate() + 1)) {
-                        if([10, 11, 0, 1].includes(j.getMonth())) joursNovFev++;
-                    }
-                }
-                if(abs.type_absence === 'RTT') rttConsommes += diffJours;
-            });
-
-            const cpRestants = params.cp_initial - cpConsommes;
-            const rttRestants = params.rtt_initial - rttConsommes;
-            
-            document.getElementById('cpt-cp').textContent = cpRestants + ' j';
-            document.getElementById('cpt-rtt').textContent = rttRestants + ' j';
-
-            if(rttRestants > 0) {
-                document.getElementById('alerte-rtt').textContent = rttRestants + ' à poser !';
-                document.getElementById('alerte-rtt').classList.remove('hidden');
-            } else { document.getElementById('alerte-rtt').classList.add('hidden'); }
-
-            let fractionnement = 0;
-            if (joursNovFev >= 8) fractionnement = 2; else if (joursNovFev >= 6) fractionnement = 1;
-            document.getElementById('cpt-fractionnement').textContent = `+${fractionnement} j`;
-            
-            const minutesSup = Math.max(0, (cpRestants * 7 * 60) - (35 * 60));
-            document.getElementById('cpt-heures').textContent = formaterDuree(minutesSup * 60000);
-        }
-
-        // --- 5. CALENDRIER ---
-        function initCalendar() {
-            const calendarEl = document.getElementById('calendar');
-            calendar = new FullCalendar.Calendar(calendarEl, {
-                initialView: 'dayGridMonth', locale: 'fr',
-                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
-                events: async function(info, successCallback, failureCallback) {
-                    const { data, error } = await supaClient.from('absences').select('*').eq('user_id', currentUser.id);
-                    if (error) return failureCallback(error);
-                    
-                    chargerSoldesEtCalculs(data);
-                    
-                    const events = data.map(abs => {
-                        let color = '#3b82f6'; 
-                        if(abs.type_absence === 'CP') color = '#14b8a6'; 
-                        if(abs.type_absence === 'Maladie') color = '#ef4444';
-                        if(abs.type_absence === 'RTT') color = '#8b5cf6';
-                        if(abs.type_absence === 'Formation') color = '#f59e0b';
-                        return { title: abs.type_absence, start: abs.date_debut, end: new Date(new Date(abs.date_fin).getTime() + 86400000).toISOString().split('T')[0], backgroundColor: color, borderColor: color };
-                    });
-                    successCallback(events);
-                }
-            });
-        }
-
-        window.switchTab = function(tabName) {
-            document.getElementById('view-pointage').classList.add('hidden'); document.getElementById('view-pointage').classList.remove('flex');
-            document.getElementById('view-planning').classList.add('hidden'); document.getElementById('view-planning').classList.remove('flex');
-            document.getElementById('btn-pointage').classList.remove('bg-teal-50', 'text-teal-700'); document.getElementById('btn-planning').classList.remove('bg-teal-50', 'text-teal-700');
-
-            if (tabName === 'pointage') {
-                document.getElementById('view-pointage').classList.remove('hidden'); document.getElementById('view-pointage').classList.add('flex');
-                document.getElementById('btn-pointage').classList.add('bg-teal-50', 'text-teal-700');
-                chargerHistoriqueJour();
-            } else {
-                document.getElementById('view-planning').classList.remove('hidden'); document.getElementById('view-planning').classList.add('flex');
-                document.getElementById('btn-planning').classList.add('bg-teal-50', 'text-teal-700');
-                if(calendar) calendar.render();
-            }
-        };
-
-        // --- 6. MODALES ---
-        window.ouvrirModalAbsence = () => {
+            document.getElementById('type_absence').value = type;
+            document.getElementById('moment_absence').value = moment;
+            document.getElementById('date_debut').value = debut || new Date().toISOString().split('T')[0];
+            document.getElementById('date_fin').value = fin || new Date().toISOString().split('T')[0];
+            gererAffichageDates();
             document.getElementById('modal-absence').classList.remove('hidden');
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('date_debut').value = today; document.getElementById('date_fin').value = today;
         };
         window.fermerModalAbsence = () => document.getElementById('modal-absence').classList.add('hidden');
-        
+
         window.sauvegarderAbsence = async () => {
-            const type = document.getElementById('type_absence').value;
-            const dateDebut = document.getElementById('date_debut').value; const dateFin = document.getElementById('date_fin').value;
-            if (!dateDebut || !dateFin) return alert('Veuillez sélectionner les dates');
-            
+            const id = document.getElementById('absence_id').value;
+            const payload = {
+                user_id: currentUser.id,
+                type_absence: document.getElementById('type_absence').value,
+                moment: document.getElementById('moment_absence').value,
+                date_debut: document.getElementById('date_debut').value,
+                date_fin: document.getElementById('date_fin').value
+            };
             try {
-                const { error } = await supaClient.from('absences').insert([{ user_id: currentUser.id, type_absence: type, date_debut: dateDebut, date_fin: dateFin }]);
-                if (error) throw error;
-                fermerModalAbsence(); calendar.refetchEvents(); showToast('Absence déclarée !');
-            } catch (error) { showToast('Erreur ajout absence : ' + error.message, true); }
+                if (id) { const { error } = await supaClient.from('absences').update(payload).eq('id', id); if(error) throw error; }
+                else { const { error } = await supaClient.from('absences').insert([payload]); if(error) throw error; }
+                fermerModalAbsence(); calendar.refetchEvents(); showToast('Absence enregistrée !');
+            } catch (e) { showToast('Erreur : ' + e.message, true); }
         };
+
+        window.supprimerAbsence = async () => {
+            if(confirm("Supprimer cette absence du calendrier ?")) {
+                await supaClient.from('absences').delete().eq('id', document.getElementById('absence_id').value);
+                fermerModalAbsence(); calendar.refetchEvents(); showToast("Absence supprimée");
+            }
+        };
+
+        // --- 5. CALENDRIER ET SOLDES ---
+        function initCalendar() {
+            calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
+                initialView: 'dayGridMonth', locale: 'fr',
+                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
+                events: async function(info, success, fail) {
+                    const { data, error } = await supaClient.from('absences').select('*').eq('user_id', currentUser.id);
+                    if (error) return fail(error);
+                    chargerSoldes(data);
+                    
+                    success(data.map(a => {
+                        let c = '#3b82f6'; if(a.type_absence === 'CP') c = '#14b8a6'; if(a.type_absence === 'Maladie') c = '#ef4444';
+                        let titre = a.type_absence; if(a.moment === 'matin') titre += " (Matin)"; if(a.moment === 'aprem') titre += " (Aprem)";
+                        return { id: a.id, extendedProps: { type: a.type_absence, moment: a.moment }, title: titre, start: a.date_debut, end: new Date(new Date(a.date_fin).getTime() + 86400000).toISOString().split('T')[0], backgroundColor: c, borderColor: c };
+                    }));
+                },
+                eventClick: function(info) {
+                    const p = info.event.extendedProps;
+                    // Formatage de la date de fin (qui a été augmentée d'1 jour pour le rendu FullCalendar)
+                    const dateFin = new Date(info.event.end ? info.event.end.getTime() - 86400000 : info.event.start).toISOString().split('T')[0];
+                    ouvrirModalAbsence(info.event.id, p.type, info.event.startStr.split('T')[0], dateFin, p.moment || 'journee');
+                }
+            });
+        }
+
+        async function chargerSoldes(absences) {
+            let { data: params } = await supaClient.from('parametres').select('*').eq('user_id', currentUser.id).maybeSingle();
+            if(!params) params = { cp_initial: 25, rtt_initial: 15, base_horaire: 39 };
+
+            let cpCons = 0; let rttCons = 0; let joursNF = 0;
+            absences.forEach(a => {
+                let j = 0;
+                if(a.moment === 'matin' || a.moment === 'aprem') { j = 0.5; } 
+                else { j = Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1; }
+
+                if(a.type_absence === 'CP') {
+                    cpCons += j;
+                    for(let d=new Date(a.date_debut); d<=new Date(a.date_fin); d.setDate(d.getDate()+1)) { if([10,11,0,1].includes(d.getMonth())) joursNF++; }
+                }
+                if(a.type_absence === 'RTT') rttCons += j;
+            });
+
+            document.getElementById('cpt-cp').textContent = (params.cp_initial - cpCons) + ' j';
+            document.getElementById('cpt-rtt').textContent = (params.rtt_initial - rttCons) + ' j';
+            document.getElementById('alerte-rtt').classList.toggle('hidden', (params.rtt_initial - rttCons) <= 0);
+            document.getElementById('cpt-fractionnement').textContent = '+' + (joursNF >= 8 ? 2 : (joursNF >= 6 ? 1 : 0)) + ' j';
+            
+            // Estimation théorique brute des heures supp (Base 39h -> 4h de rab par semaine par rapport à 35h)
+            document.getElementById('cpt-heures').textContent = '+' + ((params.base_horaire - 35) * (params.cp_initial - cpCons)).toFixed(0) + 'h';
+        }
 
         window.ouvrirModalParametres = async () => {
             const { data } = await supaClient.from('parametres').select('*').eq('user_id', currentUser.id).maybeSingle();
-            if(data) { document.getElementById('input_cp').value = data.cp_initial; document.getElementById('input_rtt').value = data.rtt_initial; }
+            if(data) {
+                document.getElementById('input_base_horaire').value = data.base_horaire || 39;
+                document.getElementById('input_cp').value = data.cp_initial;
+                document.getElementById('input_rtt').value = data.rtt_initial;
+            }
             document.getElementById('modal-parametres').classList.remove('hidden');
         };
         window.fermerModalParametres = () => document.getElementById('modal-parametres').classList.add('hidden');
-        
         window.sauvegarderParametres = async () => {
-            const cp = parseInt(document.getElementById('input_cp').value); const rtt = parseInt(document.getElementById('input_rtt').value);
             try {
-                const { error } = await supaClient.from('parametres').upsert({ user_id: currentUser.id, cp_initial: cp, rtt_initial: rtt });
-                if (error) throw error;
-                fermerModalParametres(); calendar.refetchEvents(); showToast('Soldes mis à jour !');
-            } catch (error) { showToast('Erreur sauvegarde soldes : ' + error.message, true); }
+                const p = { user_id: currentUser.id, base_horaire: parseFloat(document.getElementById('input_base_horaire').value), cp_initial: parseFloat(document.getElementById('input_cp').value), rtt_initial: parseFloat(document.getElementById('input_rtt').value) };
+                const { error } = await supaClient.from('parametres').upsert(p);
+                if(error) throw error;
+                fermerModalParametres(); calendar.refetchEvents(); showToast('Paramètres sauvés');
+            } catch(e) { showToast(e.message, true); }
+        };
+
+        window.switchTab = (tab) => {
+            ['pointage', 'planning'].forEach(t => {
+                document.getElementById('view-'+t).classList.toggle('hidden', t !== tab);
+                document.getElementById('view-'+t).classList.toggle('flex', t === tab);
+                document.getElementById('btn-'+t).classList.toggle('bg-teal-50', t === tab);
+                document.getElementById('btn-'+t).classList.toggle('text-teal-700', t === tab);
+            });
+            if(tab === 'pointage') chargerHistoriqueJour(); else if(calendar) calendar.render();
         };
     </script>
 </body>
 </html>
-

@@ -118,7 +118,20 @@
                 </div>
 
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div class="bg-teal-50 p-4 rounded-xl border border-teal-200"><div class="text-xs text-teal-600 font-bold uppercase mb-1">Heures Sup estim.</div><div class="text-2xl font-bold text-teal-700" id="cpt-heures">--</div></div>
+                    <!-- NOUVEAU BLOC HEURES SUP -->
+                    <div class="bg-teal-50 p-3 rounded-xl border border-teal-200 col-span-2 md:col-span-1 flex flex-col justify-between">
+                        <div class="text-xs text-teal-600 font-bold uppercase mb-2">Heures Sup. (Réel)</div>
+                        <div class="flex justify-between items-center text-sm border-b border-teal-100 pb-1">
+                            <span class="text-gray-600">Semaine</span><span class="font-bold text-teal-700" id="hs-semaine">--</span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm border-b border-teal-100 py-1">
+                            <span class="text-gray-600">Mois</span><span class="font-bold text-teal-700" id="hs-mois">--</span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm pt-1">
+                            <span class="text-gray-600">Année</span><span class="font-bold text-teal-700" id="hs-annee">--</span>
+                        </div>
+                    </div>
+
                     <div class="bg-gray-50 p-4 rounded-xl border border-gray-200"><div class="text-xs text-gray-500 font-bold uppercase mb-1">CP Restants</div><div class="text-2xl font-bold text-gray-800" id="cpt-cp">-- j</div></div>
                     <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 relative">
                         <div class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full animate-pulse hidden" id="alerte-rtt">À poser !</div>
@@ -177,7 +190,7 @@
                 </div>
                 <div class="mb-3">
                     <label class="text-xs font-bold text-gray-500 block">Alerte de dépassement quotidien</label>
-                    <div class="flex items-center gap-2"><input type="number" step="0.5" id="input_limite_heures" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="8"> <span class="text-gray-500 text-sm font-bold">Heures/jour</span></div>
+                    <div class="flex items-center gap-2"><input type="number" step="0.5" id="input_limite_heures" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="7.8"> <span class="text-gray-500 text-sm font-bold">Heures/jour</span></div>
                 </div>
                 <div class="flex items-center gap-2 mt-4">
                     <input type="checkbox" id="input_notifs" class="w-5 h-5 text-teal-600 rounded cursor-pointer">
@@ -210,9 +223,11 @@
         
         let currentUser = null; 
         let calendar = null;
-        let currentPointages = [];
-        // Variables globales mémorisant vos choix
-        let userParams = { cp_initial: 25, rtt_initial: 15, base_horaire: 39, limite_heures_jour: 8, notifs_actives: false };
+        let currentPointages = []; // Historique du jour (UI)
+        let pointagesAnnee = []; // Historique complet pour calculs RH
+        let currentAbsences = [];
+        
+        let userParams = { cp_initial: 25, rtt_initial: 15, base_horaire: 39, limite_heures_jour: 7.8, notifs_actives: false };
 
         // Horloge & Calculs dynamiques
         setInterval(() => {
@@ -220,10 +235,7 @@
             document.getElementById('time-display').textContent = now.toLocaleTimeString('fr-FR');
             document.getElementById('date-display').textContent = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
             
-            // Fait tourner le chronomètre en direct
-            if(currentPointages.length > 0) {
-                calculerStatistiques(currentPointages);
-            }
+            if(currentPointages.length > 0) calculerStatistiquesJour(currentPointages);
         }, 1000);
 
         function showToast(msg, isError = false) {
@@ -243,9 +255,15 @@
         window.logout = async () => { await supaClient.auth.signOut(); location.reload(); };
         window.onload = async () => { const { data: { user } } = await supaClient.auth.getUser(); if (user) initialiserApp(user); };
 
-        async function chargerParametresGlobaux() {
-            const { data } = await supaClient.from('parametres').select('*').eq('user_id', currentUser.id).maybeSingle();
-            if (data) userParams = { ...userParams, ...data };
+        async function chargerDonneesGlobales() {
+            // 1. Paramètres
+            const { data: pData } = await supaClient.from('parametres').select('*').eq('user_id', currentUser.id).maybeSingle();
+            if (pData) userParams = { ...userParams, ...pData };
+
+            // 2. Pointages de l'année (Pour calcul RH)
+            const debutAnnee = new Date(new Date().getFullYear(), 0, 1).toISOString();
+            const { data: ptData } = await supaClient.from('pointages').select('*').eq('user_id', currentUser.id).gte('timestamp', debutAnnee).order('timestamp', { ascending: true });
+            if (ptData) pointagesAnnee = ptData;
         }
 
         function initialiserApp(user) {
@@ -258,23 +276,21 @@
             document.getElementById('app-section').classList.remove('hidden', 'flex');
             document.getElementById('app-section').classList.add('flex');
             
-            chargerParametresGlobaux().then(() => {
-                chargerHistoriqueJour(); 
+            chargerDonneesGlobales().then(() => {
+                rafraichirVueJour();
                 initCalendar();
             });
         }
 
-        // --- 3. POINTAGES ET CALCUL PRECIS ---
-        async function chargerHistoriqueJour() {
+        // --- 3. POINTAGES UI (Le Jour J) ---
+        function rafraichirVueJour() {
             const debutJour = new Date(); debutJour.setHours(0,0,0,0);
-            const { data, error } = await supaClient.from('pointages').select('*').eq('user_id', currentUser.id).gte('timestamp', debutJour.toISOString()).order('timestamp', { ascending: true });
+            currentPointages = pointagesAnnee.filter(p => new Date(p.timestamp) >= debutJour);
             
             const conteneur = document.getElementById('historique-jour'); conteneur.innerHTML = '';
-            if(data && data.length > 0) {
-                currentPointages = data;
-                calculerStatistiques(data);
-                
-                data.forEach(p => {
+            if(currentPointages.length > 0) {
+                calculerStatistiquesJour(currentPointages);
+                currentPointages.forEach(p => {
                     const heure = new Date(p.timestamp).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
                     let l = p.type_action; let ic = ''; let c = "text-gray-800"; let b = "bg-gray-50";
                     if(l === 'arrivee') { l="Prise de poste"; c="text-teal-600"; ic='🟢'; b="bg-teal-50"; }
@@ -284,73 +300,138 @@
                     conteneur.innerHTML += `<div class="flex justify-between items-center py-3 px-4 border-b border-gray-100 ${b} rounded-lg mb-2"><div class="font-medium ${c}"><span>${ic}</span> ${l}</div><div class="flex gap-3"><span class="text-sm font-mono mt-1">${heure}</span><button onclick="modifierPointage('${p.id}', '${p.timestamp}')" class="text-blue-500 hover:text-blue-700 text-lg">✏️</button><button onclick="supprimerPointage('${p.id}')" class="text-red-400 hover:text-red-600 text-lg">🗑️</button></div></div>`;
                 });
             } else {
-                currentPointages = [];
                 conteneur.innerHTML = '<div class="text-center text-gray-400 py-8">Aucun pointage.</div>';
                 document.getElementById('stat-heures').textContent = '0h00'; document.getElementById('stat-pauses').textContent = '0'; document.getElementById('stat-statut').textContent = '--';
             }
+            calculerHeuresSup(); // Recalcul des Heures Sup à chaque changement
         }
 
         window.pointer = async (type) => {
-            try { await supaClient.from('pointages').insert([{ user_id: currentUser.id, type_action: type }]); chargerHistoriqueJour(); } catch(e) { showToast(e.message, true); }
+            try { 
+                await supaClient.from('pointages').insert([{ user_id: currentUser.id, type_action: type }]); 
+                await chargerDonneesGlobales(); rafraichirVueJour();
+            } catch(e) { showToast(e.message, true); }
         };
 
         window.modifierPointage = async (id, ancienneDateStr) => {
             const h = prompt("Nouvelle heure (HH:MM) :", new Date(ancienneDateStr).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}));
             if (!h || !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(h)) return showToast("Format invalide", true);
             const nd = new Date(ancienneDateStr); nd.setHours(...h.split(':'), 0, 0);
-            await supaClient.from('pointages').update({ timestamp: nd.toISOString() }).eq('id', id); chargerHistoriqueJour();
+            await supaClient.from('pointages').update({ timestamp: nd.toISOString() }).eq('id', id); 
+            await chargerDonneesGlobales(); rafraichirVueJour();
         };
 
         window.supprimerPointage = async (id) => {
-            if(confirm("Supprimer ce pointage ?")) { await supaClient.from('pointages').delete().eq('id', id); chargerHistoriqueJour(); }
+            if(confirm("Supprimer ce pointage ?")) { 
+                await supaClient.from('pointages').delete().eq('id', id); 
+                await chargerDonneesGlobales(); rafraichirVueJour(); 
+            }
         };
 
-        function calculerStatistiques(pts) {
+        function calculerStatistiquesJour(pts) {
             let totalTravail = 0; let lastArrivee = null; let pauses = 0;
             
-            // Calcul précis en déduisant les temps de pause
             pts.forEach(pt => {
                 if(pt.type_action === 'arrivee') { lastArrivee = new Date(pt.timestamp); }
-                if(pt.type_action === 'pause') { 
-                    pauses++; 
-                    if (lastArrivee) { totalTravail += (new Date(pt.timestamp) - lastArrivee); lastArrivee = null; }
-                }
-                if(pt.type_action === 'depart') { 
-                    if (lastArrivee) { totalTravail += (new Date(pt.timestamp) - lastArrivee); lastArrivee = null; }
-                }
+                if(pt.type_action === 'pause') { pauses++; if (lastArrivee) { totalTravail += (new Date(pt.timestamp) - lastArrivee); lastArrivee = null; } }
+                if(pt.type_action === 'depart') { if (lastArrivee) { totalTravail += (new Date(pt.timestamp) - lastArrivee); lastArrivee = null; } }
             });
-            
-            // Ajoute le temps en direct si on n'a pas encore pointé le départ ou la pause
             if (lastArrivee) { totalTravail += (new Date() - lastArrivee); }
 
             const spanHeures = document.getElementById('stat-heures');
-
             if (totalTravail > 0) {
-                let h = Math.floor(totalTravail / 3600000); 
-                let m = Math.floor((totalTravail % 3600000) / 60000);
+                let h = Math.floor(totalTravail / 3600000); let m = Math.floor((totalTravail % 3600000) / 60000);
                 spanHeures.textContent = `${h}h${m.toString().padStart(2, '0')}`;
                 
                 // VÉRIFICATION LIMITE & NOTIFICATION
                 const heuresDec = totalTravail / 3600000;
                 if (userParams.notifs_actives && heuresDec >= userParams.limite_heures_jour) {
-                    spanHeures.classList.remove('text-teal-600'); spanHeures.classList.add('text-red-600'); // Passe en rouge
-                    
+                    spanHeures.classList.remove('text-teal-600'); spanHeures.classList.add('text-red-600');
                     const today = new Date().toLocaleDateString();
                     if (localStorage.getItem('lastNotifDate') !== today) {
-                        showToast(`⚠️ Vous avez atteint votre limite de ${userParams.limite_heures_jour}h aujourd'hui.`, true);
+                        showToast(`⚠️ Limite de ${userParams.limite_heures_jour}h atteinte !`, true);
                         if ("Notification" in window && Notification.permission === "granted") {
                             new Notification("Fin de journée ⏱️", { body: `Vous avez atteint votre limite quotidienne de ${userParams.limite_heures_jour}h.` });
                         }
                         localStorage.setItem('lastNotifDate', today);
                     }
-                } else {
-                    spanHeures.classList.remove('text-red-600'); spanHeures.classList.add('text-teal-600');
-                }
+                } else { spanHeures.classList.remove('text-red-600'); spanHeures.classList.add('text-teal-600'); }
             } else { spanHeures.textContent = '0h00'; }
             
             document.getElementById('stat-pauses').textContent = pauses;
             document.getElementById('stat-statut').textContent = (lastArrivee) ? 'En poste' : (totalTravail > 0 ? 'En pause / Terminé' : '--');
         }
+
+        // --- MOTEUR RH : CALCUL DES HEURES SUP (REEL VS ATTENDU) ---
+        function calculerHeuresSup() {
+            const now = new Date();
+            
+            // Définition des bornes
+            const getMonday = (d) => { let day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6:1); return new Date(new Date(d).setDate(diff)); };
+            const startWeek = getMonday(now); startWeek.setHours(0,0,0,0);
+            const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const startYear = new Date(now.getFullYear(), 0, 1);
+
+            // Calcule le temps réel pointé (en heures décimales)
+            const getTempsReel = (startDate) => {
+                let totalMs = 0;
+                // Grouper les pointages par jour
+                const ptsFiltres = pointagesAnnee.filter(p => new Date(p.timestamp) >= startDate);
+                const parJour = {};
+                ptsFiltres.forEach(p => { const d = p.timestamp.split('T')[0]; if(!parJour[d]) parJour[d] = []; parJour[d].push(p); });
+                
+                for (let jour in parJour) {
+                    let lastArr = null;
+                    parJour[jour].forEach(pt => {
+                        if(pt.type_action === 'arrivee') lastArr = new Date(pt.timestamp);
+                        else if((pt.type_action === 'pause' || pt.type_action === 'depart') && lastArr) {
+                            totalMs += (new Date(pt.timestamp) - lastArr); lastArr = null;
+                        }
+                    });
+                    if (lastArr && jour === now.toISOString().split('T')[0]) totalMs += (now - lastArr); // Si en cours aujourd'hui
+                }
+                return totalMs / 3600000;
+            };
+
+            // Calcule le temps théorique exigé (jours ouvrés - absences)
+            const getTempsAttendu = (startDate) => {
+                let expected = 0;
+                const hoursPerDay = userParams.base_horaire / 5; // ex: 39/5 = 7.8
+                let d = new Date(startDate); d.setHours(0,0,0,0);
+                let end = new Date(now); end.setHours(0,0,0,0);
+
+                while(d <= end) {
+                    const dayOfWeek = d.getDay();
+                    if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Lundi à Vendredi
+                        // Vérifie si une absence validée existe ce jour-là
+                        let absence = currentAbsences.find(a => {
+                            const aStart = new Date(a.date_debut); aStart.setHours(0,0,0,0);
+                            const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0);
+                            return d >= aStart && d <= aEnd;
+                        });
+
+                        if (!absence) expected += hoursPerDay; // Jour normal
+                        else if (absence.moment === 'matin' || absence.moment === 'aprem') expected += (hoursPerDay / 2); // Demi-journée
+                    }
+                    d.setDate(d.getDate() + 1);
+                }
+                return expected;
+            };
+
+            const formatterDelta = (reel, attendu) => {
+                let diff = reel - attendu;
+                let sign = diff >= 0 ? '+' : '-';
+                diff = Math.abs(diff);
+                let h = Math.floor(diff);
+                let m = Math.round((diff - h) * 60);
+                return `${sign}${h}h${m.toString().padStart(2, '0')}`;
+            };
+
+            document.getElementById('hs-semaine').textContent = formatterDelta(getTempsReel(startWeek), getTempsAttendu(startWeek));
+            document.getElementById('hs-mois').textContent = formatterDelta(getTempsReel(startMonth), getTempsAttendu(startMonth));
+            document.getElementById('hs-annee').textContent = formatterDelta(getTempsReel(startYear), getTempsAttendu(startYear));
+        }
+
 
         // --- 4. GESTION DES ABSENCES (AVEC 1/2 JOURNEES) ---
         window.gererAffichageDates = () => {
@@ -379,16 +460,11 @@
         window.sauvegarderAbsence = async () => {
             const id = document.getElementById('absence_id').value;
             const payload = {
-                user_id: currentUser.id,
-                type_absence: document.getElementById('type_absence').value,
-                moment: document.getElementById('moment_absence').value,
-                date_debut: document.getElementById('date_debut').value,
-                date_fin: document.getElementById('date_fin').value
+                user_id: currentUser.id, type_absence: document.getElementById('type_absence').value, moment: document.getElementById('moment_absence').value, date_debut: document.getElementById('date_debut').value, date_fin: document.getElementById('date_fin').value
             };
             try {
                 if (!payload.date_debut || !payload.date_fin) throw new Error("Dates obligatoires");
-                if (id) { const { error } = await supaClient.from('absences').update(payload).eq('id', id); if(error) throw error; }
-                else { const { error } = await supaClient.from('absences').insert([payload]); if(error) throw error; }
+                if (id) await supaClient.from('absences').update(payload).eq('id', id); else await supaClient.from('absences').insert([payload]);
                 fermerModalAbsence(); calendar.refetchEvents(); showToast('Absence enregistrée !');
             } catch (e) { showToast('Erreur : ' + e.message, true); }
         };
@@ -408,7 +484,10 @@
                 events: async function(info, success, fail) {
                     const { data, error } = await supaClient.from('absences').select('*').eq('user_id', currentUser.id);
                     if (error) return fail(error);
+                    
+                    currentAbsences = data; // Stocke pour le calcul des heures sup
                     chargerSoldes(data);
+                    calculerHeuresSup(); // Recalcule les H Sup avec les nouvelles absences
                     
                     success(data.map(a => {
                         let c = '#3b82f6'; if(a.type_absence === 'CP') c = '#14b8a6'; if(a.type_absence === 'Maladie') c = '#ef4444';
@@ -424,19 +503,11 @@
             });
         }
 
-        async function chargerSoldes(absences) {
+        function chargerSoldes(absences) {
             let cpCons = 0; let rttCons = 0; let joursNF = 0;
-            
             absences.forEach(a => {
-                let j = 0;
-                // Gestion mathématique de la demi-journée
-                if(a.moment === 'matin' || a.moment === 'aprem') { j = 0.5; } 
-                else { j = Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1; }
-
-                if(a.type_absence === 'CP') {
-                    cpCons += j;
-                    for(let d=new Date(a.date_debut); d<=new Date(a.date_fin); d.setDate(d.getDate()+1)) { if([10,11,0,1].includes(d.getMonth())) joursNF++; }
-                }
+                let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1;
+                if(a.type_absence === 'CP') { cpCons += j; for(let d=new Date(a.date_debut); d<=new Date(a.date_fin); d.setDate(d.getDate()+1)) { if([10,11,0,1].includes(d.getMonth())) joursNF++; } }
                 if(a.type_absence === 'RTT') rttCons += j;
             });
 
@@ -444,14 +515,11 @@
             document.getElementById('cpt-rtt').textContent = (userParams.rtt_initial - rttCons) + ' j';
             document.getElementById('alerte-rtt').classList.toggle('hidden', (userParams.rtt_initial - rttCons) <= 0);
             document.getElementById('cpt-fractionnement').textContent = '+' + (joursNF >= 8 ? 2 : (joursNF >= 6 ? 1 : 0)) + ' j';
-            
-            // Calcul H Sup (Base de travail saisie - 35h standard légales) 
-            document.getElementById('cpt-heures').textContent = '+' + ((userParams.base_horaire - 35) * (userParams.cp_initial - cpCons)).toFixed(0) + 'h';
         }
 
         window.ouvrirModalParametres = async () => {
             document.getElementById('input_base_horaire').value = userParams.base_horaire || 39;
-            document.getElementById('input_limite_heures').value = userParams.limite_heures_jour || 8;
+            document.getElementById('input_limite_heures').value = userParams.limite_heures_jour || 7.8;
             document.getElementById('input_notifs').checked = userParams.notifs_actives || false;
             document.getElementById('input_cp').value = userParams.cp_initial;
             document.getElementById('input_rtt').value = userParams.rtt_initial;
@@ -462,42 +530,28 @@
         
         window.sauvegarderParametres = async () => {
             const notifsOn = document.getElementById('input_notifs').checked;
-            
-            // Demande l'autorisation au navigateur
-            if (notifsOn && "Notification" in window && Notification.permission !== "granted") {
-                await Notification.requestPermission();
-            }
+            if (notifsOn && "Notification" in window && Notification.permission !== "granted") await Notification.requestPermission();
 
             try {
-                const p = { 
-                    user_id: currentUser.id, 
-                    base_horaire: parseFloat(document.getElementById('input_base_horaire').value), 
-                    cp_initial: parseFloat(document.getElementById('input_cp').value), 
-                    rtt_initial: parseFloat(document.getElementById('input_rtt').value),
-                    limite_heures_jour: parseFloat(document.getElementById('input_limite_heures').value),
-                    notifs_actives: notifsOn
-                };
+                const p = { user_id: currentUser.id, base_horaire: parseFloat(document.getElementById('input_base_horaire').value), cp_initial: parseFloat(document.getElementById('input_cp').value), rtt_initial: parseFloat(document.getElementById('input_rtt').value), limite_heures_jour: parseFloat(document.getElementById('input_limite_heures').value), notifs_actives: notifsOn };
                 const { error } = await supaClient.from('parametres').upsert(p);
                 if(error) throw error;
                 
-                userParams = p; // Mise à jour instantanée
+                userParams = p; 
                 fermerModalParametres(); 
                 if(calendar) calendar.refetchEvents(); 
-                chargerHistoriqueJour();
+                calculerHeuresSup();
                 showToast('Paramètres sauvés');
             } catch(e) { showToast(e.message, true); }
         };
 
         window.switchTab = (tab) => {
             ['pointage', 'planning'].forEach(t => {
-                document.getElementById('view-'+t).classList.toggle('hidden', t !== tab);
-                document.getElementById('view-'+t).classList.toggle('flex', t === tab);
-                document.getElementById('btn-'+t).classList.toggle('bg-teal-50', t === tab);
-                document.getElementById('btn-'+t).classList.toggle('text-teal-700', t === tab);
+                document.getElementById('view-'+t).classList.toggle('hidden', t !== tab); document.getElementById('view-'+t).classList.toggle('flex', t === tab);
+                document.getElementById('btn-'+t).classList.toggle('bg-teal-50', t === tab); document.getElementById('btn-'+t).classList.toggle('text-teal-700', t === tab);
             });
-            if(tab === 'pointage') chargerHistoriqueJour(); else if(calendar) calendar.render();
+            if(tab === 'pointage') rafraichirVueJour(); else if(calendar) calendar.render();
         };
     </script>
 </body>
 </html>
-

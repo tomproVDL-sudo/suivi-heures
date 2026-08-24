@@ -7,15 +7,11 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffffff">
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- FullCalendar JS & CSS -->
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 
     <style>
-        /* Personnalisation du calendrier pour coller au design Tailwind */
         .fc { font-family: inherit; }
         .fc-button-primary { background-color: #14b8a6 !important; border-color: #14b8a6 !important; }
         .fc-button-primary:hover { background-color: #0d9488 !important; border-color: #0d9488 !important; }
@@ -24,119 +20,110 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-2 md:p-6 font-sans">
 
-    <!-- ECRAN DE CONNEXION -->
+    <!-- CONNEXION -->
     <div id="auth-section" class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
         <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">Connexion</h2>
         <input type="email" id="email" placeholder="Email" class="w-full p-3 border border-gray-300 rounded-xl mb-4 focus:outline-none focus:ring-2 focus:ring-teal-500">
         <input type="password" id="password" placeholder="Mot de passe" class="w-full p-3 border border-gray-300 rounded-xl mb-6 focus:outline-none focus:ring-2 focus:ring-teal-500">
-        <button onclick="login()" class="w-full bg-teal-500 text-white font-bold py-3 rounded-xl hover:bg-teal-600 transition shadow-lg shadow-teal-500/30">Se connecter</button>
+        <button onclick="login()" class="w-full bg-teal-500 text-white font-bold py-3 rounded-xl hover:bg-teal-600 transition shadow-lg">Se connecter</button>
     </div>
 
-    <!-- INTERFACE PRINCIPALE -->
-    <div id="app-section" class="hidden w-full max-w-5xl bg-white md:rounded-3xl shadow-2xl flex flex-col md:flex-row overflow-hidden min-h-[85vh]">
+    <!-- APP -->
+    <div id="app-section" class="hidden w-full max-w-5xl bg-white md:rounded-3xl shadow-2xl flex-col md:flex-row overflow-hidden min-h-[85vh]">
         
-        <!-- BARRE LATERALE (MENU) -->
+        <!-- MENU GAUCHE -->
         <div class="md:w-1/4 bg-gray-50 border-r border-gray-200 p-6 flex flex-col">
-            <div class="text-teal-500 font-bold text-xl flex items-center gap-2 mb-8 justify-center">
+            <div class="text-teal-500 font-bold text-xl flex items-center justify-center gap-2 mb-8">
                 <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path></svg>
                 MON SIRH
             </div>
 
-            <div class="flex flex-col items-center mb-8">
-                <div class="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center text-teal-600 font-bold text-2xl mb-2">T</div>
-                <div class="font-bold text-gray-800">Tom</div>
-                <button onclick="logout()" class="text-xs text-red-400 hover:text-red-600 mt-1 underline">Déconnexion</button>
-            </div>
-
-            <!-- Navigation -->
             <nav class="flex flex-col gap-2 mb-8">
                 <button onclick="switchTab('pointage')" id="btn-pointage" class="flex items-center gap-3 p-3 rounded-xl bg-teal-50 text-teal-700 font-medium transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Pointage
+                    Pointage du jour
                 </button>
                 <button onclick="switchTab('planning')" id="btn-planning" class="flex items-center gap-3 p-3 rounded-xl text-gray-600 hover:bg-gray-100 font-medium transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                     Planning & Congés
                 </button>
             </nav>
 
-            <div class="mt-auto pt-6 border-t border-gray-200">
-                <div id="date-display" class="text-gray-500 text-sm font-medium capitalize text-center"></div>
-                <div id="time-display" class="text-3xl font-bold text-gray-800 tracking-tight mt-1 text-center"></div>
+            <div class="mt-auto pt-6 border-t border-gray-200 text-center">
+                <div id="date-display" class="text-gray-500 text-sm font-medium capitalize"></div>
+                <div id="time-display" class="text-3xl font-bold text-gray-800 tracking-tight mt-1"></div>
             </div>
         </div>
 
-        <!-- ZONE DROITE : VUES DYNAMIQUES -->
+        <!-- ZONE DROITE -->
         <div class="md:w-3/4 flex flex-col p-4 md:p-8 relative">
             
-            <!-- VUE 1 : POINTAGE (Design précédent) -->
+            <!-- VUE 1 : POINTAGE (Dynamique) -->
             <div id="view-pointage" class="flex-1 flex flex-col">
-                <div class="flex flex-col items-center mt-2 mb-8">
-                    <div class="w-14 h-14 rounded-full border-2 border-green-500 text-green-500 flex items-center justify-center mb-3">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                    </div>
-                    <h2 class="text-2xl font-medium text-gray-800">Vous êtes en poste</h2>
-                    <span class="text-sm text-gray-500 mt-1">Ville de Lille</span>
-                    <div class="text-4xl font-light text-gray-800 mt-3">0:00:00</div>
+                <div class="flex flex-col items-center mt-2 mb-6">
+                    <h2 class="text-2xl font-medium text-gray-800">Suivi d'activité</h2>
+                    <span class="text-sm text-gray-500">Aujourd'hui</span>
                 </div>
 
-                <div class="flex-1 overflow-y-auto mb-8 px-2 space-y-4" id="historique-jour">
-                    <!-- Les pointages apparaîtront ici -->
-                    <p class="text-center text-gray-400 text-sm mt-10">Aucun pointage aujourd'hui.</p>
+                <!-- HISTORIQUE CENTRAL DEPUIS SUPABASE -->
+                <div class="flex-1 overflow-y-auto mb-8 px-2 space-y-2 border-t border-b border-gray-100 py-4" id="historique-jour">
+                    <div class="flex justify-center items-center h-full text-gray-400">Chargement de l'historique...</div>
                 </div>
 
+                <!-- BOUTONS -->
                 <div class="grid grid-cols-3 gap-3 md:gap-4 mt-auto">
                     <button onclick="pointer('arrivee')" class="bg-teal-500 hover:bg-teal-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md active:scale-95">
-                        <svg class="w-6 h-6 md:w-8 md:h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
                         <span class="text-sm md:text-base font-medium">Arrivée</span>
                     </button>
                     <button onclick="pointer('pause')" class="bg-orange-500 hover:bg-orange-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md active:scale-95">
-                        <svg class="w-6 h-6 md:w-8 md:h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 15.546c-.523 0-1.046.151-1.5.454a2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.701 2.701 0 00-1.5-.454M9 6v2m3-2v2m3-2v2M9 3h.01M12 3h.01M15 3h.01M21 21v-7a2 2 0 00-2-2H5a2 2 0 00-2 2v7h18zm-3-9v-2a2 2 0 00-2-2H8a2 2 0 00-2 2v2h12z"></path></svg>
                         <span class="text-sm md:text-base font-medium">Pause</span>
                     </button>
                     <button onclick="pointer('depart')" class="bg-slate-500 hover:bg-slate-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md active:scale-95">
-                        <svg class="w-6 h-6 md:w-8 md:h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                         <span class="text-sm md:text-base font-medium">Départ</span>
                     </button>
                 </div>
             </div>
 
-            <!-- VUE 2 : PLANNING & CONGÉS -->
+            <!-- VUE 2 : PLANNING -->
             <div id="view-planning" class="hidden flex-1 flex flex-col h-full">
-                <!-- Compteurs -->
+                
+                <!-- Bouton de paramétrage des soldes -->
+                <div class="flex justify-end mb-2">
+                    <button onclick="ouvrirModalParametres()" class="text-sm text-teal-600 hover:underline flex items-center gap-1">
+                        ⚙️ Modifier mes soldes de départ
+                    </button>
+                </div>
+
+                <!-- Compteurs (Calculés) -->
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     <div class="bg-gray-50 p-4 rounded-xl border border-gray-100">
                         <div class="text-xs text-gray-500 font-bold uppercase mb-1">Heures Sup</div>
-                        <div class="text-xl font-bold text-teal-600">+02h30</div>
+                        <div class="text-xl font-bold text-teal-600" id="cpt-heures">--</div>
                     </div>
                     <div class="bg-gray-50 p-4 rounded-xl border border-gray-100">
                         <div class="text-xs text-gray-500 font-bold uppercase mb-1">CP Restants</div>
-                        <div class="text-xl font-bold text-gray-800">22 j</div>
+                        <div class="text-xl font-bold text-gray-800" id="cpt-cp">-- j</div>
                     </div>
                     <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 relative">
-                        <!-- Alerte RTT obligatoire du mois -->
-                        <div class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full animate-pulse">1 à poser !</div>
+                        <div class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full animate-pulse hidden" id="alerte-rtt">1 à poser !</div>
                         <div class="text-xs text-blue-600 font-bold uppercase mb-1">RTT Restants</div>
-                        <div class="text-xl font-bold text-blue-800">14 j</div>
+                        <div class="text-xl font-bold text-blue-800" id="cpt-rtt">-- j</div>
                     </div>
                     <div class="bg-purple-50 p-4 rounded-xl border border-purple-100">
                         <div class="text-xs text-purple-600 font-bold uppercase mb-1">Fractionnement</div>
-                        <div class="text-xl font-bold text-purple-800" id="compteur-fractionnement">+0 j</div>
+                        <div class="text-xl font-bold text-purple-800" id="cpt-fractionnement">+0 j</div>
                     </div>
                 </div>
 
-                <button onclick="ouvrirModal()" class="w-full bg-slate-800 text-white font-bold py-3 rounded-xl mb-6 shadow-md hover:bg-slate-700 transition">
+                <button onclick="ouvrirModalAbsence()" class="w-full bg-slate-800 text-white font-bold py-3 rounded-xl mb-6 shadow-md hover:bg-slate-700">
                     + Déclarer une absence
                 </button>
 
-                <!-- Calendrier -->
                 <div id="calendar" class="flex-1 min-h-[400px]"></div>
             </div>
             
         </div>
     </div>
 
-    <!-- MODAL AJOUT ABSENCE (Cachée par défaut) -->
+    <!-- MODAL : ABSENCE -->
     <div id="modal-absence" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <h3 class="text-xl font-bold mb-4">Nouvelle absence</h3>
@@ -145,27 +132,39 @@
                 <option value="CP">Congé Payé</option>
                 <option value="Maladie">Arrêt Maladie</option>
                 <option value="Formation">Formation</option>
-                <option value="Exceptionnel">Congé Exceptionnel</option>
             </select>
             <div class="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                    <label class="text-xs text-gray-500 font-bold">Du</label>
-                    <input type="date" id="date_debut" class="w-full p-2 border border-gray-300 rounded-xl mt-1">
-                </div>
-                <div>
-                    <label class="text-xs text-gray-500 font-bold">Au</label>
-                    <input type="date" id="date_fin" class="w-full p-2 border border-gray-300 rounded-xl mt-1">
-                </div>
+                <div><label class="text-xs font-bold text-gray-500">Du</label><input type="date" id="date_debut" class="w-full p-2 border rounded-xl mt-1"></div>
+                <div><label class="text-xs font-bold text-gray-500">Au</label><input type="date" id="date_fin" class="w-full p-2 border rounded-xl mt-1"></div>
             </div>
             <div class="flex gap-3">
-                <button onclick="fermerModal()" class="flex-1 bg-gray-200 text-gray-800 font-bold py-3 rounded-xl">Annuler</button>
+                <button onclick="fermerModalAbsence()" class="flex-1 bg-gray-200 font-bold py-3 rounded-xl">Annuler</button>
                 <button onclick="sauvegarderAbsence()" class="flex-1 bg-teal-500 text-white font-bold py-3 rounded-xl">Valider</button>
             </div>
         </div>
     </div>
 
+    <!-- MODAL : PARAMETRES -->
+    <div id="modal-parametres" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <h3 class="text-xl font-bold mb-4">Mes Soldes (Acquis)</h3>
+            <div class="mb-4">
+                <label class="text-xs font-bold text-gray-500">Nombre de CP total</label>
+                <input type="number" id="input_cp" class="w-full p-3 border rounded-xl mt-1" value="25">
+            </div>
+            <div class="mb-6">
+                <label class="text-xs font-bold text-gray-500">Nombre de RTT total</label>
+                <input type="number" id="input_rtt" class="w-full p-3 border rounded-xl mt-1" value="15">
+            </div>
+            <div class="flex gap-3">
+                <button onclick="fermerModalParametres()" class="flex-1 bg-gray-200 font-bold py-3 rounded-xl">Annuler</button>
+                <button onclick="sauvegarderParametres()" class="flex-1 bg-teal-500 text-white font-bold py-3 rounded-xl">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // --- CONFIGURATION ---
+        // --- 1. CONFIGURATION ---
         const supabaseUrl = 'https://rxqtsguwoqeojsnaagxb.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4cXRzZ3V3b3Flb2pzbmFhZ3hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTA4MjcsImV4cCI6MjEwMjcyNjgyN30.FTPTGSe6tqDTieqQdD-GWUqueKlEPUpw4QGiMa4U8AA';
      
@@ -173,24 +172,21 @@
         let currentUser = null;
         let calendar = null;
 
-        // --- HORLOGE ---
-        function updateClock() {
+        // Horloge
+        setInterval(() => {
             const now = new Date();
             document.getElementById('time-display').textContent = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
             document.getElementById('date-display').textContent = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-        }
-        setInterval(updateClock, 1000); updateClock();
+        }, 1000);
 
-        // --- AUTHENTIFICATION ---
+        // --- 2. AUTHENTIFICATION ---
         window.login = async function() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const { data, error } = await supaClient.auth.signInWithPassword({ email, password });
+            const { data, error } = await supaClient.auth.signInWithPassword({ 
+                email: document.getElementById('email').value, 
+                password: document.getElementById('password').value 
+            });
             if (!error) initialiserApp(data.user);
         };
-
-        window.logout = async function() { await supaClient.auth.signOut(); location.reload(); };
-
         window.onload = async () => {
             const { data: { user } } = await supaClient.auth.getUser();
             if (user) initialiserApp(user);
@@ -201,136 +197,183 @@
             document.getElementById('auth-section').classList.add('hidden');
             document.getElementById('app-section').classList.remove('hidden');
             document.getElementById('app-section').classList.add('flex');
-            initCalendar();
+            chargerHistoriqueJour(); // Charge les pointages du jour
+            initCalendar(); // Charge le calendrier et les soldes
         }
 
-        // --- NAVIGATION ONGLETS ---
-        window.switchTab = function(tabName) {
-            const btnPointage = document.getElementById('btn-pointage');
-            const btnPlanning = document.getElementById('btn-planning');
-            const viewPointage = document.getElementById('view-pointage');
-            const viewPlanning = document.getElementById('view-planning');
+        // --- 3. GESTION DES POINTAGES (VRAI HISTORIQUE) ---
+        async function chargerHistoriqueJour() {
+            const debutJour = new Date();
+            debutJour.setHours(0, 0, 0, 0);
 
-            // Reset styles
-            btnPointage.className = 'flex items-center gap-3 p-3 rounded-xl text-gray-600 hover:bg-gray-100 font-medium transition';
-            btnPlanning.className = 'flex items-center gap-3 p-3 rounded-xl text-gray-600 hover:bg-gray-100 font-medium transition';
-            viewPointage.classList.add('hidden');
-            viewPlanning.classList.add('hidden');
+            const { data, error } = await supaClient
+                .from('pointages')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .gte('timestamp', debutJour.toISOString())
+                .order('timestamp', { ascending: false }); // Plus récent en premier
 
-            // Activer l'onglet choisi
-            if (tabName === 'pointage') {
-                btnPointage.className = 'flex items-center gap-3 p-3 rounded-xl bg-teal-50 text-teal-700 font-medium transition';
-                viewPointage.classList.remove('hidden');
-                viewPointage.classList.add('flex');
+            const conteneur = document.getElementById('historique-jour');
+            conteneur.innerHTML = '';
+
+            if(data && data.length > 0) {
+                data.forEach(p => {
+                    const heure = new Date(p.timestamp).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
+                    
+                    // Style conditionnel selon l'action
+                    let label = p.type_action;
+                    let couleurTexte = "text-gray-800";
+                    if(label === 'arrivee') { label = "Prise de poste"; couleurTexte = "text-teal-600"; }
+                    if(label === 'pause') { label = "Pause"; couleurTexte = "text-orange-500"; }
+                    if(label === 'depart') { label = "Fin de poste"; couleurTexte = "text-slate-600"; }
+
+                    conteneur.innerHTML += `
+                        <div class="flex justify-between items-center py-3 border-b border-gray-50">
+                            <div class="font-medium ${couleurTexte} capitalize">${label}</div>
+                            <div class="text-gray-500 text-sm">${heure}</div>
+                        </div>
+                    `;
+                });
             } else {
-                btnPlanning.className = 'flex items-center gap-3 p-3 rounded-xl bg-teal-50 text-teal-700 font-medium transition';
-                viewPlanning.classList.remove('hidden');
-                viewPlanning.classList.add('flex');
-                if (calendar) calendar.render(); // Force le calendrier à s'afficher correctement après le display:block
+                conteneur.innerHTML = '<div class="flex justify-center items-center h-full text-gray-400">Aucun pointage aujourd\'hui.</div>';
             }
-        };
+        }
 
-        // --- POINTAGE (Simple) ---
         window.pointer = async function(type) {
             if (!currentUser) return;
-            const { error } = await supaClient.from('pointages').insert([{ user_id: currentUser.id, type_action: type }]);
-            if (!error) alert("Pointage enregistré !");
+            await supaClient.from('pointages').insert([{ user_id: currentUser.id, type_action: type }]);
+            chargerHistoriqueJour(); // Met à jour la liste immédiatement !
         };
 
-        // --- PLANNING & CONGÉS ---
+        // --- 4. GESTION DES SOLDES ET ABSENCES ---
+        async function chargerSoldesEtCalculs(absencesVues) {
+            // 1. Récupérer les paramètres de base
+            let { data: params } = await supaClient.from('parametres').select('*').eq('user_id', currentUser.id).single();
+            
+            // Si pas de paramètres enregistrés, on met des valeurs par défaut
+            if(!params) { params = { cp_initial: 25, rtt_initial: 15 }; }
+
+            // 2. Calculer le consommé
+            let cpConsommes = 0;
+            let rttConsommes = 0;
+            let joursNovFev = 0; // Pour le fractionnement
+
+            absencesVues.forEach(abs => {
+                // Calcul du nombre de jours entre debut et fin
+                const debut = new Date(abs.date_debut);
+                const fin = new Date(abs.date_fin);
+                // +1 car si on pose du Lundi au Lundi, ça fait 1 jour, pas 0.
+                const diffJours = Math.round((fin - debut) / (1000 * 60 * 60 * 24)) + 1; 
+
+                if(abs.type_absence === 'CP') {
+                    cpConsommes += diffJours;
+                    // Vérification Novembre à Février
+                    for (let j = new Date(debut); j <= fin; j.setDate(j.getDate() + 1)) {
+                        if([10, 11, 0, 1].includes(j.getMonth())) joursNovFev++;
+                    }
+                }
+                if(abs.type_absence === 'RTT') rttConsommes += diffJours;
+            });
+
+            // 3. Affichage Restant (Initial - Consommé)
+            document.getElementById('cpt-cp').textContent = (params.cp_initial - cpConsommes) + ' j';
+            document.getElementById('cpt-rtt').textContent = (params.rtt_initial - rttConsommes) + ' j';
+
+            // Alerte RTT obligatoire : vérifie si on est dans le mois en cours et s'il reste des RTT
+            if((params.rtt_initial - rttConsommes) > 0) {
+                document.getElementById('alerte-rtt').classList.remove('hidden');
+            }
+
+            // 4. Fractionnement
+            let fractionnement = 0;
+            if (joursNovFev >= 8) fractionnement = 2;
+            else if (joursNovFev >= 6) fractionnement = 1;
+            document.getElementById('cpt-fractionnement').textContent = `+${fractionnement} j`;
+        }
+
+        // --- 5. CALENDRIER ---
         function initCalendar() {
             const calendarEl = document.getElementById('calendar');
             calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'dayGridMonth',
                 locale: 'fr',
-                headerToolbar: {
-                    left: 'prev,next today',
-                    center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
-                },
-                buttonText: { today: "Aujourd'hui", month: 'Mois', week: 'Semaine', day: 'Jour' },
-                events: chargerEvenementsCalendrier
+                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
+                events: async function(info, successCallback, failureCallback) {
+                    const { data, error } = await supaClient.from('absences').select('*').eq('user_id', currentUser.id);
+                    if (error) { failureCallback(error); return; }
+
+                    chargerSoldesEtCalculs(data); // Met à jour les compteurs avec les données réelles
+
+                    const events = data.map(abs => {
+                        let color = '#3b82f6'; 
+                        if(abs.type_absence === 'CP') color = '#14b8a6'; 
+                        if(abs.type_absence === 'Maladie') color = '#ef4444'; 
+                        return {
+                            title: abs.type_absence,
+                            start: abs.date_debut,
+                            end: new Date(new Date(abs.date_fin).getTime() + 86400000).toISOString().split('T')[0], 
+                            backgroundColor: color, borderColor: color
+                        };
+                    });
+                    successCallback(events);
+                }
             });
-            // N'est rendu que lorsqu'on clique sur l'onglet (géré dans switchTab)
         }
 
-        async function chargerEvenementsCalendrier(info, successCallback, failureCallback) {
-            // Ici, nous récupérons les congés depuis Supabase
-            const { data, error } = await supaClient.from('absences').select('*').eq('user_id', currentUser.id);
-            if (error) { failureCallback(error); return; }
+        window.switchTab = function(tabName) {
+            document.getElementById('view-pointage').classList.add('hidden');
+            document.getElementById('view-planning').classList.add('hidden');
+            document.getElementById('btn-pointage').classList.remove('bg-teal-50', 'text-teal-700');
+            document.getElementById('btn-planning').classList.remove('bg-teal-50', 'text-teal-700');
 
-            const events = data.map(abs => {
-                // Couleurs différentes selon le type
-                let color = '#3b82f6'; // RTT: Bleu
-                if(abs.type_absence === 'CP') color = '#14b8a6'; // Vert
-                if(abs.type_absence === 'Maladie') color = '#ef4444'; // Rouge
-                
-                return {
-                    title: abs.type_absence,
-                    start: abs.date_debut,
-                    end: new Date(new Date(abs.date_fin).getTime() + 86400000).toISOString().split('T')[0], // Ajoute 1j pour FullCalendar (exclusif)
-                    backgroundColor: color,
-                    borderColor: color
-                };
-            });
-            
-            // On en profite pour calculer les jours de fractionnement à la volée !
-            calculerFractionnement(data);
-            
-            successCallback(events);
-        }
-
-        // --- GESTION DES MODALES ---
-        window.ouvrirModal = () => document.getElementById('modal-absence').classList.remove('hidden');
-        window.fermerModal = () => document.getElementById('modal-absence').classList.add('hidden');
-
-        window.sauvegarderAbsence = async () => {
-            const type = document.getElementById('type_absence').value;
-            const debut = document.getElementById('date_debut').value;
-            const fin = document.getElementById('date_fin').value;
-
-            if(!debut || !fin) return alert("Veuillez sélectionner les dates.");
-
-            const { error } = await supaClient.from('absences').insert([{ 
-                user_id: currentUser.id, type_absence: type, date_debut: debut, date_fin: fin 
-            }]);
-
-            if (error) {
-                alert("Erreur lors de l'enregistrement.");
+            if (tabName === 'pointage') {
+                document.getElementById('view-pointage').classList.remove('hidden');
+                document.getElementById('view-pointage').classList.add('flex');
+                document.getElementById('btn-pointage').classList.add('bg-teal-50', 'text-teal-700');
+                chargerHistoriqueJour(); // Rafraîchit l'historique quand on revient dessus
             } else {
-                fermerModal();
-                calendar.refetchEvents(); // Met à jour le calendrier !
+                document.getElementById('view-planning').classList.remove('hidden');
+                document.getElementById('view-planning').classList.add('flex');
+                document.getElementById('btn-planning').classList.add('bg-teal-50', 'text-teal-700');
+                if(calendar) calendar.render();
             }
         };
 
-        // --- LOGIQUE METIER : JOURS DE FRACTIONNEMENT ---
-        function calculerFractionnement(absences) {
-            let joursNovFev = 0;
+        // --- 6. MODALES ---
+        window.ouvrirModalAbsence = () => document.getElementById('modal-absence').classList.remove('hidden');
+        window.fermerModalAbsence = () => document.getElementById('modal-absence').classList.add('hidden');
+        
+        window.sauvegarderAbsence = async () => {
+            const { error } = await supaClient.from('absences').insert([{ 
+                user_id: currentUser.id, 
+                type_absence: document.getElementById('type_absence').value, 
+                date_debut: document.getElementById('date_debut').value, 
+                date_fin: document.getElementById('date_fin').value 
+            }]);
+            fermerModalAbsence();
+            calendar.refetchEvents(); // Recharge le calendrier ET les soldes !
+        };
+
+        window.ouvrirModalParametres = async () => {
+            const { data } = await supaClient.from('parametres').select('*').eq('user_id', currentUser.id).single();
+            if(data) {
+                document.getElementById('input_cp').value = data.cp_initial;
+                document.getElementById('input_rtt').value = data.rtt_initial;
+            }
+            document.getElementById('modal-parametres').classList.remove('hidden');
+        };
+        window.fermerModalParametres = () => document.getElementById('modal-parametres').classList.add('hidden');
+        
+        window.sauvegarderParametres = async () => {
+            const cp = document.getElementById('input_cp').value;
+            const rtt = document.getElementById('input_rtt').value;
             
-            // Pour chaque congé, on vérifie s'il tombe entre le 1er Novembre et le 28/29 Février
-            absences.forEach(abs => {
-                if(abs.type_absence === 'CP') {
-                    let d = new Date(abs.date_debut);
-                    let f = new Date(abs.date_fin);
-                    // Boucle sur chaque jour du congé
-                    for (let j = new Date(d); j <= f; j.setDate(j.getDate() + 1)) {
-                        let mois = j.getMonth(); // 0 = Janvier, 1 = Février ... 10 = Nov, 11 = Dec
-                        // Si le mois est Nov, Dec, Jan, Fev (10, 11, 0, 1)
-                        if([10, 11, 0, 1].includes(mois)) {
-                            joursNovFev++;
-                        }
-                    }
-                }
+            await supaClient.from('parametres').upsert({ 
+                user_id: currentUser.id, cp_initial: cp, rtt_initial: rtt 
             });
-
-            // Application de votre règle personnalisée : +1 pour 6 jours, +2 pour 8 jours
-            let fractionnement = 0;
-            if (joursNovFev >= 8) fractionnement = 2;
-            else if (joursNovFev >= 6) fractionnement = 1;
-
-            document.getElementById('compteur-fractionnement').textContent = `+${fractionnement} j`;
-        }
+            fermerModalParametres();
+            calendar.refetchEvents(); // Recalcule les restants
+        };
     </script>
 </body>
 </html>
-

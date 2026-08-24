@@ -16,67 +16,176 @@
         .fc-button-primary { background-color: #14b8a6 !important; border-color: #14b8a6 !important; }
         .fc-button-primary:hover { background-color: #0d9488 !important; border-color: #0d9488 !important; }
         .fc-button-active { background-color: #0f766e !important; }
+        
+        /* Animations */
+        @keyframes slideIn {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        /* Scrollbar personnalisée */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #14b8a6;
+            border-radius: 3px;
+        }
+        
+        /* Amélioration des boutons */
+        .btn-primary {
+            transition: all 0.2s ease;
+        }
+        .btn-primary:active {
+            transform: scale(0.95);
+        }
+        .btn-primary:hover {
+            box-shadow: 0 10px 20px rgba(20, 184, 166, 0.3);
+        }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center p-2 md:p-6 font-sans">
+<body class="bg-gradient-to-br from-teal-50 to-gray-100 min-h-screen flex items-center justify-center p-2 md:p-6 font-sans">
 
     <!-- CONNEXION -->
-    <div id="auth-section" class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-        <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">Connexion</h2>
-        <input type="email" id="email" placeholder="Email" class="w-full p-3 border border-gray-300 rounded-xl mb-4 focus:outline-none focus:ring-2 focus:ring-teal-500">
-        <input type="password" id="password" placeholder="Mot de passe" class="w-full p-3 border border-gray-300 rounded-xl mb-6 focus:outline-none focus:ring-2 focus:ring-teal-500">
-        <button onclick="login()" class="w-full bg-teal-500 text-white font-bold py-3 rounded-xl hover:bg-teal-600 transition shadow-lg">Se connecter</button>
+    <div id="auth-section" class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md animate-slide-in">
+        <div class="text-center mb-8">
+            <div class="text-teal-500 text-5xl mb-4">⏱️</div>
+            <h2 class="text-3xl font-bold text-gray-800">Mon SIRH</h2>
+            <p class="text-gray-500 mt-2">Gestion du temps de travail</p>
+        </div>
+        
+        <div class="space-y-4">
+            <div>
+                <label class="text-sm font-medium text-gray-700 mb-1 block">Email</label>
+                <input type="email" id="email" placeholder="votre@email.com" 
+                       class="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 transition">
+            </div>
+            <div>
+                <label class="text-sm font-medium text-gray-700 mb-1 block">Mot de passe</label>
+                <input type="password" id="password" placeholder="••••••••" 
+                       class="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 transition">
+            </div>
+            <button onclick="login()" 
+                    class="w-full bg-teal-500 text-white font-bold py-3 rounded-xl hover:bg-teal-600 transition shadow-lg btn-primary">
+                Se connecter
+            </button>
+        </div>
+        
+        <div class="mt-6 text-center text-sm text-gray-500">
+            <p>Application sécurisée • Données chiffrées</p>
+        </div>
     </div>
 
     <!-- APP -->
-    <div id="app-section" class="hidden w-full max-w-5xl bg-white md:rounded-3xl shadow-2xl flex-col md:flex-row overflow-hidden min-h-[85vh]">
+    <div id="app-section" class="hidden w-full max-w-6xl bg-white md:rounded-3xl shadow-2xl flex-col md:flex-row overflow-hidden min-h-[90vh]">
         
         <!-- MENU GAUCHE -->
-        <div class="md:w-1/4 bg-gray-50 border-r border-gray-200 p-6 flex flex-col">
-            <div class="text-teal-500 font-bold text-xl flex items-center justify-center gap-2 mb-8">
-                <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path></svg>
-                MON SIRH
+        <div class="md:w-72 bg-gray-50 border-r border-gray-200 p-6 flex flex-col">
+            <div class="flex items-center gap-3 mb-8">
+                <div class="w-12 h-12 bg-teal-500 rounded-xl flex items-center justify-center text-white text-2xl font-bold">
+                    {initials}
+                </div>
+                <div>
+                    <div class="font-bold text-gray-800">{userName}</div>
+                    <div class="text-xs text-gray-500">{userEmail}</div>
+                </div>
             </div>
 
-            <nav class="flex flex-col gap-2 mb-8">
-                <button onclick="switchTab('pointage')" id="btn-pointage" class="flex items-center gap-3 p-3 rounded-xl bg-teal-50 text-teal-700 font-medium transition">
+            <nav class="flex flex-col gap-2 mb-6">
+                <button onclick="switchTab('pointage')" id="btn-pointage" 
+                        class="flex items-center gap-3 p-3 rounded-xl bg-teal-50 text-teal-700 font-medium transition hover:bg-teal-100">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
                     Pointage du jour
                 </button>
-                <button onclick="switchTab('planning')" id="btn-planning" class="flex items-center gap-3 p-3 rounded-xl text-gray-600 hover:bg-gray-100 font-medium transition">
+                <button onclick="switchTab('planning')" id="btn-planning" 
+                        class="flex items-center gap-3 p-3 rounded-xl text-gray-600 hover:bg-gray-100 font-medium transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
                     Planning & Congés
+                </button>
+                <button onclick="logout()" 
+                        class="flex items-center gap-3 p-3 rounded-xl text-red-600 hover:bg-red-50 font-medium transition mt-4">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                    </svg>
+                    Déconnexion
                 </button>
             </nav>
 
-            <div class="mt-auto pt-6 border-t border-gray-200 text-center">
-                <div id="date-display" class="text-gray-500 text-sm font-medium capitalize"></div>
-                <div id="time-display" class="text-3xl font-bold text-gray-800 tracking-tight mt-1"></div>
+            <div class="mt-auto pt-6 border-t border-gray-200">
+                <div class="bg-white rounded-xl p-4 shadow-sm">
+                    <div class="text-center">
+                        <div id="date-display" class="text-gray-500 text-sm font-medium capitalize mb-1"></div>
+                        <div id="time-display" class="text-4xl font-bold text-teal-600 tracking-tight"></div>
+                        <div class="mt-3 flex justify-center gap-2">
+                            <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">● En ligne</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- ZONE DROITE -->
-        <div class="md:w-3/4 flex flex-col p-4 md:p-8 relative">
+        <div class="flex-1 flex flex-col p-4 md:p-8 relative">
             
-            <!-- VUE 1 : POINTAGE (Dynamique) -->
+            <!-- VUE 1 : POINTAGE -->
             <div id="view-pointage" class="flex-1 flex flex-col">
                 <div class="flex flex-col items-center mt-2 mb-6">
                     <h2 class="text-2xl font-medium text-gray-800">Suivi d'activité</h2>
                     <span class="text-sm text-gray-500">Aujourd'hui</span>
                 </div>
 
-                <!-- HISTORIQUE CENTRAL DEPUIS SUPABASE -->
-                <div class="flex-1 overflow-y-auto mb-8 px-2 space-y-2 border-t border-b border-gray-100 py-4" id="historique-jour">
+                <!-- STATISTIQUES RAPIDES -->
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="bg-teal-50 p-4 rounded-xl text-center">
+                        <div class="text-2xl font-bold text-teal-600" id="stat-heures">0h</div>
+                        <div class="text-xs text-gray-600 mt-1">Heures travaillées</div>
+                    </div>
+                    <div class="bg-orange-50 p-4 rounded-xl text-center">
+                        <div class="text-2xl font-bold text-orange-600" id="stat-pauses">0</div>
+                        <div class="text-xs text-gray-600 mt-1">Pauses prises</div>
+                    </div>
+                    <div class="bg-blue-50 p-4 rounded-xl text-center">
+                        <div class="text-2xl font-bold text-blue-600" id="stat-statut">--</div>
+                        <div class="text-xs text-gray-600 mt-1">Statut actuel</div>
+                    </div>
+                </div>
+
+                <!-- HISTORIQUE -->
+                <div class="flex-1 overflow-y-auto custom-scrollbar mb-6 px-2 space-y-2 border-t border-b border-gray-100 py-4" id="historique-jour">
                     <div class="flex justify-center items-center h-full text-gray-400">Chargement de l'historique...</div>
                 </div>
 
                 <!-- BOUTONS -->
                 <div class="grid grid-cols-3 gap-3 md:gap-4 mt-auto">
-                    <button onclick="pointer('arrivee')" class="bg-teal-500 hover:bg-teal-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md active:scale-95">
+                    <button onclick="pointer('arrivee')" 
+                            class="btn-primary bg-teal-500 hover:bg-teal-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md">
+                        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
                         <span class="text-sm md:text-base font-medium">Arrivée</span>
                     </button>
-                    <button onclick="pointer('pause')" class="bg-orange-500 hover:bg-orange-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md active:scale-95">
+                    <button onclick="pointer('pause')" 
+                            class="btn-primary bg-orange-500 hover:bg-orange-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md">
+                        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
                         <span class="text-sm md:text-base font-medium">Pause</span>
                     </button>
-                    <button onclick="pointer('depart')" class="bg-slate-500 hover:bg-slate-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md active:scale-95">
+                    <button onclick="pointer('depart')" 
+                            class="btn-primary bg-slate-500 hover:bg-slate-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md">
+                        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                        </svg>
                         <span class="text-sm md:text-base font-medium">Départ</span>
                     </button>
                 </div>
@@ -85,39 +194,46 @@
             <!-- VUE 2 : PLANNING -->
             <div id="view-planning" class="hidden flex-1 flex flex-col h-full">
                 
-                <!-- Bouton de paramétrage des soldes -->
-                <div class="flex justify-end mb-2">
-                    <button onclick="ouvrirModalParametres()" class="text-sm text-teal-600 hover:underline flex items-center gap-1">
-                        ⚙️ Modifier mes soldes de départ
-                    </button>
+                <!-- En-tête avec actions -->
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">Mes soldes et congés</h3>
+                        <p class="text-sm text-gray-500">Gérez vos absences et visualisez votre planning</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="ouvrirModalAbsence()" 
+                                class="bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:bg-slate-700 transition">
+                            + Déclarer une absence
+                        </button>
+                        <button onclick="ouvrirModalParametres()" 
+                                class="text-sm text-teal-600 hover:underline flex items-center gap-1 py-2.5 px-4">
+                            ⚙️ Paramètres
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Compteurs (Calculés) -->
+                <!-- Compteurs -->
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div class="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                        <div class="text-xs text-gray-500 font-bold uppercase mb-1">Heures Sup</div>
-                        <div class="text-xl font-bold text-teal-600" id="cpt-heures">--</div>
+                    <div class="bg-gradient-to-br from-teal-50 to-teal-100 p-4 rounded-xl border border-teal-200">
+                        <div class="text-xs text-teal-600 font-bold uppercase mb-1">Heures Sup</div>
+                        <div class="text-2xl font-bold text-teal-700" id="cpt-heures">--</div>
                     </div>
-                    <div class="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <div class="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl border border-gray-200">
                         <div class="text-xs text-gray-500 font-bold uppercase mb-1">CP Restants</div>
-                        <div class="text-xl font-bold text-gray-800" id="cpt-cp">-- j</div>
+                        <div class="text-2xl font-bold text-gray-800" id="cpt-cp">-- j</div>
                     </div>
-                    <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 relative">
+                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 relative">
                         <div class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full animate-pulse hidden" id="alerte-rtt">1 à poser !</div>
                         <div class="text-xs text-blue-600 font-bold uppercase mb-1">RTT Restants</div>
-                        <div class="text-xl font-bold text-blue-800" id="cpt-rtt">-- j</div>
+                        <div class="text-2xl font-bold text-blue-800" id="cpt-rtt">-- j</div>
                     </div>
-                    <div class="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                    <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200">
                         <div class="text-xs text-purple-600 font-bold uppercase mb-1">Fractionnement</div>
-                        <div class="text-xl font-bold text-purple-800" id="cpt-fractionnement">+0 j</div>
+                        <div class="text-2xl font-bold text-purple-800" id="cpt-fractionnement">+0 j</div>
                     </div>
                 </div>
 
-                <button onclick="ouvrirModalAbsence()" class="w-full bg-slate-800 text-white font-bold py-3 rounded-xl mb-6 shadow-md hover:bg-slate-700">
-                    + Déclarer une absence
-                </button>
-
-                <div id="calendar" class="flex-1 min-h-[400px]"></div>
+                <div id="calendar" class="flex-1 min-h-[400px] shadow-lg rounded-xl border border-gray-200 p-2"></div>
             </div>
             
         </div>
@@ -125,68 +241,136 @@
 
     <!-- MODAL : ABSENCE -->
     <div id="modal-absence" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <h3 class="text-xl font-bold mb-4">Nouvelle absence</h3>
-            <select id="type_absence" class="w-full p-3 border border-gray-300 rounded-xl mb-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-slide-in">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Nouvelle absence</h3>
+                <button onclick="fermerModalAbsence()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <select id="type_absence" class="w-full p-3 border border-gray-300 rounded-xl mb-4 focus:outline-none focus:ring-2 focus:ring-teal-500">
                 <option value="RTT">RTT</option>
                 <option value="CP">Congé Payé</option>
                 <option value="Maladie">Arrêt Maladie</option>
                 <option value="Formation">Formation</option>
+                <option value="Autre">Autre</option>
             </select>
+            
             <div class="grid grid-cols-2 gap-4 mb-6">
-                <div><label class="text-xs font-bold text-gray-500">Du</label><input type="date" id="date_debut" class="w-full p-2 border rounded-xl mt-1"></div>
-                <div><label class="text-xs font-bold text-gray-500">Au</label><input type="date" id="date_fin" class="w-full p-2 border rounded-xl mt-1"></div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500">Du</label>
+                    <input type="date" id="date_debut" class="w-full p-2 border rounded-xl mt-1 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500">Au</label>
+                    <input type="date" id="date_fin" class="w-full p-2 border rounded-xl mt-1 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                </div>
             </div>
+            
             <div class="flex gap-3">
-                <button onclick="fermerModalAbsence()" class="flex-1 bg-gray-200 font-bold py-3 rounded-xl">Annuler</button>
-                <button onclick="sauvegarderAbsence()" class="flex-1 bg-teal-500 text-white font-bold py-3 rounded-xl">Valider</button>
+                <button onclick="fermerModalAbsence()" class="flex-1 bg-gray-200 font-bold py-3 rounded-xl hover:bg-gray-300 transition">Annuler</button>
+                <button onclick="sauvegarderAbsence()" class="flex-1 bg-teal-500 text-white font-bold py-3 rounded-xl hover:bg-teal-600 transition btn-primary">Valider</button>
             </div>
         </div>
     </div>
 
     <!-- MODAL : PARAMETRES -->
     <div id="modal-parametres" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <h3 class="text-xl font-bold mb-4">Mes Soldes (Acquis)</h3>
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-slide-in">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Mes Soldes (Acquis)</h3>
+                <button onclick="fermerModalParametres()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
             <div class="mb-4">
-                <label class="text-xs font-bold text-gray-500">Nombre de CP total</label>
-                <input type="number" id="input_cp" class="w-full p-3 border rounded-xl mt-1" value="25">
+                <label class="text-xs font-bold text-gray-500 mb-1 block">Nombre de CP total</label>
+                <input type="number" id="input_cp" class="w-full p-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500" value="25">
             </div>
             <div class="mb-6">
-                <label class="text-xs font-bold text-gray-500">Nombre de RTT total</label>
-                <input type="number" id="input_rtt" class="w-full p-3 border rounded-xl mt-1" value="15">
+                <label class="text-xs font-bold text-gray-500 mb-1 block">Nombre de RTT total</label>
+                <input type="number" id="input_rtt" class="w-full p-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500" value="15">
             </div>
+            
             <div class="flex gap-3">
-                <button onclick="fermerModalParametres()" class="flex-1 bg-gray-200 font-bold py-3 rounded-xl">Annuler</button>
-                <button onclick="sauvegarderParametres()" class="flex-1 bg-teal-500 text-white font-bold py-3 rounded-xl">Enregistrer</button>
+                <button onclick="fermerModalParametres()" class="flex-1 bg-gray-200 font-bold py-3 rounded-xl hover:bg-gray-300 transition">Annuler</button>
+                <button onclick="sauvegarderParametres()" class="flex-1 bg-teal-500 text-white font-bold py-3 rounded-xl hover:bg-teal-600 transition btn-primary">Enregistrer</button>
             </div>
         </div>
     </div>
 
+    <!-- Toast Notification -->
+    <div id="toast" class="hidden fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg animate-slide-in">
+        Opération réussie !
+    </div>
+
     <script>
         // --- 1. CONFIGURATION ---
-        const supabaseUrl = 'https://rxqtsguwoqeojsnaagxb.supabase.co';
-        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4cXRzZ3V3b3Flb2pzbmFhZ3hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTA4MjcsImV4cCI6MjEwMjcyNjgyN30.FTPTGSe6tqDTieqQdD-GWUqueKlEPUpw4QGiMa4U8AA';
-     
+        const supabaseUrl = 'VOTRE_URL_SUPABASE';
+        const supabaseKey = 'VOTRE_CLE_ANON';
         const supaClient = window.supabase.createClient(supabaseUrl, supabaseKey);
         let currentUser = null;
         let calendar = null;
+        let currentPointages = [];
 
-        // Horloge
-        setInterval(() => {
+        // Horloge améliorée
+        function updateClock() {
             const now = new Date();
-            document.getElementById('time-display').textContent = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-            document.getElementById('date-display').textContent = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-        }, 1000);
+            document.getElementById('time-display').textContent = now.toLocaleTimeString('fr-FR', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('date-display').textContent = now.toLocaleDateString('fr-FR', { 
+                weekday: 'long', 
+                day: 'numeric', 
+                month: 'long',
+                year: 'numeric'
+            });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Toast notification
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
 
         // --- 2. AUTHENTIFICATION ---
         window.login = async function() {
-            const { data, error } = await supaClient.auth.signInWithPassword({ 
-                email: document.getElementById('email').value, 
-                password: document.getElementById('password').value 
-            });
-            if (!error) initialiserApp(data.user);
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const { data, error } = await supaClient.auth.signInWithPassword({ 
+                    email: email, 
+                    password: password 
+                });
+                
+                if (error) throw error;
+                initialiserApp(data.user);
+                showToast('Connexion réussie !');
+            } catch (error) {
+                alert('Erreur de connexion : ' + error.message);
+            }
         };
+
+        window.logout = async function() {
+            await supaClient.auth.signOut();
+            location.reload();
+        };
+
         window.onload = async () => {
             const { data: { user } } = await supaClient.auth.getUser();
             if (user) initialiserApp(user);
@@ -194,14 +378,22 @@
 
         function initialiserApp(user) {
             currentUser = user;
+            
+            // Mettre à jour les informations utilisateur
+            const initials = user.email.substring(0, 2).toUpperCase();
+            document.querySelector('.bg-teal-500.rounded-xl').textContent = initials;
+            document.querySelector('.font-bold.text-gray-800').textContent = user.email.split('@')[0];
+            document.querySelector('.text-xs.text-gray-500').textContent = user.email;
+            
             document.getElementById('auth-section').classList.add('hidden');
             document.getElementById('app-section').classList.remove('hidden');
             document.getElementById('app-section').classList.add('flex');
-            chargerHistoriqueJour(); // Charge les pointages du jour
-            initCalendar(); // Charge le calendrier et les soldes
+            
+            chargerHistoriqueJour();
+            initCalendar();
         }
 
-        // --- 3. GESTION DES POINTAGES (VRAI HISTORIQUE) ---
+        // --- 3. GESTION DES POINTAGES AVEC STATISTIQUES ---
         async function chargerHistoriqueJour() {
             const debutJour = new Date();
             debutJour.setHours(0, 0, 0, 0);
@@ -211,63 +403,139 @@
                 .select('*')
                 .eq('user_id', currentUser.id)
                 .gte('timestamp', debutJour.toISOString())
-                .order('timestamp', { ascending: false }); // Plus récent en premier
+                .order('timestamp', { ascending: true }); // Plus ancien en premier
 
+            if (error) {
+                console.error('Erreur chargement historique:', error);
+                return;
+            }
+
+            currentPointages = data || [];
             const conteneur = document.getElementById('historique-jour');
             conteneur.innerHTML = '';
 
-            if(data && data.length > 0) {
-                data.forEach(p => {
+            if(currentPointages.length > 0) {
+                // Calculer les statistiques
+                calculerStatistiques(currentPointages);
+                
+                // Afficher l'historique
+                currentPointages.forEach(p => {
                     const heure = new Date(p.timestamp).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
                     
-                    // Style conditionnel selon l'action
                     let label = p.type_action;
+                    let icon = '';
                     let couleurTexte = "text-gray-800";
-                    if(label === 'arrivee') { label = "Prise de poste"; couleurTexte = "text-teal-600"; }
-                    if(label === 'pause') { label = "Pause"; couleurTexte = "text-orange-500"; }
-                    if(label === 'depart') { label = "Fin de poste"; couleurTexte = "text-slate-600"; }
+                    let bgColor = "bg-gray-50";
+                    
+                    if(label === 'arrivee') { 
+                        label = "Prise de poste"; 
+                        couleurTexte = "text-teal-600";
+                        icon = '🟢';
+                        bgColor = "bg-teal-50";
+                    }
+                    if(label === 'pause') { 
+                        label = "Pause"; 
+                        couleurTexte = "text-orange-500";
+                        icon = '⏸️';
+                        bgColor = "bg-orange-50";
+                    }
+                    if(label === 'depart') { 
+                        label = "Fin de poste"; 
+                        couleurTexte = "text-slate-600";
+                        icon = '🔴';
+                        bgColor = "bg-slate-50";
+                    }
 
                     conteneur.innerHTML += `
-                        <div class="flex justify-between items-center py-3 border-b border-gray-50">
-                            <div class="font-medium ${couleurTexte} capitalize">${label}</div>
-                            <div class="text-gray-500 text-sm">${heure}</div>
+                        <div class="flex justify-between items-center py-3 px-4 border-b border-gray-100 ${bgColor} rounded-lg animate-slide-in">
+                            <div class="font-medium ${couleurTexte} capitalize flex items-center gap-2">
+                                <span>${icon}</span> ${label}
+                            </div>
+                            <div class="text-gray-500 text-sm font-mono">${heure}</div>
                         </div>
                     `;
                 });
             } else {
                 conteneur.innerHTML = '<div class="flex justify-center items-center h-full text-gray-400">Aucun pointage aujourd\'hui.</div>';
+                document.getElementById('stat-heures').textContent = '0h';
+                document.getElementById('stat-pauses').textContent = '0';
+                document.getElementById('stat-statut').textContent = '--';
             }
+        }
+
+        function calculerStatistiques(pointages) {
+            let arrivee = null;
+            let depart = null;
+            let pauses = 0;
+            let statut = '--';
+            
+            pointages.forEach(p => {
+                if (p.type_action === 'arrivee') {
+                    arrivee = new Date(p.timestamp);
+                    statut = 'En poste';
+                }
+                if (p.type_action === 'pause') {
+                    pauses++;
+                }
+                if (p.type_action === 'depart') {
+                    depart = new Date(p.timestamp);
+                    statut = 'Terminé';
+                }
+            });
+            
+            // Calculer les heures travaillées
+            if (arrivee && depart) {
+                const diffMs = depart - arrivee;
+                const diffHeures = (diffMs / (1000 * 60 * 60)).toFixed(1);
+                document.getElementById('stat-heures').textContent = diffHeures + 'h';
+            } else if (arrivee && !depart) {
+                const now = new Date();
+                const diffMs = now - arrivee;
+                const diffHeures = (diffMs / (1000 * 60 * 60)).toFixed(1);
+                document.getElementById('stat-heures').textContent = diffHeures + 'h';
+            }
+            
+            document.getElementById('stat-pauses').textContent = pauses;
+            document.getElementById('stat-statut').textContent = statut;
         }
 
         window.pointer = async function(type) {
             if (!currentUser) return;
-            await supaClient.from('pointages').insert([{ user_id: currentUser.id, type_action: type }]);
-            chargerHistoriqueJour(); // Met à jour la liste immédiatement !
+            
+            try {
+                const { error } = await supaClient.from('pointages').insert([{ 
+                    user_id: currentUser.id, 
+                    type_action: type 
+                }]);
+                
+                if (error) throw error;
+                
+                chargerHistoriqueJour();
+                showToast('Pointage enregistré : ' + type);
+            } catch (error) {
+                alert('Erreur lors du pointage : ' + error.message);
+            }
         };
 
         // --- 4. GESTION DES SOLDES ET ABSENCES ---
         async function chargerSoldesEtCalculs(absencesVues) {
-            // 1. Récupérer les paramètres de base
             let { data: params } = await supaClient.from('parametres').select('*').eq('user_id', currentUser.id).single();
             
-            // Si pas de paramètres enregistrés, on met des valeurs par défaut
-            if(!params) { params = { cp_initial: 25, rtt_initial: 15 }; }
+            if(!params) { 
+                params = { cp_initial: 25, rtt_initial: 15 }; 
+            }
 
-            // 2. Calculer le consommé
             let cpConsommes = 0;
             let rttConsommes = 0;
-            let joursNovFev = 0; // Pour le fractionnement
+            let joursNovFev = 0;
 
             absencesVues.forEach(abs => {
-                // Calcul du nombre de jours entre debut et fin
                 const debut = new Date(abs.date_debut);
                 const fin = new Date(abs.date_fin);
-                // +1 car si on pose du Lundi au Lundi, ça fait 1 jour, pas 0.
                 const diffJours = Math.round((fin - debut) / (1000 * 60 * 60 * 24)) + 1; 
 
                 if(abs.type_absence === 'CP') {
                     cpConsommes += diffJours;
-                    // Vérification Novembre à Février
                     for (let j = new Date(debut); j <= fin; j.setDate(j.getDate() + 1)) {
                         if([10, 11, 0, 1].includes(j.getMonth())) joursNovFev++;
                     }
@@ -275,20 +543,29 @@
                 if(abs.type_absence === 'RTT') rttConsommes += diffJours;
             });
 
-            // 3. Affichage Restant (Initial - Consommé)
-            document.getElementById('cpt-cp').textContent = (params.cp_initial - cpConsommes) + ' j';
-            document.getElementById('cpt-rtt').textContent = (params.rtt_initial - rttConsommes) + ' j';
+            const cpRestants = params.cp_initial - cpConsommes;
+            const rttRestants = params.rtt_initial - rttConsommes;
+            
+            document.getElementById('cpt-cp').textContent = cpRestants + ' j';
+            document.getElementById('cpt-rtt').textContent = rttRestants + ' j';
 
-            // Alerte RTT obligatoire : vérifie si on est dans le mois en cours et s'il reste des RTT
-            if((params.rtt_initial - rttConsommes) > 0) {
+            // Alerte RTT
+            if(rttRestants > 0) {
+                document.getElementById('alerte-rtt').textContent = rttRestants + ' à poser !';
                 document.getElementById('alerte-rtt').classList.remove('hidden');
+            } else {
+                document.getElementById('alerte-rtt').classList.add('hidden');
             }
 
-            // 4. Fractionnement
+            // Fractionnement
             let fractionnement = 0;
             if (joursNovFev >= 8) fractionnement = 2;
             else if (joursNovFev >= 6) fractionnement = 1;
             document.getElementById('cpt-fractionnement').textContent = `+${fractionnement} j`;
+            
+            // Calcul des heures supplémentaires (exemple : dépassement de 35h/semaine)
+            const heuresSup = Math.max(0, (cpRestants * 7) - 35);
+            document.getElementById('cpt-heures').textContent = heuresSup.toFixed(1) + 'h';
         }
 
         // --- 5. CALENDRIER ---
@@ -297,25 +574,45 @@
             calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'dayGridMonth',
                 locale: 'fr',
-                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
+                headerToolbar: { 
+                    left: 'prev,next today', 
+                    center: 'title', 
+                    right: 'dayGridMonth,timeGridWeek,listMonth' 
+                },
+                buttonText: {
+                    today: 'Aujourd\'hui',
+                    month: 'Mois',
+                    week: 'Semaine',
+                    list: 'Liste'
+                },
                 events: async function(info, successCallback, failureCallback) {
                     const { data, error } = await supaClient.from('absences').select('*').eq('user_id', currentUser.id);
-                    if (error) { failureCallback(error); return; }
+                    if (error) { 
+                        failureCallback(error); 
+                        return; 
+                    }
 
-                    chargerSoldesEtCalculs(data); // Met à jour les compteurs avec les données réelles
+                    chargerSoldesEtCalculs(data);
 
                     const events = data.map(abs => {
                         let color = '#3b82f6'; 
                         if(abs.type_absence === 'CP') color = '#14b8a6'; 
-                        if(abs.type_absence === 'Maladie') color = '#ef4444'; 
+                        if(abs.type_absence === 'Maladie') color = '#ef4444';
+                        if(abs.type_absence === 'RTT') color = '#8b5cf6';
+                        if(abs.type_absence === 'Formation') color = '#f59e0b';
+                        
                         return {
                             title: abs.type_absence,
                             start: abs.date_debut,
                             end: new Date(new Date(abs.date_fin).getTime() + 86400000).toISOString().split('T')[0], 
-                            backgroundColor: color, borderColor: color
+                            backgroundColor: color, 
+                            borderColor: color
                         };
                     });
                     successCallback(events);
+                },
+                eventClick: function(info) {
+                    alert(`${info.event.title}\nDu ${info.event.start.toLocaleDateString('fr-FR')} au ${info.event.end.toLocaleDateString('fr-FR')}`);
                 }
             });
         }
@@ -330,7 +627,7 @@
                 document.getElementById('view-pointage').classList.remove('hidden');
                 document.getElementById('view-pointage').classList.add('flex');
                 document.getElementById('btn-pointage').classList.add('bg-teal-50', 'text-teal-700');
-                chargerHistoriqueJour(); // Rafraîchit l'historique quand on revient dessus
+                chargerHistoriqueJour();
             } else {
                 document.getElementById('view-planning').classList.remove('hidden');
                 document.getElementById('view-planning').classList.add('flex');
@@ -340,18 +637,47 @@
         };
 
         // --- 6. MODALES ---
-        window.ouvrirModalAbsence = () => document.getElementById('modal-absence').classList.remove('hidden');
+        window.ouvrirModalAbsence = () => {
+            document.getElementById('modal-absence').classList.remove('hidden');
+            // Définir les dates par défaut
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('date_debut').value = today;
+            document.getElementById('date_fin').value = today;
+        };
+        
         window.fermerModalAbsence = () => document.getElementById('modal-absence').classList.add('hidden');
         
         window.sauvegarderAbsence = async () => {
-            const { error } = await supaClient.from('absences').insert([{ 
-                user_id: currentUser.id, 
-                type_absence: document.getElementById('type_absence').value, 
-                date_debut: document.getElementById('date_debut').value, 
-                date_fin: document.getElementById('date_fin').value 
-            }]);
-            fermerModalAbsence();
-            calendar.refetchEvents(); // Recharge le calendrier ET les soldes !
+            const type = document.getElementById('type_absence').value;
+            const dateDebut = document.getElementById('date_debut').value;
+            const dateFin = document.getElementById('date_fin').value;
+            
+            if (!dateDebut || !dateFin) {
+                alert('Veuillez sélectionner les dates');
+                return;
+            }
+            
+            if (new Date(dateFin) < new Date(dateDebut)) {
+                alert('La date de fin doit être après la date de début');
+                return;
+            }
+            
+            try {
+                const { error } = await supaClient.from('absences').insert([{ 
+                    user_id: currentUser.id, 
+                    type_absence: type, 
+                    date_debut: dateDebut, 
+                    date_fin: dateFin 
+                }]);
+                
+                if (error) throw error;
+                
+                fermerModalAbsence();
+                calendar.refetchEvents();
+                showToast('Absence déclarée avec succès !');
+            } catch (error) {
+                alert('Erreur lors de la sauvegarde : ' + error.message);
+            }
         };
 
         window.ouvrirModalParametres = async () => {
@@ -362,17 +688,31 @@
             }
             document.getElementById('modal-parametres').classList.remove('hidden');
         };
+        
         window.fermerModalParametres = () => document.getElementById('modal-parametres').classList.add('hidden');
         
         window.sauvegarderParametres = async () => {
-            const cp = document.getElementById('input_cp').value;
-            const rtt = document.getElementById('input_rtt').value;
+            const cp = parseInt(document.getElementById('input_cp').value);
+            const rtt = parseInt(document.getElementById('input_rtt').value);
             
-            await supaClient.from('parametres').upsert({ 
-                user_id: currentUser.id, cp_initial: cp, rtt_initial: rtt 
-            });
-            fermerModalParametres();
-            calendar.refetchEvents(); // Recalcule les restants
+            if (cp < 0 || rtt < 0) {
+                alert('Les valeurs doivent être positives');
+                return;
+            }
+            
+            try {
+                await supaClient.from('parametres').upsert({ 
+                    user_id: currentUser.id, 
+                    cp_initial: cp, 
+                    rtt_initial: rtt 
+                });
+                
+                fermerModalParametres();
+                calendar.refetchEvents();
+                showToast('Paramètres mis à jour !');
+            } catch (error) {
+                alert('Erreur lors de la sauvegarde : ' + error.message);
+            }
         };
     </script>
 </body>

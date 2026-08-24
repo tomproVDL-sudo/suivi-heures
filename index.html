@@ -2,76 +2,149 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mes Horaires</title>
-    <!-- Lien vers le manifest pour la PWA -->
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#2563eb">
-    
-    <!-- Tailwind CSS pour un design rapide sans fichier CSS externe -->
+    <meta name="theme-color" content="#ffffff">
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Chart.js pour le graphique -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-gray-50 text-gray-800 p-4 md:p-8 max-w-md mx-auto">
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-2 md:p-6 font-sans">
 
-    <h1 class="text-2xl font-bold mb-6 text-center text-blue-600">Pointage PWA</h1>
-
-    <!-- Module de Connexion (Obligatoire pour la sécurité RLS) -->
-    <div id="auth-section" class="bg-white p-6 rounded-lg shadow-md mb-6">
-        <h2 class="text-lg font-semibold mb-4">Connexion</h2>
-        <input type="email" id="email" placeholder="Email" class="w-full p-2 border rounded mb-3">
-        <input type="password" id="password" placeholder="Mot de passe" class="w-full p-2 border rounded mb-3">
-        <button onclick="login()" class="w-full bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700">Se connecter</button>
+    <!-- ECRAN DE CONNEXION -->
+    <div id="auth-section" class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+        <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">Connexion</h2>
+        <input type="email" id="email" placeholder="Email" class="w-full p-3 border border-gray-300 rounded-xl mb-4 focus:outline-none focus:ring-2 focus:ring-teal-500">
+        <input type="password" id="password" placeholder="Mot de passe" class="w-full p-3 border border-gray-300 rounded-xl mb-6 focus:outline-none focus:ring-2 focus:ring-teal-500">
+        <button onclick="login()" class="w-full bg-teal-500 text-white font-bold py-3 rounded-xl hover:bg-teal-600 transition shadow-lg shadow-teal-500/30">Se connecter</button>
     </div>
 
-    <!-- Interface principale (Cachée tant que non connecté) -->
-    <div id="app-section" class="hidden">
-        <button onclick="logout()" class="text-sm text-red-500 mb-6 underline">Se déconnecter</button>
+    <!-- INTERFACE PRINCIPALE (Inspirée du mockup) -->
+    <div id="app-section" class="hidden w-full max-w-4xl bg-white md:rounded-3xl shadow-2xl flex flex-col md:flex-row overflow-hidden min-h-[80vh]">
+        
+        <!-- BARRE LATERALE GAUCHE -->
+        <div class="md:w-1/3 bg-gray-50 border-r border-gray-200 p-6 flex flex-col items-center">
+            <!-- Logo -->
+            <div class="text-teal-500 font-bold text-xl flex items-center gap-2 mb-8">
+                <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path></svg>
+                POINTAGE
+            </div>
 
-        <div class="grid grid-cols-2 gap-4 mb-8">
-            <button onclick="pointer('arrivee')" class="bg-green-500 text-white font-bold py-4 rounded-lg shadow active:scale-95 transition">Arrivée</button>
-            <button onclick="pointer('depart')" class="bg-red-500 text-white font-bold py-4 rounded-lg shadow active:scale-95 transition">Départ</button>
-            <button onclick="pointer('debut_pause')" class="bg-yellow-500 text-white font-bold py-4 rounded-lg shadow active:scale-95 transition">Début Pause</button>
-            <button onclick="pointer('fin_pause')" class="bg-blue-400 text-white font-bold py-4 rounded-lg shadow active:scale-95 transition">Fin Pause</button>
+            <!-- Date et Heure en direct -->
+            <div class="text-center mb-8">
+                <div id="date-display" class="text-gray-500 text-sm font-medium capitalize">Chargement...</div>
+                <div id="time-display" class="text-4xl font-bold text-gray-800 tracking-tight mt-1">00:00</div>
+            </div>
+
+            <!-- Profil Utilisateur -->
+            <div class="flex flex-col items-center mb-10">
+                <div class="w-20 h-20 bg-teal-100 rounded-full flex items-center justify-center text-teal-600 font-bold text-3xl mb-3 shadow-inner">
+                    T
+                </div>
+                <div class="font-bold text-gray-800 text-lg">Tom</div>
+                <button onclick="logout()" class="text-xs text-red-400 hover:text-red-600 mt-1 underline">Déconnexion</button>
+            </div>
+
+            <!-- Compteurs -->
+            <div class="w-full space-y-6">
+                <div>
+                    <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 text-center">Total du jour</div>
+                    <div class="text-2xl font-bold text-gray-800 text-center">--:--</div>
+                </div>
+                <div class="border-t border-gray-200 pt-6">
+                    <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 text-center">Total de la semaine</div>
+                    <div class="text-2xl font-bold text-gray-800 text-center">--:--</div>
+                </div>
+            </div>
         </div>
 
-        <!-- Graphique -->
-        <div class="bg-white p-4 rounded-lg shadow-md">
-            <h3 class="font-semibold mb-2 text-center">Aperçu de la semaine</h3>
-            <canvas id="myChart"></canvas>
+        <!-- ZONE CENTRALE DROITE -->
+        <div class="md:w-2/3 flex flex-col p-4 md:p-8">
+            
+            <!-- Statut en haut -->
+            <div class="flex flex-col items-center mt-2 mb-8">
+                <div class="w-14 h-14 rounded-full border-2 border-green-500 text-green-500 flex items-center justify-center mb-3">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                </div>
+                <h2 class="text-2xl font-medium text-gray-800">Vous êtes en poste</h2>
+                <span class="text-sm text-gray-500 mt-1">à Ville de Lille</span>
+                <!-- Chrono Actif -->
+                <div class="text-4xl font-light text-gray-800 mt-3">0:00:00</div>
+            </div>
+
+            <!-- Historique des actions du jour -->
+            <div class="flex-1 overflow-y-auto mb-8 px-2 space-y-4">
+                <!-- Ces lignes sont statiques pour le design, nous les rendrons dynamiques plus tard -->
+                <div class="flex justify-between items-center py-3 border-b border-gray-100">
+                    <div>
+                        <div class="font-medium text-teal-600">Arrivée</div>
+                        <div class="text-xs text-gray-400">Prise de poste</div>
+                    </div>
+                    <div class="text-gray-600 font-medium">08:30</div>
+                </div>
+                <div class="flex justify-between items-center py-3 border-b border-gray-100">
+                    <div>
+                        <div class="font-medium text-orange-500">Début de pause</div>
+                        <div class="text-xs text-gray-400">Repas</div>
+                    </div>
+                    <div class="text-gray-600 font-medium">12:15</div>
+                </div>
+            </div>
+
+            <!-- Boutons d'action (En bas) -->
+            <div class="grid grid-cols-3 gap-3 md:gap-4 mt-auto">
+                <button onclick="pointer('arrivee')" class="bg-teal-500 hover:bg-teal-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md active:scale-95">
+                    <svg class="w-6 h-6 md:w-8 md:h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
+                    <span class="text-sm md:text-base font-medium">Arrivée</span>
+                </button>
+                <button onclick="pointer('pause')" class="bg-orange-500 hover:bg-orange-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md active:scale-95">
+                    <svg class="w-6 h-6 md:w-8 md:h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 15.546c-.523 0-1.046.151-1.5.454a2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.701 2.701 0 00-1.5-.454M9 6v2m3-2v2m3-2v2M9 3h.01M12 3h.01M15 3h.01M21 21v-7a2 2 0 00-2-2H5a2 2 0 00-2 2v7h18zm-3-9v-2a2 2 0 00-2-2H8a2 2 0 00-2 2v2h12z"></path></svg>
+                    <span class="text-sm md:text-base font-medium">Pause</span>
+                </button>
+                <button onclick="pointer('depart')" class="bg-slate-500 hover:bg-slate-600 text-white py-4 md:py-6 rounded-2xl flex flex-col items-center justify-center transition shadow-md active:scale-95">
+                    <svg class="w-6 h-6 md:w-8 md:h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                    <span class="text-sm md:text-base font-medium">Départ</span>
+                </button>
+            </div>
         </div>
     </div>
-
 
     <script>
-        // 1. Initialisation
-        // ATTENTION : Conservez bien les guillemets simples ' autour des valeurs
+        // --- 1. HORLOGE EN TEMPS REEL ---
+        function updateClock() {
+            const now = new Date();
+            // Format de l'heure (ex: 14:30)
+            const timeString = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            // Format de la date (ex: Lundi, 1 mai)
+            const dateString = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+            
+            document.getElementById('time-display').textContent = timeString;
+            document.getElementById('date-display').textContent = dateString;
+        }
+        setInterval(updateClock, 1000); // Met à jour chaque seconde
+        updateClock(); // Lancement immédiat
+
+        // --- 2. CONFIGURATION SUPABASE ---
         const supabaseUrl = 'https://rxqtsguwoqeojsnaagxb.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4cXRzZ3V3b3Flb2pzbmFhZ3hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTA4MjcsImV4cCI6MjEwMjcyNjgyN30.FTPTGSe6tqDTieqQdD-GWUqueKlEPUpw4QGiMa4U8AA';
+     
         
-
-        // Utilisation d'un nom spécifique (supaClient) pour éviter les conflits
         const supaClient = window.supabase.createClient(supabaseUrl, supabaseKey);
         let currentUser = null;
 
-        // 2. Gestion de l'authentification (Attachée à window pour être 100% trouvée par le bouton)
+        // --- 3. AUTHENTIFICATION ---
         window.login = async function() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
-            
             const { data, error } = await supaClient.auth.signInWithPassword({ email, password });
             
             if (error) {
-                alert("Erreur de connexion : " + error.message);
+                alert("Erreur : " + error.message);
             } else {
                 currentUser = data.user;
                 document.getElementById('auth-section').classList.add('hidden');
                 document.getElementById('app-section').classList.remove('hidden');
-                initChart(); 
+                document.getElementById('app-section').classList.add('flex');
             }
         };
 
@@ -80,57 +153,33 @@
             location.reload();
         };
 
-        // Vérification automatique au chargement de la page
         window.onload = async () => {
             const { data: { user } } = await supaClient.auth.getUser();
             if (user) {
                 currentUser = user;
                 document.getElementById('auth-section').classList.add('hidden');
                 document.getElementById('app-section').classList.remove('hidden');
-                initChart();
+                document.getElementById('app-section').classList.add('flex');
             }
         };
 
-        // 3. Fonction de pointage
+        // --- 4. POINTAGE ---
         window.pointer = async function(type) {
-            if (!currentUser) return alert("Veuillez vous connecter");
+            if (!currentUser) return;
 
             const { data, error } = await supaClient
                 .from('pointages')
                 .insert([{ user_id: currentUser.id, type_action: type }]);
 
             if (error) {
-                console.error(error);
                 alert("Erreur lors du pointage !");
             } else {
-                alert(`Pointage enregistré : ${type.replace('_', ' ')}`);
+                // Petit effet visuel pour confirmer
+                const actions = { 'arrivee': 'Arrivée', 'pause': 'Pause', 'depart': 'Départ' };
+                alert(`✅ Pointage enregistré : ${actions[type]}`);
             }
         };
-
-        // 4. Graphique
-        function initChart() {
-            const ctx = document.getElementById('myChart');
-            new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven'],
-                    datasets: [{
-                        label: 'Heures travaillées',
-                        data: [7.5, 8, 7.5, 8.5, 7], 
-                        backgroundColor: '#3b82f6',
-                        borderRadius: 4
-                    }]
-                },
-                options: { scales: { y: { beginAtZero: true, max: 10 } } }
-            });
-        }
-
-        // 5. Service Worker (pour plus tard)
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js')
-                .then(() => console.log('Service Worker enregistré !'))
-                .catch(err => console.log('Pas de Service worker pour le moment.'));
-        }
     </script>
 </body>
 </html>
+

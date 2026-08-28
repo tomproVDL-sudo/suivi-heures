@@ -47,8 +47,22 @@
         .fc .fc-today-button {
             height: 32px;
             padding: 0 12px;
-            /* largeur approximative des deux flèches réunies + gap */
-            min-width: 72px;
+            min-width: 72px; /* largeur approximative des deux flèches réunies + gap */
+        }
+
+        /* Positionnement du bouton today en dessous des flèches sur mobile */
+        .fc .fc-toolbar.fc-header-toolbar {
+            flex-wrap: wrap;
+        }
+        .fc .fc-toolbar-chunk:first-child {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .fc .fc-today-button {
+            flex-basis: 100%; /* force le bouton à prendre toute la largeur du premier chunk sur mobile */
+            order: 2; /* le place après les flèches */
+            margin-top: 4px;
         }
 
         @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -256,9 +270,7 @@
     <div id="toast" class="hidden fixed bottom-4 right-4 text-white px-6 py-3 rounded-xl shadow-lg z-50">...</div>
 
     <script>
-
         // --- 1. CONFIGURATION ---
-
         const supabaseUrl = 'https://rxqtsguwoqeojsnaagxb.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4cXRzZ3V3b3Flb2pzbmFhZ3hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTA4MjcsImV4cCI6MjEwMjcyNjgyN30.FTPTGSe6tqDTieqQdD-GWUqueKlEPUpw4QGiMa4U8AA';
 
@@ -665,9 +677,14 @@
                 slotMinTime: '06:00:00', 
                 slotMaxTime: '22:00:00',
                 headerToolbar: { 
-                    left: 'prev,next today', 
+                    left: 'prev,next', 
                     center: 'title', 
                     right: 'dayGridMonth,timeGridWeek' 
+                },
+                footerToolbar: { 
+                    left: 'today', 
+                    center: '', 
+                    right: '' 
                 },
                 navLinks: true,
                 editable: false,
@@ -684,10 +701,8 @@
 
                 // Style Google Fit pour les bulles de la vue mois UNIQUEMENT
                 dayCellDidMount: function(info) {
-                    // Ne s'exécute que pour la vue mois (dayGridMonth)
                     if (calendar.view.type !== 'dayGridMonth') return;
                     
-                    // Utilisation de la date locale pour éviter tout décalage
                     const year = info.date.getFullYear();
                     const month = String(info.date.getMonth() + 1).padStart(2, '0');
                     const day = String(info.date.getDate()).padStart(2, '0');
@@ -709,7 +724,6 @@
                         }
                     });
                     
-                    // Si toujours en poste aujourd'hui
                     const today = new Date();
                     const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
                     if(dateStr === todayStr && lastArr) {
@@ -720,12 +734,10 @@
                         const hDec = msJour / 3600000;
                         const reqHours = userParams.base_horaire / 5;
 
-                        // Couleur : Rouge si > 10h, Bleu si < quota journalier requis, Vert sinon
-                        let color = '#10b981'; // Vert
-                        if (hDec > 10) color = '#ef4444'; // Rouge
-                        else if (hDec < reqHours) color = '#3b82f6'; // Bleu
+                        let color = '#10b981';
+                        if (hDec > 10) color = '#ef4444';
+                        else if (hDec < reqHours) color = '#3b82f6';
 
-                        // Diamètre variable selon les heures (entre 12px et 32px)
                         let diameter = Math.min(32, Math.max(12, Math.round(hDec * 3.2)));
 
                         const container = document.createElement('div');
@@ -740,10 +752,8 @@
 
                         container.appendChild(bubble);
                         
-                        // Insertion au bon endroit dans la cellule
                         const dayFrame = info.el.querySelector('.fc-daygrid-day-frame');
                         if (dayFrame) {
-                            // Supprimer les anciennes bulles si elles existent
                             const oldBubble = dayFrame.querySelector('.fit-bubble-container');
                             if (oldBubble) oldBubble.remove();
                             
@@ -933,3 +943,4 @@
     </script>
 </body>
 </html>
+

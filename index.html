@@ -23,7 +23,8 @@
             display: flex; 
             justify-content: center; 
             align-items: center; 
-            margin-top: 2px; 
+            margin-top: 4px; 
+            height: 32px;
             pointer-events: none;
         }
         .fit-bubble { 
@@ -39,7 +40,7 @@
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #14b8a6; border-radius: 3px; }
         .btn-card { transition: all 0.2s ease; cursor: pointer; }
         .btn-card:active { transform: scale(0.97); }
-        .work-block { opacity: 0.85; }
+        .work-block { opacity: 0.8; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-teal-50 to-gray-100 min-h-screen flex items-center justify-center p-2 md:p-6 font-sans">
@@ -238,6 +239,7 @@
 
     <script>
         // --- 1. CONFIGURATION ---
+// --- 1. CONFIGURATION ---
         const supabaseUrl = 'https://rxqtsguwoqeojsnaagxb.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4cXRzZ3V3b3Flb2pzbmFhZ3hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTA4MjcsImV4cCI6MjEwMjcyNjgyN30.FTPTGSe6tqDTieqQdD-GWUqueKlEPUpw4QGiMa4U8AA';
 
@@ -372,7 +374,7 @@
         window.pointer = async (type) => {
             try { 
                 await supaClient.from('pointages').insert([{ user_id: currentUser.id, type_action: type }]); 
-                await chargerDonneesGlobales(); 
+                await chargerDonneesGlobalales(); 
                 rafraichirVueJour(); 
                 if(calendar) calendar.refetchEvents();
             } catch(e) { 
@@ -590,6 +592,7 @@
         window.ouvrirModalAbsence = (id = null, type = 'RTT', debut = '', fin = '', moment = 'journee') => {
             document.getElementById('absence_id').value = id || '';
             document.getElementById('titre-modal-absence').textContent = id ? "Modifier l'absence" : "Nouvelle absence";
+            document.getElementById('btn-sauvegarder-absence').textContent = id ? "Mettre à jour" : "Valider";
             document.getElementById('btn-supprimer-absence').classList.toggle('hidden', !id);
             
             document.getElementById('type_absence').value = type;
@@ -661,20 +664,14 @@
                     ouvrirModalAbsence(null, 'RTT', info.dateStr, info.dateStr, 'journee');
                 },
 
-                // Style Google Fit pour les bulles de la vue mois UNIQUEMENT (injectées dans l'en-tête du jour)
+                // Style Google Fit pour les bulles de la vue mois
                 dayCellDidMount: function(info) {
-                    if (calendar.view.type !== 'dayGridMonth') return;
-                    
-                    const year = info.date.getFullYear();
-                    const month = String(info.date.getMonth() + 1).padStart(2, '0');
-                    const day = String(info.date.getDate()).padStart(2, '0');
-                    const dateStr = `${year}-${month}-${day}`;
-                    
+                    const dateStr = info.date.toISOString().split('T')[0];
                     let msJour = 0; 
                     let lastArr = null;
                     
                     pointagesAnnee.filter(p => {
-                        const pDate = p.timestamp.split('T')[0];
+                        const pDate = new Date(p.timestamp).toISOString().split('T')[0];
                         return pDate === dateStr;
                     }).forEach(pt => {
                         if(pt.type_action === 'arrivee') {
@@ -686,9 +683,9 @@
                         }
                     });
                     
-                    const today = new Date();
-                    const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-                    if(dateStr === todayStr && lastArr) {
+                    // Si toujours en poste aujourd'hui
+                    const today = new Date().toISOString().split('T')[0];
+                    if(dateStr === today && lastArr) {
                         msJour += (new Date() - lastArr);
                     }
                     
@@ -696,11 +693,13 @@
                         const hDec = msJour / 3600000;
                         const reqHours = userParams.base_horaire / 5;
 
-                        let color = '#10b981';
-                        if (hDec > 10) color = '#ef4444';
-                        else if (hDec < reqHours) color = '#3b82f6';
+                        // Couleur : Rouge si > 10h, Bleu si < quota journalier requis, Vert sinon
+                        let color = '#10b981'; // Vert
+                        if (hDec > 10) color = '#ef4444'; // Rouge
+                        else if (hDec < reqHours) color = '#3b82f6'; // Bleu
 
-                        let diameter = Math.min(30, Math.max(12, Math.round(hDec * 3)));
+                        // Diamètre variable selon les heures (entre 12px et 32px)
+                        let diameter = Math.min(32, Math.max(12, Math.round(hDec * 3.2)));
 
                         const container = document.createElement('div');
                         container.className = 'fit-bubble-container';
@@ -710,15 +709,18 @@
                         bubble.style.width = `${diameter}px`;
                         bubble.style.height = `${diameter}px`;
                         bubble.style.backgroundColor = color;
-                        bubble.style.opacity = '0.85';
+                        bubble.style.opacity = '0.8';
 
                         container.appendChild(bubble);
                         
-                        const dayTop = info.el.querySelector('.fc-daygrid-day-top');
-                        if (dayTop) {
-                            const oldBubble = dayTop.querySelector('.fit-bubble-container');
+                        // Insertion au bon endroit dans la cellule
+                        const dayFrame = info.el.querySelector('.fc-daygrid-day-frame');
+                        if (dayFrame) {
+                            // Supprimer les anciennes bulles si elles existent
+                            const oldBubble = dayFrame.querySelector('.fit-bubble-container');
                             if (oldBubble) oldBubble.remove();
-                            dayTop.appendChild(container);
+                            
+                            dayFrame.appendChild(container);
                         }
                     }
                 },
@@ -749,61 +751,62 @@
                         };
                     });
 
-                    // Créneaux travaillés affichés UNIQUEMENT dans la vue semaine (timeGridWeek)
-                    if (info.view.type === 'timeGridWeek') {
-                        const parJour = {};
-                        pointagesAnnee.forEach(p => { 
-                            const d = p.timestamp.split('T')[0]; 
-                            if(!parJour[d]) parJour[d] = []; 
-                            parJour[d].push(p); 
-                        });
+                    // Génération des blocs de travail pour la vue semaine/jour
+                    const parJour = {};
+                    pointagesAnnee.forEach(p => { 
+                        const d = new Date(p.timestamp).toISOString().split('T')[0]; 
+                        if(!parJour[d]) parJour[d] = []; 
+                        parJour[d].push(p); 
+                    });
 
-                        for (let jour in parJour) {
-                            let lastArr = null;
-                            let blockStart = null;
+                    for (let jour in parJour) {
+                        let lastArr = null;
+                        let blockStart = null;
+                        
+                        parJour[jour].forEach(pt => {
+                            const timestamp = new Date(pt.timestamp);
                             
-                            parJour[jour].forEach(pt => {
-                                const timestamp = new Date(pt.timestamp);
-                                
-                                if(pt.type_action === 'arrivee') {
-                                    lastArr = timestamp;
-                                    blockStart = timestamp;
-                                }
-                                else if(pt.type_action === 'pause' && lastArr) {
-                                    eventsList.push({
-                                        title: 'Travail',
-                                        start: blockStart,
-                                        end: timestamp,
-                                        backgroundColor: '#14b8a6',
-                                        borderColor: '#0d9488',
-                                        className: 'work-block'
-                                    });
-                                    blockStart = null;
-                                }
-                                else if(pt.type_action === 'depart' && lastArr) {
-                                    eventsList.push({
-                                        title: 'Travail',
-                                        start: blockStart || lastArr,
-                                        end: timestamp,
-                                        backgroundColor: '#14b8a6',
-                                        borderColor: '#0d9488',
-                                        className: 'work-block'
-                                    });
-                                    lastArr = null;
-                                    blockStart = null;
-                                }
-                            });
-                            
-                            if(lastArr) {
+                            if(pt.type_action === 'arrivee') {
+                                lastArr = timestamp;
+                                blockStart = timestamp;
+                            }
+                            else if(pt.type_action === 'pause' && lastArr) {
+                                // Créer un bloc de travail jusqu'à la pause
                                 eventsList.push({
-                                    title: 'Travail en cours',
-                                    start: blockStart || lastArr,
-                                    end: new Date(),
+                                    title: 'Travail',
+                                    start: blockStart,
+                                    end: timestamp,
                                     backgroundColor: '#14b8a6',
                                     borderColor: '#0d9488',
                                     className: 'work-block'
                                 });
+                                blockStart = null;
                             }
+                            else if(pt.type_action === 'depart' && lastArr) {
+                                // Créer un bloc de travail final
+                                eventsList.push({
+                                    title: 'Travail',
+                                    start: blockStart || lastArr,
+                                    end: timestamp,
+                                    backgroundColor: '#14b8a6',
+                                    borderColor: '#0d9488',
+                                    className: 'work-block'
+                                });
+                                lastArr = null;
+                                blockStart = null;
+                            }
+                        });
+                        
+                        // Si toujours en poste (pas de départ)
+                        if(lastArr) {
+                            eventsList.push({
+                                title: 'Travail en cours',
+                                start: blockStart || lastArr,
+                                end: new Date(), // Jusqu'à maintenant
+                                backgroundColor: '#14b8a6',
+                                borderColor: '#0d9488',
+                                className: 'work-block'
+                            });
                         }
                     }
 
@@ -901,4 +904,3 @@
     </script>
 </body>
 </html>
-        

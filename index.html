@@ -37,7 +37,7 @@
             padding: 0 12px;
         }
         
-        /* Bulles style Google Fit centrées dans la case du jour */
+        /* Bulles style Google Fit centrées en arrière-plan de la case */
         .fc-daygrid-day-frame {
             position: relative !important;
         }
@@ -48,12 +48,16 @@
             justify-content: center; 
             align-items: center; 
             pointer-events: none;
-            z-index: 1;
+            z-index: 0;
         }
         .fit-bubble { 
             border-radius: 50%; 
             transition: all 0.2s;
             box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+        .fc-daygrid-day-top, .fc-daygrid-day-events {
+            position: relative;
+            z-index: 2;
         }
 
         @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -261,7 +265,7 @@
     <div id="toast" class="hidden fixed bottom-4 right-4 text-white px-6 py-3 rounded-xl shadow-lg z-50">...</div>
 
     <script>
-// --- 1. CONFIGURATION ---
+        // --- 1. CONFIGURATION ---
         const supabaseUrl = 'https://rxqtsguwoqeojsnaagxb.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4cXRzZ3V3b3Flb2pzbmFhZ3hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTA4MjcsImV4cCI6MjEwMjcyNjgyN30.FTPTGSe6tqDTieqQdD-GWUqueKlEPUpw4QGiMa4U8AA';
 
@@ -695,7 +699,7 @@
                     ouvrirModalAbsence(null, 'RTT', info.dateStr, info.dateStr, 'journee');
                 },
 
-                // Bulles style Google Fit parfaitement centrées dans chaque case de la vue mois
+                // Rendu des bulles style Google Fit en arrière-plan (vue mois uniquement)
                 dayCellDidMount: function(info) {
                     if (!calendar || calendar.view.type !== 'dayGridMonth') return;
                     
@@ -737,7 +741,7 @@
                         if (hDec > 10) color = '#ef4444'; // Rouge
                         else if (hDec < reqHours) color = '#3b82f6'; // Bleu
 
-                        let diameter = Math.min(42, Math.max(16, Math.round(hDec * 4)));
+                        let diameter = Math.min(50, Math.max(18, Math.round(hDec * 4.5)));
 
                         const container = document.createElement('div');
                         container.className = 'fit-bubble-container';
@@ -747,7 +751,7 @@
                         bubble.style.width = `${diameter}px`;
                         bubble.style.height = `${diameter}px`;
                         bubble.style.backgroundColor = color;
-                        bubble.style.opacity = '0.35'; // Douce transparence pour laisser les événements visibles par-dessus
+                        bubble.style.opacity = '0.35'; // Douce transparence pour laisser passer les événements par-dessus
 
                         container.appendChild(bubble);
                         
@@ -768,6 +772,7 @@
                     chargerSoldes(data);
                     calculerHeuresSupEt1607();
                     
+                    // Chargement des absences (RTT, CP, Maladie...) pour toutes les vues
                     let eventsList = data.map(a => {
                         let c = '#3b82f6'; 
                         if(a.type_absence === 'CP') c = '#14b8a6'; 

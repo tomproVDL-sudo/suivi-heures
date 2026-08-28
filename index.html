@@ -37,10 +37,7 @@
             padding: 0 12px;
         }
         
-        /* Bulles style Google Fit centrées en arrière-plan de la case */
-        .fc-daygrid-day-frame {
-            position: relative !important;
-        }
+        /* Bulles style Google Fit centrées dans l'arrière-plan de la cellule */
         .fit-bubble-container { 
             position: absolute;
             inset: 0;
@@ -54,10 +51,6 @@
             border-radius: 50%; 
             transition: all 0.2s;
             box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-        }
-        .fc-daygrid-day-top, .fc-daygrid-day-events {
-            position: relative;
-            z-index: 2;
         }
 
         @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -266,6 +259,7 @@
 
     <script>
         // --- 1. CONFIGURATION ---
+// --- 1. CONFIGURATION ---
         const supabaseUrl = 'https://rxqtsguwoqeojsnaagxb.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4cXRzZ3V3b3Flb2pzbmFhZ3hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTA4MjcsImV4cCI6MjEwMjcyNjgyN30.FTPTGSe6tqDTieqQdD-GWUqueKlEPUpw4QGiMa4U8AA';
 
@@ -699,7 +693,7 @@
                     ouvrirModalAbsence(null, 'RTT', info.dateStr, info.dateStr, 'journee');
                 },
 
-                // Rendu des bulles style Google Fit en arrière-plan (vue mois uniquement)
+                // Rendu des bulles Google Fit dans l'arrière-plan de la cellule (vue mois uniquement)
                 dayCellDidMount: function(info) {
                     if (!calendar || calendar.view.type !== 'dayGridMonth') return;
                     
@@ -751,15 +745,15 @@
                         bubble.style.width = `${diameter}px`;
                         bubble.style.height = `${diameter}px`;
                         bubble.style.backgroundColor = color;
-                        bubble.style.opacity = '0.35'; // Douce transparence pour laisser passer les événements par-dessus
+                        bubble.style.opacity = '0.35';
 
                         container.appendChild(bubble);
                         
-                        const dayFrame = info.el.querySelector('.fc-daygrid-day-frame');
-                        if (dayFrame) {
-                            const oldBubble = dayFrame.querySelector('.fit-bubble-container');
+                        const dayBg = info.el.querySelector('.fc-daygrid-day-bg');
+                        if (dayBg) {
+                            const oldBubble = dayBg.querySelector('.fit-bubble-container');
                             if (oldBubble) oldBubble.remove();
-                            dayFrame.appendChild(container);
+                            dayBg.appendChild(container);
                         }
                     }
                 },

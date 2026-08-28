@@ -12,11 +12,11 @@
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 
     <style>
-        .fc { font-family: inherit; cursor: pointer; font-size: 0.85rem; }
+        .fc { font-family: inherit; font-size: 0.85rem; }
         .fc-button-primary { background-color: #14b8a6 !important; border-color: #14b8a6 !important; font-size: 0.75rem !important; }
         .fc-button-primary:hover { background-color: #0d9488 !important; border-color: #0d9488 !important; }
         .fc-button-active { background-color: #0f766e !important; }
-        .fc-event { transition: transform 0.2s; border-radius: 6px; font-size: 0.75rem; border: none; }
+        .fc-event { transition: transform 0.2s; border-radius: 6px; font-size: 0.75rem; border: none; cursor: pointer; }
         
         /* Harmonisation des boutons du calendrier */
         .fc .fc-button {
@@ -41,12 +41,7 @@
             }
             .fc-toolbar-chunk:nth-child(1) { order: 1; display: flex; gap: 4px; } 
             .fc-toolbar-chunk:nth-child(3) { order: 2; display: flex; gap: 4px; } 
-            .fc-toolbar-chunk:nth-child(2) { 
-                order: 3; 
-                width: 100%; 
-                text-align: center; 
-                margin-top: 12px; 
-            }
+            .fc-toolbar-chunk:nth-child(2) { order: 3; width: 100%; text-align: center; margin-top: 12px; }
             .fc .fc-toolbar-title { font-size: 1.35rem !important; }
         }
         
@@ -335,7 +330,7 @@
         let userParams = { 
             cp_initial: 25, rtt_initial: 15, base_horaire: 39, 
             limite_heures_jour: 10, notifs_actives: false,
-            objectif_annuel: 1607, reliquat_cp: 0, date_limite_reliquat: '', cet_initial: 0
+            objectif_annuel: 1607, reliquat_cp: 0, date_limite_reliquat: '', cet_initial: 0, annee_maj: null
         };
 
         setInterval(() => {
@@ -355,21 +350,12 @@
 
         window.login = async function() {
             try {
-                const { data, error } = await supaClient.auth.signInWithPassword({ 
-                    email: document.getElementById('email').value, 
-                    password: document.getElementById('password').value 
-                });
-                if (error) throw error;
-                initialiserApp(data.user);
-            } catch (e) { 
-                showToast(e.message, true); 
-            }
+                const { data, error } = await supaClient.auth.signInWithPassword({ email: document.getElementById('email').value, password: document.getElementById('password').value });
+                if (error) throw error; initialiserApp(data.user);
+            } catch (e) { showToast(e.message, true); }
         };
         
-        window.logout = async () => { 
-            await supaClient.auth.signOut(); 
-            location.reload(); 
-        };
+        window.logout = async () => { await supaClient.auth.signOut(); location.reload(); };
         
         window.onload = async () => { 
             const { data: { user } } = await supaClient.auth.getUser(); 
@@ -380,7 +366,54 @@
             const { data: pData } = await supaClient.from('parametres').select('*').eq('user_id', currentUser.id).maybeSingle();
             if (pData) userParams = { ...userParams, ...pData };
 
-            const debutAnnee = new Date(new Date().getFullYear(), 0, 1).toISOString();
+            const currentYear = new Date().getFullYear();
+            
+            // --- AUTOMATISATION DU PASSAGE D'ANNEE ---
+            if (!userParams.annee_maj) {
+                userParams.annee_maj = currentYear;
+                await supaClient.from('parametres').upsert({ user_id: currentUser.id, annee_maj: currentYear });
+            } else if (userParams.annee_maj < currentYear) {
+                // Il y a eu un changement d'année ! On calcule les restes de l'année précédente
+                const { data: absPrecedentes } = await supaClient.from('absences')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .eq('type_absence', 'CP')
+                    .gte('date_debut', `${userParams.annee_maj}-01-01`)
+                    .lte('date_debut', `${userParams.annee_maj}-12-31`);
+                    
+                let cpConsBeforeLimit = 0;
+                let cpConsAfterLimit = 0;
+                const limiteDateStr = userParams.date_limite_reliquat;
+                const limiteDate = limiteDateStr ? new Date(limiteDateStr + 'T23:59:59') : null;
+                
+                (absPrecedentes || []).forEach(a => {
+                    let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1;
+                    if (limiteDate && new Date(a.date_debut) > limiteDate) cpConsAfterLimit += j;
+                    else cpConsBeforeLimit += j;
+                });
+                
+                let ancienReliquat = userParams.reliquat_cp || 0;
+                let cpRestantsN = userParams.cp_initial - Math.max(0, cpConsBeforeLimit - ancienReliquat) - cpConsAfterLimit;
+                
+                // Le nouveau reliquat N-1 devient ce qu'il restait en CP 
+                userParams.reliquat_cp = Math.max(0, cpRestantsN);
+                userParams.annee_maj = currentYear;
+                
+                // Décale la date limite d'un an pour la nouvelle année
+                if (userParams.date_limite_reliquat) {
+                    let d = new Date(userParams.date_limite_reliquat);
+                    d.setFullYear(currentYear);
+                    userParams.date_limite_reliquat = `${currentYear}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                }
+                
+                await supaClient.from('parametres').upsert({ 
+                    user_id: currentUser.id, annee_maj: currentYear,
+                    reliquat_cp: userParams.reliquat_cp, date_limite_reliquat: userParams.date_limite_reliquat
+                });
+                showToast("Nouvelle année : Reliquat calculé automatiquement !");
+            }
+
+            const debutAnnee = new Date(currentYear, 0, 1).toISOString();
             const { data: ptData } = await supaClient.from('pointages').select('*').eq('user_id', currentUser.id).gte('timestamp', debutAnnee).order('timestamp', { ascending: true });
             if (ptData) pointagesAnnee = ptData;
         }
@@ -402,71 +435,45 @@
         }
 
         function rafraichirVueJour() {
-            const debutJour = new Date(); 
-            debutJour.setHours(0,0,0,0);
+            const debutJour = new Date(); debutJour.setHours(0,0,0,0);
             currentPointages = pointagesAnnee.filter(p => new Date(p.timestamp) >= debutJour);
-            
-            const conteneur = document.getElementById('historique-jour'); 
-            conteneur.innerHTML = '';
+            const conteneur = document.getElementById('historique-jour'); conteneur.innerHTML = '';
             
             if(currentPointages.length > 0) {
                 calculerStatistiquesJour(currentPointages);
                 currentPointages.forEach(p => {
                     const heure = new Date(p.timestamp).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
-                    let l = p.type_action; 
-                    let ic = ''; 
-                    let c = "text-gray-800"; 
-                    let b = "bg-gray-50";
-                    
+                    let l = p.type_action; let ic = ''; let c = "text-gray-800"; let b = "bg-gray-50";
                     if(l === 'arrivee') { l="Prise de poste / Reprise"; c="text-teal-600"; ic='🟢'; b="bg-teal-50"; }
                     if(l === 'pause') { l="Début de pause"; c="text-orange-500"; ic='⏸️'; b="bg-orange-50"; }
                     if(l === 'depart') { l="Fin de poste"; c="text-slate-600"; ic='🔴'; b="bg-slate-50"; }
                     
                     conteneur.innerHTML += `<div class="flex justify-between items-center py-2.5 px-3 border-b border-gray-100 ${b} rounded-lg mb-2 text-xs md:text-sm">
                         <div class="font-medium ${c}"><span>${ic}</span> ${l}</div>
-                        <div class="flex gap-3">
-                            <span class="font-mono mt-0.5">${heure}</span>
-                            <button onclick="modifierPointage('${p.id}', '${p.timestamp}')" class="text-blue-500 hover:text-blue-700">✏️</button>
-                            <button onclick="supprimerPointage('${p.id}')" class="text-red-400 hover:text-red-600">🗑️</button>
-                        </div>
-                    </div>`;
+                        <div class="flex gap-3"><span class="font-mono mt-0.5">${heure}</span>
+                        <button onclick="modifierPointage('${p.id}', '${p.timestamp}')" class="text-blue-500 hover:text-blue-700">✏️</button>
+                        <button onclick="supprimerPointage('${p.id}')" class="text-red-400 hover:text-red-600">🗑️</button></div></div>`;
                 });
             } else {
                 conteneur.innerHTML = '<div class="text-center text-gray-400 py-8 text-xs">Aucun pointage aujourd\'hui.</div>';
-                document.getElementById('stat-heures').textContent = '0h00'; 
-                document.getElementById('stat-pauses').textContent = '0'; 
-                document.getElementById('stat-statut').textContent = '--';
+                document.getElementById('stat-heures').textContent = '0h00'; document.getElementById('stat-pauses').textContent = '0'; document.getElementById('stat-statut').textContent = '--';
             }
             calculerHeuresSupEt1607();
         }
 
         window.pointer = async (type) => {
-            try { 
-                await supaClient.from('pointages').insert([{ user_id: currentUser.id, type_action: type }]); 
-                await chargerDonneesGlobales(); 
-                rafraichirVueJour(); 
-                if(calendar) calendar.refetchEvents();
-            } catch(e) { showToast(e.message, true); }
+            try { await supaClient.from('pointages').insert([{ user_id: currentUser.id, type_action: type }]); await chargerDonneesGlobales(); rafraichirVueJour(); if(calendar) calendar.refetchEvents(); } catch(e) { showToast(e.message, true); }
         };
 
         window.modifierPointage = async (id, ancienneDateStr) => {
             const h = prompt("Nouvelle heure (HH:MM) :", new Date(ancienneDateStr).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}));
             if (!h || !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(h)) return showToast("Format invalide", true);
-            const nd = new Date(ancienneDateStr); 
-            nd.setHours(...h.split(':'), 0, 0);
-            await supaClient.from('pointages').update({ timestamp: nd.toISOString() }).eq('id', id); 
-            await chargerDonneesGlobales(); 
-            rafraichirVueJour(); 
-            if(calendar) calendar.refetchEvents();
+            const nd = new Date(ancienneDateStr); nd.setHours(...h.split(':'), 0, 0);
+            await supaClient.from('pointages').update({ timestamp: nd.toISOString() }).eq('id', id); await chargerDonneesGlobales(); rafraichirVueJour(); if(calendar) calendar.refetchEvents();
         };
 
         window.supprimerPointage = async (id) => {
-            if(confirm("Supprimer ce pointage ?")) { 
-                await supaClient.from('pointages').delete().eq('id', id); 
-                await chargerDonneesGlobales(); 
-                rafraichirVueJour(); 
-                if(calendar) calendar.refetchEvents();
-            }
+            if(confirm("Supprimer ce pointage ?")) { await supaClient.from('pointages').delete().eq('id', id); await chargerDonneesGlobales(); rafraichirVueJour(); if(calendar) calendar.refetchEvents(); }
         };
 
         function calculerStatistiquesJour(pts) {
@@ -488,9 +495,7 @@
                     const today = new Date().toLocaleDateString();
                     if (localStorage.getItem('lastNotifDate') !== today) {
                         showToast(`⚠️ Alerte : Seuil des ${userParams.limite_heures_jour}h atteint !`, true);
-                        if ("Notification" in window && Notification.permission === "granted") {
-                            new Notification("Alerte Temps de Travail ⏱️", { body: `Limite journalière de ${userParams.limite_heures_jour}h atteinte.` });
-                        }
+                        if ("Notification" in window && Notification.permission === "granted") { new Notification("Alerte Temps de Travail ⏱️", { body: `Limite journalière de ${userParams.limite_heures_jour}h atteinte.` }); }
                         localStorage.setItem('lastNotifDate', today);
                     }
                 } else { spanHeures.classList.remove('text-red-600'); spanHeures.classList.add('text-teal-600'); }
@@ -503,7 +508,6 @@
         function calculerHeuresSupEt1607() {
             const objAnnuel = userParams.objectif_annuel || 1607;
             document.getElementById('lbl-objectif').textContent = objAnnuel;
-            
             const now = new Date();
             const getMonday = (d) => { let day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6:1); return new Date(new Date(d).setDate(diff)); };
             const startWeek = getMonday(now); startWeek.setHours(0,0,0,0);
@@ -512,10 +516,7 @@
 
             const getMapTempsReelParJour = () => {
                 const map = {}; const parJour = {};
-                pointagesAnnee.forEach(p => { 
-                    const d = p.timestamp.split('T')[0]; 
-                    if(!parJour[d]) parJour[d] = []; parJour[d].push(p); 
-                });
+                pointagesAnnee.forEach(p => { const d = p.timestamp.split('T')[0]; if(!parJour[d]) parJour[d] = []; parJour[d].push(p); });
                 for (let jour in parJour) {
                     let totalMs = 0; let lastArr = null;
                     parJour[jour].forEach(pt => {
@@ -533,19 +534,15 @@
 
             const getTempsAttendu = (startDate) => {
                 let expected = 0; const hoursPerDay = userParams.base_horaire / 5;
-                let d = new Date(startDate); d.setHours(0,0,0,0);
-                let end = new Date(now); end.setHours(0,0,0,0);
-
+                let d = new Date(startDate); d.setHours(0,0,0,0); let end = new Date(now); end.setHours(0,0,0,0);
                 while(d <= end) {
                     const dayOfWeek = d.getDay();
                     if (dayOfWeek !== 0 && dayOfWeek !== 6) {
                         let absence = currentAbsences.find(a => {
-                            const aStart = new Date(a.date_debut); aStart.setHours(0,0,0,0);
-                            const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0);
+                            const aStart = new Date(a.date_debut); aStart.setHours(0,0,0,0); const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0);
                             return d >= aStart && d <= aEnd;
                         });
-                        if (!absence) expected += hoursPerDay;
-                        else if (absence.moment === 'matin' || absence.moment === 'aprem') expected += (hoursPerDay / 2);
+                        if (!absence) expected += hoursPerDay; else if (absence.moment === 'matin' || absence.moment === 'aprem') expected += (hoursPerDay / 2);
                     }
                     d.setDate(d.getDate() + 1);
                 }
@@ -554,8 +551,7 @@
 
             const formatterDelta = (reel, attendu) => {
                 let diff = reel - attendu; let sign = diff >= 0 ? '+' : '-'; diff = Math.abs(diff);
-                let h = Math.floor(diff); let m = Math.round((diff - h) * 60);
-                return `${sign}${h}h${m.toString().padStart(2, '0')}`;
+                let h = Math.floor(diff); let m = Math.round((diff - h) * 60); return `${sign}${h}h${m.toString().padStart(2, '0')}`;
             };
 
             document.getElementById('hs-semaine').textContent = formatterDelta(getTempsReelTotal(startWeek), getTempsAttendu(startWeek));
@@ -576,53 +572,36 @@
         }
 
         window.gererAffichageDates = () => {
-            const moment = document.getElementById('moment_absence').value;
-            const dateFin = document.getElementById('date_fin');
+            const moment = document.getElementById('moment_absence').value; const dateFin = document.getElementById('date_fin');
             if (moment !== 'journee') { dateFin.value = document.getElementById('date_debut').value; dateFin.disabled = true; dateFin.classList.add('opacity-50'); }
             else { dateFin.disabled = false; dateFin.classList.remove('opacity-50'); }
         };
         
-        window.synchroniserDates = () => { 
-            if(document.getElementById('moment_absence').value !== 'journee') { document.getElementById('date_fin').value = document.getElementById('date_debut').value; }
-        };
+        window.synchroniserDates = () => { if(document.getElementById('moment_absence').value !== 'journee') { document.getElementById('date_fin').value = document.getElementById('date_debut').value; } };
 
         window.ouvrirModalAbsence = (id = null, type = 'RTT', debut = '', fin = '', moment = 'journee') => {
             document.getElementById('absence_id').value = id || '';
             document.getElementById('titre-modal-absence').textContent = id ? "Modifier l'absence" : "Nouvelle absence";
             document.getElementById('btn-supprimer-absence').classList.toggle('hidden', !id);
-            document.getElementById('type_absence').value = type;
-            document.getElementById('moment_absence').value = moment;
-            
+            document.getElementById('type_absence').value = type; document.getElementById('moment_absence').value = moment;
             const todayStr = (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`; })();
-            document.getElementById('date_debut').value = debut || todayStr;
-            document.getElementById('date_fin').value = fin || todayStr;
-            gererAffichageDates();
-            document.getElementById('modal-absence').classList.remove('hidden');
+            document.getElementById('date_debut').value = debut || todayStr; document.getElementById('date_fin').value = fin || todayStr;
+            gererAffichageDates(); document.getElementById('modal-absence').classList.remove('hidden');
         };
         
         window.fermerModalAbsence = () => document.getElementById('modal-absence').classList.add('hidden');
 
         window.sauvegarderAbsence = async () => {
             const id = document.getElementById('absence_id').value;
-            const payload = {
-                user_id: currentUser.id, type_absence: document.getElementById('type_absence').value, 
-                moment: document.getElementById('moment_absence').value, 
-                date_debut: document.getElementById('date_debut').value, date_fin: document.getElementById('date_fin').value
-            };
+            const payload = { user_id: currentUser.id, type_absence: document.getElementById('type_absence').value, moment: document.getElementById('moment_absence').value, date_debut: document.getElementById('date_debut').value, date_fin: document.getElementById('date_fin').value };
             try {
                 if (!payload.date_debut || !payload.date_fin) throw new Error("Dates obligatoires");
-                if (id) { await supaClient.from('absences').update(payload).eq('id', id); } 
-                else { await supaClient.from('absences').insert([payload]); }
+                if (id) { await supaClient.from('absences').update(payload).eq('id', id); } else { await supaClient.from('absences').insert([payload]); }
                 fermerModalAbsence(); calendar.refetchEvents(); showToast('Absence enregistrée !');
             } catch (e) { showToast('Erreur : ' + e.message, true); }
         };
 
-        window.supprimerAbsence = async () => {
-            if(confirm("Supprimer cette absence ?")) {
-                await supaClient.from('absences').delete().eq('id', document.getElementById('absence_id').value);
-                fermerModalAbsence(); calendar.refetchEvents(); showToast("Absence supprimée");
-            }
-        };
+        window.supprimerAbsence = async () => { if(confirm("Supprimer cette absence ?")) { await supaClient.from('absences').delete().eq('id', document.getElementById('absence_id').value); fermerModalAbsence(); calendar.refetchEvents(); showToast("Absence supprimée"); } };
 
         // --- CALENDRIER ---
         function initCalendar() {
@@ -631,39 +610,28 @@
                 locale: 'fr',
                 firstDay: 1, 
                 slotMinTime: '06:00:00', slotMaxTime: '22:00:00',
-                headerToolbar: { 
-                    left: 'prev,next today', 
-                    center: 'title', 
-                    right: 'dayGridMonth,timeGridWeek' 
-                },
-                navLinks: true, editable: false, dayMaxEvents: true, eventDisplay: 'block',
+                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
+                navLinks: false, // <-- ICI : Cela DÉSACTIVE complètement la vue "Jour" au clic sur le numéro
+                editable: false, dayMaxEvents: true, eventDisplay: 'block',
                 
                 datesSet: function() { calendar.updateSize(); },
                 dateClick: function(info) { ouvrirModalAbsence(null, 'RTT', info.dateStr, info.dateStr, 'journee'); },
 
-                // MASQUE les événements "Travail" sur la vue mensuelle
-                eventDidMount: function(info) {
-                    if (info.view.type === 'dayGridMonth' && info.event.extendedProps.isWork) {
-                        info.el.style.display = 'none';
-                    }
-                },
+                eventDidMount: function(info) { if (info.view.type === 'dayGridMonth' && info.event.extendedProps.isWork) { info.el.style.display = 'none'; } },
 
-                // Injection du cercle Google Fit (uniquement vue mois)
                 dayCellDidMount: function(info) {
                     if (!calendar || calendar.view.type !== 'dayGridMonth') return;
                     const dateStr = `${info.date.getFullYear()}-${String(info.date.getMonth() + 1).padStart(2, '0')}-${String(info.date.getDate()).padStart(2, '0')}`;
                     let msJour = 0; let lastArr = null;
                     
                     pointagesAnnee.filter(p => {
-                        const dObj = new Date(p.timestamp);
-                        return `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, '0')}-${String(dObj.getDate()).padStart(2, '0')}` === dateStr;
+                        const dObj = new Date(p.timestamp); return `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, '0')}-${String(dObj.getDate()).padStart(2, '0')}` === dateStr;
                     }).forEach(pt => {
                         if(pt.type_action === 'arrivee') lastArr = new Date(pt.timestamp);
                         else if((pt.type_action === 'pause' || pt.type_action === 'depart') && lastArr) { msJour += (new Date(pt.timestamp) - lastArr); lastArr = null; }
                     });
                     
-                    const todayObj = new Date();
-                    const todayStr = `${todayObj.getFullYear()}-${String(todayObj.getMonth()+1).padStart(2,'0')}-${String(todayObj.getDate()).padStart(2,'0')}`;
+                    const todayObj = new Date(); const todayStr = `${todayObj.getFullYear()}-${String(todayObj.getMonth()+1).padStart(2,'0')}-${String(todayObj.getDate()).padStart(2,'0')}`;
                     if(dateStr === todayStr && lastArr) msJour += (new Date() - lastArr);
                     
                     if(msJour > 0) {
@@ -671,20 +639,14 @@
                         let color = '#10b981'; if (hDec > 10) color = '#ef4444'; else if (hDec < reqHours) color = '#3b82f6';
                         let diameter = Math.min(46, Math.max(16, Math.round(hDec * 4.5)));
 
-                        const container = document.createElement('div');
-                        container.className = 'fit-bubble-container';
-                        const bubble = document.createElement('div');
-                        bubble.className = 'fit-bubble';
+                        const container = document.createElement('div'); container.className = 'fit-bubble-container';
+                        const bubble = document.createElement('div'); bubble.className = 'fit-bubble';
                         bubble.style.width = `${diameter}px`; bubble.style.height = `${diameter}px`;
                         bubble.style.backgroundColor = color; bubble.style.opacity = '0.35';
                         container.appendChild(bubble);
                         
                         const dayFrame = info.el.querySelector('.fc-daygrid-day-frame');
-                        if (dayFrame) {
-                            const oldBubble = dayFrame.querySelector('.fit-bubble-container');
-                            if (oldBubble) oldBubble.remove();
-                            dayFrame.appendChild(container);
-                        }
+                        if (dayFrame) { const oldBubble = dayFrame.querySelector('.fit-bubble-container'); if (oldBubble) oldBubble.remove(); dayFrame.appendChild(container); }
                     }
                 },
 
@@ -694,29 +656,15 @@
                     
                     currentAbsences = data; chargerSoldes(data); calculerHeuresSupEt1607();
                     
-                    // Chargement Absences (Ajout couleur CET violet)
                     let eventsList = data.map(a => {
-                        let c = '#3b82f6'; 
-                        if(a.type_absence === 'CP') c = '#14b8a6'; 
-                        if(a.type_absence === 'Maladie') c = '#ef4444';
-                        if(a.type_absence === 'CET') c = '#8b5cf6'; // Violet pour le CET
-
+                        let c = '#3b82f6'; if(a.type_absence === 'CP') c = '#14b8a6'; if(a.type_absence === 'Maladie') c = '#ef4444'; if(a.type_absence === 'CET') c = '#8b5cf6';
                         let titre = a.type_absence; if(a.moment === 'matin') titre += " (Matin)"; if(a.moment === 'aprem') titre += " (Aprem)";
                         const endDateObj = new Date(new Date(a.date_fin).getTime() + 86400000);
-                        return { 
-                            id: a.id, extendedProps: { type: a.type_absence, moment: a.moment }, title: titre, 
-                            start: a.date_debut, end: `${endDateObj.getFullYear()}-${String(endDateObj.getMonth()+1).padStart(2,'0')}-${String(endDateObj.getDate()).padStart(2,'0')}`, 
-                            backgroundColor: c, borderColor: c, allDay: true 
-                        };
+                        return { id: a.id, extendedProps: { type: a.type_absence, moment: a.moment }, title: titre, start: a.date_debut, end: `${endDateObj.getFullYear()}-${String(endDateObj.getMonth()+1).padStart(2,'0')}-${String(endDateObj.getDate()).padStart(2,'0')}`, backgroundColor: c, borderColor: c, allDay: true };
                     });
 
-                    // Chargement Créneaux de travail
                     const parJour = {};
-                    pointagesAnnee.forEach(p => { 
-                        const pDateObj = new Date(p.timestamp);
-                        const d = `${pDateObj.getFullYear()}-${String(pDateObj.getMonth()+1).padStart(2,'0')}-${String(pDateObj.getDate()).padStart(2,'0')}`;
-                        if(!parJour[d]) parJour[d] = []; parJour[d].push(p); 
-                    });
+                    pointagesAnnee.forEach(p => { const pDateObj = new Date(p.timestamp); const d = `${pDateObj.getFullYear()}-${String(pDateObj.getMonth()+1).padStart(2,'0')}-${String(pDateObj.getDate()).padStart(2,'0')}`; if(!parJour[d]) parJour[d] = []; parJour[d].push(p); });
 
                     for (let jour in parJour) {
                         let lastArr = null; let blockStart = null;
@@ -730,7 +678,6 @@
                         });
                         if(lastArr) { eventsList.push({ title: 'Travail en cours', start: blockStart || lastArr, end: new Date(), backgroundColor: '#14b8a6', borderColor: '#0d9488', className: 'work-block', extendedProps: { isWork: true } }); }
                     }
-
                     success(eventsList);
                 },
                 
@@ -738,73 +685,55 @@
                     if(info.event.extendedProps.isWork) return; 
                     info.jsEvent.stopPropagation();
                     const p = info.event.extendedProps;
-                    const endObj = info.event.end ? new Date(info.event.end.getTime() - 86400000) : info.event.start;
-                    const startObj = info.event.start;
-                    ouvrirModalAbsence(
-                        info.event.id, p.type, 
-                        `${startObj.getFullYear()}-${String(startObj.getMonth()+1).padStart(2,'0')}-${String(startObj.getDate()).padStart(2,'0')}`, 
-                        `${endObj.getFullYear()}-${String(endObj.getMonth()+1).padStart(2,'0')}-${String(endObj.getDate()).padStart(2,'0')}`, 
-                        p.moment || 'journee'
-                    );
+                    const endObj = info.event.end ? new Date(info.event.end.getTime() - 86400000) : info.event.start; const startObj = info.event.start;
+                    ouvrirModalAbsence(info.event.id, p.type, `${startObj.getFullYear()}-${String(startObj.getMonth()+1).padStart(2,'0')}-${String(startObj.getDate()).padStart(2,'0')}`, `${endObj.getFullYear()}-${String(endObj.getMonth()+1).padStart(2,'0')}-${String(endObj.getDate()).padStart(2,'0')}`, p.moment || 'journee');
                 }
             });
             calendar.render();
         }
 
         function chargerSoldes(absences) {
-            let cpConsBeforeLimit = 0; 
-            let cpConsAfterLimit = 0;
-            let rttCons = 0; 
-            let cetCons = 0;
-            let joursNF = 0;
+            let cpConsBeforeLimit = 0; let cpConsAfterLimit = 0; let rttCons = 0; let cetCons = 0; let joursNF = 0;
 
+            const currentYear = new Date().getFullYear();
             const now = new Date();
-            // On fixe l'heure à 23:59:59 pour inclure toute la journée de la date limite
             const limiteDate = userParams.date_limite_reliquat ? new Date(userParams.date_limite_reliquat + 'T23:59:59') : null;
 
             absences.forEach(a => {
+                // FILTRE : On ne calcule les compteurs que pour l'année en cours
+                const startYear = new Date(a.date_debut).getFullYear();
+                if (startYear !== currentYear) return;
+
                 let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1;
                 
                 if(a.type_absence === 'CP') { 
-                    // Vérification de la date de l'absence par rapport à la date limite
-                    if (limiteDate && new Date(a.date_debut) > limiteDate) {
-                        cpConsAfterLimit += j; // CP pris APRES la date butoir
-                    } else {
-                        cpConsBeforeLimit += j; // CP pris AVANT la date butoir
-                    }
-                    // Calcul fractionnement
+                    if (limiteDate && new Date(a.date_debut) > limiteDate) { cpConsAfterLimit += j; } 
+                    else { cpConsBeforeLimit += j; }
                     for(let d = new Date(a.date_debut); d <= new Date(a.date_fin); d.setDate(d.getDate() + 1)) { if([10, 11, 0, 1].includes(d.getMonth())) joursNF++; } 
                 }
                 if(a.type_absence === 'RTT') rttCons += j;
                 if(a.type_absence === 'CET') cetCons += j;
             });
             
-            // Calcul Logique Reliquat N-1
+            // Calcul Reliquat Intelligent
             let reliquatConfig = userParams.reliquat_cp || 0;
-            let reliquatUtilise = Math.min(reliquatConfig, cpConsBeforeLimit);
-            
             let reliquatRestant = 0;
             let cpRestants = 0;
 
             if (limiteDate) {
-                // Si la date actuelle a dépassé la limite, le reliquat est perdu (0), sinon on affiche ce qu'il reste
+                // Si la date limite est passée, le reliquat tombe à 0
                 reliquatRestant = (now > limiteDate) ? 0 : Math.max(0, reliquatConfig - cpConsBeforeLimit);
-                // On déduit les CP consommés, en s'assurant que le reliquat a "encaissé" les premiers congés
                 cpRestants = userParams.cp_initial - Math.max(0, cpConsBeforeLimit - reliquatConfig) - cpConsAfterLimit;
             } else {
-                // S'il n'y a pas de date limite renseignée, tout se déduit normalement
                 reliquatRestant = Math.max(0, reliquatConfig - (cpConsBeforeLimit + cpConsAfterLimit));
                 cpRestants = userParams.cp_initial - Math.max(0, (cpConsBeforeLimit + cpConsAfterLimit) - reliquatConfig);
             }
 
-            // MAJ Interface
             document.getElementById('cpt-reliquat').textContent = reliquatRestant + ' j';
             if (userParams.date_limite_reliquat) {
                 const dateLim = new Date(userParams.date_limite_reliquat);
                 document.getElementById('date-reliquat').textContent = 'Avant le ' + dateLim.toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit'});
-            } else {
-                document.getElementById('date-reliquat').textContent = '';
-            }
+            } else { document.getElementById('date-reliquat').textContent = ''; }
             
             document.getElementById('cpt-cp').textContent = cpRestants + ' j';
             document.getElementById('cpt-rtt').textContent = (userParams.rtt_initial - rttCons) + ' j';
@@ -833,32 +762,20 @@
             if (notifsOn && "Notification" in window && Notification.permission !== "granted") { await Notification.requestPermission(); }
             try {
                 const p = { 
-                    user_id: currentUser.id, 
-                    objectif_annuel: parseFloat(document.getElementById('input_objectif_annuel').value),
-                    base_horaire: parseFloat(document.getElementById('input_base_horaire').value), 
-                    cp_initial: parseFloat(document.getElementById('input_cp').value), 
-                    reliquat_cp: parseFloat(document.getElementById('input_reliquat_cp').value),
-                    date_limite_reliquat: document.getElementById('input_date_limite_reliquat').value,
-                    rtt_initial: parseFloat(document.getElementById('input_rtt').value), 
-                    cet_initial: parseFloat(document.getElementById('input_cet').value), 
-                    limite_heures_jour: parseFloat(document.getElementById('input_limite_heures').value), 
-                    notifs_actives: notifsOn 
+                    user_id: currentUser.id, objectif_annuel: parseFloat(document.getElementById('input_objectif_annuel').value),
+                    base_horaire: parseFloat(document.getElementById('input_base_horaire').value), cp_initial: parseFloat(document.getElementById('input_cp').value), 
+                    reliquat_cp: parseFloat(document.getElementById('input_reliquat_cp').value), date_limite_reliquat: document.getElementById('input_date_limite_reliquat').value,
+                    rtt_initial: parseFloat(document.getElementById('input_rtt').value), cet_initial: parseFloat(document.getElementById('input_cet').value), 
+                    limite_heures_jour: parseFloat(document.getElementById('input_limite_heures').value), notifs_actives: notifsOn 
                 };
                 const { error } = await supaClient.from('parametres').upsert(p);
                 if(error) throw error;
-                userParams = p; fermerModalParametres(); 
-                if(calendar) calendar.refetchEvents(); 
-                calculerHeuresSupEt1607(); showToast('Paramètres sauvés');
+                userParams = p; fermerModalParametres(); if(calendar) calendar.refetchEvents(); calculerHeuresSupEt1607(); showToast('Paramètres sauvés');
             } catch(e) { showToast(e.message, true); }
         };
 
         window.switchTab = (tab) => {
-            ['pointage', 'planning'].forEach(t => {
-                document.getElementById('view-' + t).classList.toggle('hidden', t !== tab); 
-                document.getElementById('view-' + t).classList.toggle('flex', t === tab);
-                document.getElementById('btn-' + t).classList.toggle('bg-teal-50', t === tab); 
-                document.getElementById('btn-' + t).classList.toggle('text-teal-700', t === tab);
-            });
+            ['pointage', 'planning'].forEach(t => { document.getElementById('view-' + t).classList.toggle('hidden', t !== tab); document.getElementById('view-' + t).classList.toggle('flex', t === tab); document.getElementById('btn-' + t).classList.toggle('bg-teal-50', t === tab); document.getElementById('btn-' + t).classList.toggle('text-teal-700', t === tab); });
             if(tab === 'pointage') rafraichirVueJour(); else if(calendar) { calendar.render(); calendar.updateSize(); }
         };
     </script>

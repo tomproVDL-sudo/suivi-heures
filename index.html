@@ -23,46 +23,13 @@
             display: flex; 
             justify-content: center; 
             align-items: center; 
-            margin-top: 4px; 
-            height: 32px;
+            margin-top: 2px; 
             pointer-events: none;
         }
         .fit-bubble { 
             border-radius: 50%; 
             transition: all 0.2s;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        /* Harmonisation des boutons de navigation */
-        .fc .fc-button {
-            height: 32px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .fc .fc-prev-button, .fc .fc-next-button {
-            width: 32px;
-            padding: 0;
-        }
-        .fc .fc-today-button {
-            height: 32px;
-            padding: 0 12px;
-            min-width: 72px; /* largeur approximative des deux flèches réunies + gap */
-        }
-
-        /* Positionnement du bouton today en dessous des flèches sur mobile */
-        .fc .fc-toolbar.fc-header-toolbar {
-            flex-wrap: wrap;
-        }
-        .fc .fc-toolbar-chunk:first-child {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-        }
-        .fc .fc-today-button {
-            flex-basis: 100%; /* force le bouton à prendre toute la largeur du premier chunk sur mobile */
-            order: 2; /* le place après les flèches */
-            margin-top: 4px;
         }
 
         @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -72,7 +39,7 @@
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #14b8a6; border-radius: 3px; }
         .btn-card { transition: all 0.2s ease; cursor: pointer; }
         .btn-card:active { transform: scale(0.97); }
-        .work-block { opacity: 0.8; }
+        .work-block { opacity: 0.85; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-teal-50 to-gray-100 min-h-screen flex items-center justify-center p-2 md:p-6 font-sans">
@@ -273,6 +240,7 @@
         // --- 1. CONFIGURATION ---
         const supabaseUrl = 'https://rxqtsguwoqeojsnaagxb.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4cXRzZ3V3b3Flb2pzbmFhZ3hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTA4MjcsImV4cCI6MjEwMjcyNjgyN30.FTPTGSe6tqDTieqQdD-GWUqueKlEPUpw4QGiMa4U8AA';
+
 
         const supaClient = window.supabase.createClient(supabaseUrl, supabaseKey);
         
@@ -622,7 +590,6 @@
         window.ouvrirModalAbsence = (id = null, type = 'RTT', debut = '', fin = '', moment = 'journee') => {
             document.getElementById('absence_id').value = id || '';
             document.getElementById('titre-modal-absence').textContent = id ? "Modifier l'absence" : "Nouvelle absence";
-            document.getElementById('btn-sauvegarder-absence').textContent = id ? "Mettre à jour" : "Valider";
             document.getElementById('btn-supprimer-absence').classList.toggle('hidden', !id);
             
             document.getElementById('type_absence').value = type;
@@ -694,7 +661,7 @@
                     ouvrirModalAbsence(null, 'RTT', info.dateStr, info.dateStr, 'journee');
                 },
 
-                // Style Google Fit pour les bulles de la vue mois UNIQUEMENT
+                // Style Google Fit pour les bulles de la vue mois UNIQUEMENT (injectées dans l'en-tête du jour)
                 dayCellDidMount: function(info) {
                     if (calendar.view.type !== 'dayGridMonth') return;
                     
@@ -707,7 +674,7 @@
                     let lastArr = null;
                     
                     pointagesAnnee.filter(p => {
-                        const pDate = new Date(p.timestamp).toISOString().split('T')[0];
+                        const pDate = p.timestamp.split('T')[0];
                         return pDate === dateStr;
                     }).forEach(pt => {
                         if(pt.type_action === 'arrivee') {
@@ -733,7 +700,7 @@
                         if (hDec > 10) color = '#ef4444';
                         else if (hDec < reqHours) color = '#3b82f6';
 
-                        let diameter = Math.min(32, Math.max(12, Math.round(hDec * 3.2)));
+                        let diameter = Math.min(30, Math.max(12, Math.round(hDec * 3)));
 
                         const container = document.createElement('div');
                         container.className = 'fit-bubble-container';
@@ -743,16 +710,15 @@
                         bubble.style.width = `${diameter}px`;
                         bubble.style.height = `${diameter}px`;
                         bubble.style.backgroundColor = color;
-                        bubble.style.opacity = '0.8';
+                        bubble.style.opacity = '0.85';
 
                         container.appendChild(bubble);
                         
-                        const dayFrame = info.el.querySelector('.fc-daygrid-day-frame');
-                        if (dayFrame) {
-                            const oldBubble = dayFrame.querySelector('.fit-bubble-container');
+                        const dayTop = info.el.querySelector('.fc-daygrid-day-top');
+                        if (dayTop) {
+                            const oldBubble = dayTop.querySelector('.fit-bubble-container');
                             if (oldBubble) oldBubble.remove();
-                            
-                            dayFrame.appendChild(container);
+                            dayTop.appendChild(container);
                         }
                     }
                 },
@@ -783,11 +749,11 @@
                         };
                     });
 
-                    // N'ajouter les événements de travail QUE dans la vue semaine (timeGridWeek)
+                    // Créneaux travaillés affichés UNIQUEMENT dans la vue semaine (timeGridWeek)
                     if (info.view.type === 'timeGridWeek') {
                         const parJour = {};
                         pointagesAnnee.forEach(p => { 
-                            const d = new Date(p.timestamp).toISOString().split('T')[0]; 
+                            const d = p.timestamp.split('T')[0]; 
                             if(!parJour[d]) parJour[d] = []; 
                             parJour[d].push(p); 
                         });
@@ -804,7 +770,6 @@
                                     blockStart = timestamp;
                                 }
                                 else if(pt.type_action === 'pause' && lastArr) {
-                                    // Créer un bloc de travail jusqu'à la pause
                                     eventsList.push({
                                         title: 'Travail',
                                         start: blockStart,
@@ -816,7 +781,6 @@
                                     blockStart = null;
                                 }
                                 else if(pt.type_action === 'depart' && lastArr) {
-                                    // Créer un bloc de travail final
                                     eventsList.push({
                                         title: 'Travail',
                                         start: blockStart || lastArr,
@@ -830,12 +794,11 @@
                                 }
                             });
                             
-                            // Si toujours en poste (pas de départ)
                             if(lastArr) {
                                 eventsList.push({
                                     title: 'Travail en cours',
                                     start: blockStart || lastArr,
-                                    end: new Date(), // Jusqu'à maintenant
+                                    end: new Date(),
                                     backgroundColor: '#14b8a6',
                                     borderColor: '#0d9488',
                                     className: 'work-block'
@@ -938,3 +901,4 @@
     </script>
 </body>
 </html>
+        

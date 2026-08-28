@@ -16,9 +16,9 @@
         .fc-button-primary { background-color: #14b8a6 !important; border-color: #14b8a6 !important; font-size: 0.75rem !important; }
         .fc-button-primary:hover { background-color: #0d9488 !important; border-color: #0d9488 !important; }
         .fc-button-active { background-color: #0f766e !important; }
-        .fc-event { transition: transform 0.2s; border-radius: 6px; font-size: 0.75rem; }
+        .fc-event { transition: transform 0.2s; border-radius: 6px; font-size: 0.75rem; border: none; }
         
-        /* Harmonisation des boutons */
+        /* Harmonisation des boutons du calendrier */
         .fc .fc-button {
             height: 32px;
             display: inline-flex;
@@ -30,21 +30,30 @@
         .fc .fc-prev-button, .fc .fc-next-button { width: 32px; padding: 0; }
         .fc .fc-today-button { height: 32px; line-height: 32px; padding: 0 12px; }
         
-        /* 📱 Interface Mobile : Réorganisation du header du calendrier */
+        /* 📱 Interface Mobile Épurée (Header) */
         @media (max-width: 768px) {
             .fc-toolbar.fc-header-toolbar {
-                flex-direction: column;
-                gap: 0.75rem;
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: space-between;
+                align-items: center;
                 margin-bottom: 1rem !important;
             }
-            .fc-toolbar-chunk { display: flex; justify-content: center; width: 100%; }
-            .fc-toolbar-chunk:nth-child(1) { order: 1; gap: 0.5rem; } /* Flèches + Today */
-            .fc-toolbar-chunk:nth-child(3) { order: 2; gap: 0.5rem; } /* Month / Week */
-            .fc-toolbar-chunk:nth-child(2) { order: 3; margin-top: 0.5rem; } /* Titre Date */
-            .fc .fc-toolbar-title { font-size: 1.4rem !important; }
+            /* Flèches + Today à gauche */
+            .fc-toolbar-chunk:nth-child(1) { order: 1; display: flex; gap: 4px; } 
+            /* Month + Week à droite */
+            .fc-toolbar-chunk:nth-child(3) { order: 2; display: flex; gap: 4px; } 
+            /* Titre Date en dessous */
+            .fc-toolbar-chunk:nth-child(2) { 
+                order: 3; 
+                width: 100%; 
+                text-align: center; 
+                margin-top: 12px; 
+            }
+            .fc .fc-toolbar-title { font-size: 1.35rem !important; }
         }
         
-        /* Bulles style Google Fit - Centrage Absolu sans perturber FullCalendar */
+        /* Bulles style Google Fit - Centrage absolu en arrière-plan */
         .fc-daygrid-day-frame { position: relative !important; }
         .fc-daygrid-day-bg, .fc-daygrid-day-events, .fc-daygrid-day-top { position: relative; z-index: 1; }
         
@@ -57,7 +66,7 @@
             justify-content: center; 
             align-items: center; 
             pointer-events: none;
-            z-index: 0; /* Bien en arrière-plan */
+            z-index: 0; /* Arrière-plan total */
         }
         .fit-bubble { 
             border-radius: 50%; 
@@ -124,7 +133,7 @@
         </div>
 
         <!-- ZONE DROITE -->
-        <div class="flex-1 flex flex-col p-4 md:p-8 relative">
+        <div class="flex-1 flex flex-col p-4 md:p-8 relative overflow-hidden">
             
             <!-- VUE POINTAGE -->
             <div id="view-pointage" class="flex-1 flex flex-col">
@@ -173,25 +182,35 @@
                     </div>
                 </div>
 
-                <!-- 1. BLOC HEURES SUP EN PREMIER -->
+                <!-- 1. BLOC HEURES SUP -->
                 <div class="grid grid-cols-3 gap-2 mb-4 bg-teal-50/60 p-3 rounded-xl border border-teal-200 text-center shadow-sm">
                     <div><span class="text-[10px] text-teal-700 font-bold uppercase block">H. Sup Semaine</span><span class="font-bold text-teal-800 text-base" id="hs-semaine">--</span></div>
                     <div><span class="text-[10px] text-teal-700 font-bold uppercase block">H. Sup Mois</span><span class="font-bold text-teal-800 text-base" id="hs-mois">--</span></div>
                     <div><span class="text-[10px] text-teal-700 font-bold uppercase block">H. Sup Année</span><span class="font-bold text-teal-800 text-base" id="hs-annee">--</span></div>
                 </div>
 
-                <!-- AUTRES SOLDES & 1607H -->
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <!-- AUTRES SOLDES & RELIQUAT -->
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
                     <div class="bg-gray-50 p-3 rounded-xl border border-gray-200 flex flex-col justify-between">
-                        <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Objectif 1607h</div>
+                        <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Objectif <span id="lbl-objectif">1607</span>h</div>
                         <div class="text-xs md:text-sm font-bold text-gray-800" id="info-1607">Calcul...</div>
                     </div>
-                    <div class="bg-gray-50 p-3 rounded-xl border border-gray-200"><div class="text-[10px] text-gray-500 font-bold uppercase mb-1">CP Restants</div><div class="text-xl font-bold text-gray-800" id="cpt-cp">-- j</div></div>
+                    <div class="bg-gray-50 p-3 rounded-xl border border-gray-200">
+                        <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Reliquat N-1</div>
+                        <div class="text-xl font-bold text-gray-800" id="cpt-reliquat">-- j</div>
+                        <div class="text-[9px] text-red-500 font-bold mt-0.5" id="date-reliquat"></div>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded-xl border border-gray-200">
+                        <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">CP Restants</div>
+                        <div class="text-xl font-bold text-gray-800" id="cpt-cp">-- j</div>
+                    </div>
                     <div class="bg-blue-50 p-3 rounded-xl border border-blue-200 relative">
                         <div class="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full animate-pulse hidden" id="alerte-rtt">À poser !</div>
                         <div class="text-[10px] text-blue-600 font-bold uppercase mb-1">RTT Restants</div><div class="text-xl font-bold text-blue-800" id="cpt-rtt">-- j</div>
                     </div>
-                    <div class="bg-purple-50 p-3 rounded-xl border border-purple-200"><div class="text-[10px] text-purple-600 font-bold uppercase mb-1">Fractionnement</div><div class="text-xl font-bold text-purple-800" id="cpt-fractionnement">+0 j</div></div>
+                    <div class="bg-purple-50 p-3 rounded-xl border border-purple-200">
+                        <div class="text-[10px] text-purple-600 font-bold uppercase mb-1">Fractionnement</div><div class="text-xl font-bold text-purple-800" id="cpt-fractionnement">+0 j</div>
+                    </div>
                 </div>
 
                 <!-- CALENDRIER AGRANDI SUR MOBILE -->
@@ -240,12 +259,16 @@
             <div class="p-4 bg-gray-50 rounded-xl mb-4">
                 <h4 class="font-bold text-gray-700 mb-3 text-sm">Temps de travail & Notifications</h4>
                 <div class="mb-3">
+                    <label class="text-xs font-bold text-gray-500 block">Objectif annuel (Heures)</label>
+                    <div class="flex items-center gap-2"><input type="number" id="input_objectif_annuel" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="1607"></div>
+                </div>
+                <div class="mb-3">
                     <label class="text-xs font-bold text-gray-500 block">Base hebdomadaire</label>
-                    <div class="flex items-center gap-2"><input type="number" id="input_base_horaire" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="39"> <span class="text-gray-500 text-sm font-bold">Heures</span></div>
+                    <div class="flex items-center gap-2"><input type="number" id="input_base_horaire" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="39"></div>
                 </div>
                 <div class="mb-3">
                     <label class="text-xs font-bold text-gray-500 block">Alerte dépassement quotidien (Max 10h)</label>
-                    <div class="flex items-center gap-2"><input type="number" step="0.5" max="10" id="input_limite_heures" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="10"> <span class="text-gray-500 text-sm font-bold">Heures/jour</span></div>
+                    <div class="flex items-center gap-2"><input type="number" step="0.5" max="10" id="input_limite_heures" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="10"></div>
                 </div>
                 <div class="flex items-center gap-2 mt-4">
                     <input type="checkbox" id="input_notifs" class="w-5 h-5 text-teal-600 rounded cursor-pointer">
@@ -254,9 +277,25 @@
             </div>
 
             <div class="p-4 bg-gray-50 rounded-xl mb-6">
-                <h4 class="font-bold text-gray-700 mb-3 text-sm">Soldes initiaux acquis</h4>
-                <div class="mb-3"><label class="text-xs font-bold text-gray-500 block">Congés Payés</label><input type="number" id="input_cp" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="25"></div>
-                <div><label class="text-xs font-bold text-gray-500 block">RTT</label><input type="number" id="input_rtt" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="15"></div>
+                <h4 class="font-bold text-gray-700 mb-3 text-sm">Soldes initiaux acquis & Reliquats</h4>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="text-xs font-bold text-gray-500 block">Congés Payés N</label>
+                        <input type="number" step="0.5" id="input_cp" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="25">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-500 block">Reliquat C.P N-1</label>
+                        <input type="number" step="0.5" id="input_reliquat_cp" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="0">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="text-xs font-bold text-gray-500 block">Date limite du reliquat (N-1)</label>
+                    <input type="date" id="input_date_limite_reliquat" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 block">RTT</label>
+                    <input type="number" step="0.5" id="input_rtt" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="15">
+                </div>
             </div>
 
             <div class="flex gap-3">
@@ -283,7 +322,11 @@
         let pointagesAnnee = []; 
         let currentAbsences = [];
         
-        let userParams = { cp_initial: 25, rtt_initial: 15, base_horaire: 39, limite_heures_jour: 10, notifs_actives: false };
+        let userParams = { 
+            cp_initial: 25, rtt_initial: 15, base_horaire: 39, 
+            limite_heures_jour: 10, notifs_actives: false,
+            objectif_annuel: 1607, reliquat_cp: 0, date_limite_reliquat: ''
+        };
 
         setInterval(() => {
             const now = new Date();
@@ -417,28 +460,18 @@
         };
 
         function calculerStatistiquesJour(pts) {
-            let totalTravail = 0; 
-            let lastArrivee = null; 
-            let pauses = 0;
-            
+            let totalTravail = 0; let lastArrivee = null; let pauses = 0;
             pts.forEach(pt => {
                 if(pt.type_action === 'arrivee') { lastArrivee = new Date(pt.timestamp); }
-                if(pt.type_action === 'pause') { 
-                    pauses++; 
-                    if (lastArrivee) { totalTravail += (new Date(pt.timestamp) - lastArrivee); lastArrivee = null; } 
-                }
-                if(pt.type_action === 'depart') { 
-                    if (lastArrivee) { totalTravail += (new Date(pt.timestamp) - lastArrivee); lastArrivee = null; } 
-                }
+                if(pt.type_action === 'pause') { pauses++; if (lastArrivee) { totalTravail += (new Date(pt.timestamp) - lastArrivee); lastArrivee = null; } }
+                if(pt.type_action === 'depart') { if (lastArrivee) { totalTravail += (new Date(pt.timestamp) - lastArrivee); lastArrivee = null; } }
             });
             if (lastArrivee) { totalTravail += (new Date() - lastArrivee); }
 
             const spanHeures = document.getElementById('stat-heures');
             if (totalTravail > 0) {
-                let h = Math.floor(totalTravail / 3600000); 
-                let m = Math.floor((totalTravail % 3600000) / 60000);
+                let h = Math.floor(totalTravail / 3600000); let m = Math.floor((totalTravail % 3600000) / 60000);
                 spanHeures.textContent = `${h}h${m.toString().padStart(2, '0')}`;
-                
                 const heuresDec = totalTravail / 3600000;
                 if (userParams.notifs_actives && heuresDec >= userParams.limite_heures_jour) {
                     spanHeures.classList.remove('text-teal-600'); spanHeures.classList.add('text-red-600');
@@ -458,6 +491,9 @@
         }
 
         function calculerHeuresSupEt1607() {
+            const objAnnuel = userParams.objectif_annuel || 1607;
+            document.getElementById('lbl-objectif').textContent = objAnnuel;
+            
             const now = new Date();
             const getMonday = (d) => { let day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6:1); return new Date(new Date(d).setDate(diff)); };
             const startWeek = getMonday(now); startWeek.setHours(0,0,0,0);
@@ -483,9 +519,7 @@
             };
 
             const mapReelJour = getMapTempsReelParJour();
-            const getTempsReelTotal = (startDate) => {
-                let total = 0; for(let jour in mapReelJour) { if(new Date(jour) >= startDate) total += mapReelJour[jour]; } return total;
-            };
+            const getTempsReelTotal = (startDate) => { let total = 0; for(let jour in mapReelJour) { if(new Date(jour) >= startDate) total += mapReelJour[jour]; } return total; };
 
             const getTempsAttendu = (startDate) => {
                 let expected = 0; const hoursPerDay = userParams.base_horaire / 5;
@@ -522,13 +556,13 @@
             while(d <= now) {
                 const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                 cumulAnnee += (mapReelJour[dateStr] || 0);
-                if (cumulAnnee >= 1607) { dateAtteinte = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); break; }
+                if (cumulAnnee >= objAnnuel) { dateAtteinte = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); break; }
                 d.setDate(d.getDate() + 1);
             }
 
             const info1607 = document.getElementById('info-1607');
             if (dateAtteinte) { info1607.textContent = `Atteint le ${dateAtteinte} 🎉`; } 
-            else { info1607.textContent = `Reste ~${(1607 - cumulAnnee).toFixed(0)}h (${cumulAnnee.toFixed(0)}h / 1607h)`; }
+            else { info1607.textContent = `Reste ~${(objAnnuel - cumulAnnee).toFixed(0)}h (${cumulAnnee.toFixed(0)}h / ${objAnnuel}h)`; }
         }
 
         window.gererAffichageDates = () => {
@@ -580,7 +614,7 @@
             }
         };
 
-        // --- 5. CALENDRIER ET SOLDES ---
+        // --- CALENDRIER ---
         function initCalendar() {
             calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
                 initialView: 'dayGridMonth', 
@@ -597,7 +631,14 @@
                 datesSet: function() { calendar.updateSize(); },
                 dateClick: function(info) { ouvrirModalAbsence(null, 'RTT', info.dateStr, info.dateStr, 'journee'); },
 
-                // Injection du cercle au centre de la case (sans altérer le DOM natif)
+                // Évite la superposition : MASQUE les événements "Travail" sur la vue mensuelle
+                eventDidMount: function(info) {
+                    if (info.view.type === 'dayGridMonth' && info.event.extendedProps.isWork) {
+                        info.el.style.display = 'none';
+                    }
+                },
+
+                // Injection du cercle Google Fit (uniquement vue mois, en arrière plan)
                 dayCellDidMount: function(info) {
                     if (!calendar || calendar.view.type !== 'dayGridMonth') return;
                     const dateStr = `${info.date.getFullYear()}-${String(info.date.getMonth() + 1).padStart(2, '0')}-${String(info.date.getDate()).padStart(2, '0')}`;
@@ -628,7 +669,6 @@
                         bubble.style.backgroundColor = color; bubble.style.opacity = '0.35';
                         container.appendChild(bubble);
                         
-                        // Ajout sécurisé au composant frame parent
                         const dayFrame = info.el.querySelector('.fc-daygrid-day-frame');
                         if (dayFrame) {
                             const oldBubble = dayFrame.querySelector('.fit-bubble-container');
@@ -651,14 +691,12 @@
                         const endDateObj = new Date(new Date(a.date_fin).getTime() + 86400000);
                         return { 
                             id: a.id, extendedProps: { type: a.type_absence, moment: a.moment }, title: titre, 
-                            start: a.date_debut, 
-                            end: `${endDateObj.getFullYear()}-${String(endDateObj.getMonth()+1).padStart(2,'0')}-${String(endDateObj.getDate()).padStart(2,'0')}`, 
-                            backgroundColor: c, borderColor: c,
-                            allDay: true // Garanti l'affichage correct des blocs complets
+                            start: a.date_debut, end: `${endDateObj.getFullYear()}-${String(endDateObj.getMonth()+1).padStart(2,'0')}-${String(endDateObj.getDate()).padStart(2,'0')}`, 
+                            backgroundColor: c, borderColor: c, allDay: true 
                         };
                     });
 
-                    // Chargement Créneaux de travail (Restauré pour la vue Mois & Semaine)
+                    // Chargement Créneaux de travail
                     const parJour = {};
                     pointagesAnnee.forEach(p => { 
                         const pDateObj = new Date(p.timestamp);
@@ -672,18 +710,19 @@
                             const timestamp = new Date(pt.timestamp);
                             if(pt.type_action === 'arrivee') { lastArr = timestamp; blockStart = timestamp; }
                             else if((pt.type_action === 'pause' || pt.type_action === 'depart') && lastArr) {
-                                eventsList.push({ title: 'Travail', start: blockStart, end: timestamp, backgroundColor: '#14b8a6', borderColor: '#0d9488', className: 'work-block' });
+                                // "isWork: true" permet de les masquer en vue mois !
+                                eventsList.push({ title: 'Travail', start: blockStart, end: timestamp, backgroundColor: '#14b8a6', borderColor: '#0d9488', className: 'work-block', extendedProps: { isWork: true } });
                                 lastArr = null; blockStart = null;
                             }
                         });
-                        if(lastArr) { eventsList.push({ title: 'Travail en cours', start: blockStart || lastArr, end: new Date(), backgroundColor: '#14b8a6', borderColor: '#0d9488', className: 'work-block' }); }
+                        if(lastArr) { eventsList.push({ title: 'Travail en cours', start: blockStart || lastArr, end: new Date(), backgroundColor: '#14b8a6', borderColor: '#0d9488', className: 'work-block', extendedProps: { isWork: true } }); }
                     }
 
                     success(eventsList);
                 },
                 
                 eventClick: function(info) {
-                    if(!info.event.extendedProps.type) return; 
+                    if(info.event.extendedProps.isWork) return; // Empêche l'édition d'un créneau "Travail"
                     info.jsEvent.stopPropagation();
                     const p = info.event.extendedProps;
                     const endObj = info.event.end ? new Date(info.event.end.getTime() - 86400000) : info.event.start;
@@ -709,20 +748,38 @@
                 }
                 if(a.type_absence === 'RTT') rttCons += j;
             });
-            document.getElementById('cpt-cp').textContent = (userParams.cp_initial - cpCons) + ' j';
+            
+            // Calcul CPs et Reliquat
+            let reliquatConfig = userParams.reliquat_cp || 0;
+            let reliquatRestant = Math.max(0, reliquatConfig - cpCons);
+            let cpRestants = userParams.cp_initial - Math.max(0, cpCons - reliquatConfig);
+
+            document.getElementById('cpt-reliquat').textContent = reliquatRestant + ' j';
+            if (userParams.date_limite_reliquat) {
+                const dateLim = new Date(userParams.date_limite_reliquat);
+                document.getElementById('date-reliquat').textContent = 'Avant le ' + dateLim.toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit'});
+            } else {
+                document.getElementById('date-reliquat').textContent = '';
+            }
+            
+            document.getElementById('cpt-cp').textContent = cpRestants + ' j';
             document.getElementById('cpt-rtt').textContent = (userParams.rtt_initial - rttCons) + ' j';
             document.getElementById('alerte-rtt').classList.toggle('hidden', (userParams.rtt_initial - rttCons) > 0);
             document.getElementById('cpt-fractionnement').textContent = '+' + (joursNF >= 8 ? 2 : (joursNF >= 6 ? 1 : 0)) + ' j';
         }
 
         window.ouvrirModalParametres = async () => {
+            document.getElementById('input_objectif_annuel').value = userParams.objectif_annuel || 1607;
             document.getElementById('input_base_horaire').value = userParams.base_horaire || 39;
             document.getElementById('input_limite_heures').value = userParams.limite_heures_jour || 10;
             document.getElementById('input_notifs').checked = userParams.notifs_actives || false;
-            document.getElementById('input_cp').value = userParams.cp_initial;
-            document.getElementById('input_rtt').value = userParams.rtt_initial;
+            document.getElementById('input_cp').value = userParams.cp_initial || 25;
+            document.getElementById('input_reliquat_cp').value = userParams.reliquat_cp || 0;
+            document.getElementById('input_date_limite_reliquat').value = userParams.date_limite_reliquat || '';
+            document.getElementById('input_rtt').value = userParams.rtt_initial || 15;
             document.getElementById('modal-parametres').classList.remove('hidden');
         };
+        
         window.fermerModalParametres = () => document.getElementById('modal-parametres').classList.add('hidden');
         
         window.sauvegarderParametres = async () => {
@@ -730,9 +787,15 @@
             if (notifsOn && "Notification" in window && Notification.permission !== "granted") { await Notification.requestPermission(); }
             try {
                 const p = { 
-                    user_id: currentUser.id, base_horaire: parseFloat(document.getElementById('input_base_horaire').value), 
-                    cp_initial: parseFloat(document.getElementById('input_cp').value), rtt_initial: parseFloat(document.getElementById('input_rtt').value), 
-                    limite_heures_jour: parseFloat(document.getElementById('input_limite_heures').value), notifs_actives: notifsOn 
+                    user_id: currentUser.id, 
+                    objectif_annuel: parseFloat(document.getElementById('input_objectif_annuel').value),
+                    base_horaire: parseFloat(document.getElementById('input_base_horaire').value), 
+                    cp_initial: parseFloat(document.getElementById('input_cp').value), 
+                    reliquat_cp: parseFloat(document.getElementById('input_reliquat_cp').value),
+                    date_limite_reliquat: document.getElementById('input_date_limite_reliquat').value,
+                    rtt_initial: parseFloat(document.getElementById('input_rtt').value), 
+                    limite_heures_jour: parseFloat(document.getElementById('input_limite_heures').value), 
+                    notifs_actives: notifsOn 
                 };
                 const { error } = await supaClient.from('parametres').upsert(p);
                 if(error) throw error;

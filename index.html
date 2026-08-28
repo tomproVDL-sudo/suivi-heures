@@ -16,11 +16,11 @@
         .fc-button-primary { background-color: #14b8a6 !important; border-color: #14b8a6 !important; font-size: 0.75rem !important; padding: 4px 8px !important; }
         .fc-button-primary:hover { background-color: #0d9488 !important; border-color: #0d9488 !important; }
         .fc-button-active { background-color: #0f766e !important; }
-        .fc-event { transition: transform 0.2s; border-radius: 6px; }
-        .fc-event:hover { transform: scale(1.02); z-index: 10; }
+        .fc-event { transition: transform 0.2s; border-radius: 6px; font-size: 0.75rem; }
         
-        /* Badge d'heures style Google Fit dans le calendrier */
-        .day-hours-badge { font-size: 10px; background: #ccfbf1; color: #0f766e; border-radius: 999px; padding: 1px 6px; font-weight: bold; display: inline-block; margin-top: 2px; }
+        /* Bulles style Google Fit dans la vue mois */
+        .fit-bubble-container { display: flex; justify-content: center; align-items: center; margin-top: 4px; height: 32px; }
+        .fit-bubble { border-radius: 50%; transition: all 0.2s; }
 
         @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .animate-slide-in { animation: slideIn 0.3s ease-out; }
@@ -86,7 +86,6 @@
             <div id="view-pointage" class="flex-1 flex flex-col">
                 <h2 class="text-2xl font-medium text-gray-800 text-center mb-6">Suivi d'activité</h2>
                 
-                <!-- STATISTIQUES DU JOUR -->
                 <div class="grid grid-cols-3 gap-3 md:gap-4 mb-4">
                     <div class="bg-teal-50 p-3 md:p-4 rounded-xl text-center transition-colors duration-300">
                         <div class="text-xl md:text-2xl font-bold text-teal-600 transition-colors duration-300" id="stat-heures">0h00</div>
@@ -102,7 +101,6 @@
                     </div>
                 </div>
 
-                <!-- BOUTONS DE POINTAGE (Même taille et structure que les cartes de stats) -->
                 <div class="grid grid-cols-3 gap-3 md:gap-4 mb-6">
                     <div onclick="pointer('arrivee')" class="btn-card bg-teal-500 text-white p-3 md:p-4 rounded-xl text-center shadow-md flex flex-col justify-center items-center">
                         <span class="text-xs md:text-sm font-bold">Arrivée / Reprise</span>
@@ -118,24 +116,31 @@
                     </div>
                 </div>
 
-                <!-- HISTORIQUE -->
                 <div class="flex-1 overflow-y-auto custom-scrollbar mb-4 px-2 space-y-2 border-t border-b border-gray-100 py-4" id="historique-jour"></div>
             </div>
 
             <!-- VUE PLANNING -->
             <div id="view-planning" class="hidden flex-1 flex flex-col h-full">
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-semibold text-gray-800">Mes soldes & 1607h</h3>
+                    <h3 class="text-lg font-semibold text-gray-800">Mes soldes & Planning</h3>
                     <div class="flex gap-2">
                         <button onclick="ouvrirModalAbsence()" class="bg-slate-800 text-white font-bold py-2 px-3 text-xs md:text-sm rounded-xl shadow-md hover:bg-slate-700 transition">+ Déclarer</button>
                         <button onclick="ouvrirModalParametres()" class="text-xs md:text-sm text-teal-600 hover:underline py-2 px-2">⚙️ Paramètres</button>
                     </div>
                 </div>
 
+                <!-- 1. BLOC HEURES SUP EN PREMIER -->
+                <div class="grid grid-cols-3 gap-2 mb-4 bg-teal-50/60 p-3 rounded-xl border border-teal-200 text-center shadow-sm">
+                    <div><span class="text-[10px] text-teal-700 font-bold uppercase block">H. Sup Semaine</span><span class="font-bold text-teal-800 text-base" id="hs-semaine">--</span></div>
+                    <div><span class="text-[10px] text-teal-700 font-bold uppercase block">H. Sup Mois</span><span class="font-bold text-teal-800 text-base" id="hs-mois">--</span></div>
+                    <div><span class="text-[10px] text-teal-700 font-bold uppercase block">H. Sup Année</span><span class="font-bold text-teal-800 text-base" id="hs-annee">--</span></div>
+                </div>
+
+                <!-- AUTRES SOLDES & 1607H -->
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                    <div class="bg-teal-50 p-3 rounded-xl border border-teal-200 col-span-2 md:col-span-1 flex flex-col justify-between">
-                        <div class="text-[10px] text-teal-600 font-bold uppercase mb-1">Objectif 1607h</div>
-                        <div class="text-sm font-bold text-teal-700" id="info-1607">Calcul en cours...</div>
+                    <div class="bg-gray-50 p-3 rounded-xl border border-gray-200 flex flex-col justify-between">
+                        <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Objectif 1607h</div>
+                        <div class="text-xs md:text-sm font-bold text-gray-800" id="info-1607">Calcul...</div>
                     </div>
                     <div class="bg-gray-50 p-3 rounded-xl border border-gray-200"><div class="text-[10px] text-gray-500 font-bold uppercase mb-1">CP Restants</div><div class="text-xl font-bold text-gray-800" id="cpt-cp">-- j</div></div>
                     <div class="bg-blue-50 p-3 rounded-xl border border-blue-200 relative">
@@ -145,14 +150,8 @@
                     <div class="bg-purple-50 p-3 rounded-xl border border-purple-200"><div class="text-[10px] text-purple-600 font-bold uppercase mb-1">Fractionnement</div><div class="text-xl font-bold text-purple-800" id="cpt-fractionnement">+0 j</div></div>
                 </div>
 
-                <!-- COMPteurs Heures Sup -->
-                <div class="grid grid-cols-3 gap-2 mb-4 bg-gray-50 p-2.5 rounded-xl border border-gray-200 text-center">
-                    <div><span class="text-[10px] text-gray-500 block">Semaine</span><span class="font-bold text-teal-700 text-sm" id="hs-semaine">--</span></div>
-                    <div><span class="text-[10px] text-gray-500 block">Mois</span><span class="font-bold text-teal-700 text-sm" id="hs-mois">--</span></div>
-                    <div><span class="text-[10px] text-gray-500 block">Année</span><span class="font-bold text-teal-700 text-sm" id="hs-annee">--</span></div>
-                </div>
-
-                <div id="calendar" class="flex-1 min-h-[350px] shadow-lg rounded-xl border border-gray-200 p-2"></div>
+                <!-- CALENDRIER AGRANDI SUR MOBILE -->
+                <div id="calendar" class="flex-1 min-h-[600px] md:min-h-[450px] shadow-lg rounded-xl border border-gray-200 p-2 bg-white"></div>
             </div>
         </div>
     </div>
@@ -227,7 +226,7 @@
     <div id="toast" class="hidden fixed bottom-4 right-4 text-white px-6 py-3 rounded-xl shadow-lg z-50">...</div>
 
     <script>
-      // --- 1. CONFIGURATION ---
+        // --- 1. CONFIGURATION ---
         const supabaseUrl = 'https://rxqtsguwoqeojsnaagxb.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4cXRzZ3V3b3Flb2pzbmFhZ3hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTA4MjcsImV4cCI6MjEwMjcyNjgyN30.FTPTGSe6tqDTieqQdD-GWUqueKlEPUpw4QGiMa4U8AA';
 
@@ -350,7 +349,6 @@
                 spanHeures.textContent = `${h}h${m.toString().padStart(2, '0')}`;
                 
                 const heuresDec = totalTravail / 3600000;
-                // Alerte dépassement limite journalière (10h max par défaut)
                 if (userParams.notifs_actives && heuresDec >= userParams.limite_heures_jour) {
                     spanHeures.classList.remove('text-teal-600'); spanHeures.classList.add('text-red-600');
                     const today = new Date().toLocaleDateString();
@@ -368,7 +366,6 @@
             document.getElementById('stat-statut').textContent = (lastArrivee) ? 'En poste' : (totalTravail > 0 ? 'Terminé' : '--');
         }
 
-        // --- MOTEUR RH : HEURES SUP & CALCUL 1607H ---
         function calculerHeuresSupEt1607() {
             const now = new Date();
             const getMonday = (d) => { let day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6:1); return new Date(new Date(d).setDate(diff)); };
@@ -376,7 +373,6 @@
             const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
             const startYear = new Date(now.getFullYear(), 0, 1);
 
-            // Regroupe les pointages par jour et calcule les heures réelles
             const getMapTempsReelParJour = () => {
                 const map = {};
                 const parJour = {};
@@ -400,9 +396,7 @@
 
             const getTempsReelTotal = (startDate) => {
                 let total = 0;
-                for(let jour in mapReelJour) {
-                    if(new Date(jour) >= startDate) total += mapReelJour[jour];
-                }
+                for(let jour in mapReelJour) { if(new Date(jour) >= startDate) total += mapReelJour[jour]; }
                 return total;
             };
 
@@ -420,7 +414,6 @@
                             const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0);
                             return d >= aStart && d <= aEnd;
                         });
-
                         if (!absence) expected += hoursPerDay;
                         else if (absence.moment === 'matin' || absence.moment === 'aprem') expected += (hoursPerDay / 2);
                     }
@@ -442,10 +435,7 @@
             document.getElementById('hs-mois').textContent = formatterDelta(getTempsReelTotal(startMonth), getTempsAttendu(startMonth));
             document.getElementById('hs-annee').textContent = formatterDelta(getTempsReelTotal(startYear), getTempsAttendu(startYear));
 
-            // Calcul de la date d'atteinte des 1607 heures
-            let cumulAnnee = 0;
-            let dateAtteinte = null;
-            let d = new Date(startYear);
+            let cumulAnnee = 0; let dateAtteinte = null; let d = new Date(startYear);
             while(d <= now) {
                 const dateStr = d.toISOString().split('T')[0];
                 cumulAnnee += (mapReelJour[dateStr] || 0);
@@ -457,15 +447,13 @@
             }
 
             const info1607 = document.getElementById('info-1607');
-            if (dateAtteinte) {
-                info1607.textContent = `Atteint le ${dateAtteinte} 🎉`;
-            } else {
+            if (dateAtteinte) info1607.textContent = `Atteint le ${dateAtteinte} 🎉`;
+            else {
                 let reste = (1607 - cumulAnnee).toFixed(0);
                 info1607.textContent = `Reste ~${reste}h (${cumulAnnee.toFixed(0)}h / 1607h)`;
             }
         }
 
-        // --- 4. GESTION DES ABSENCES ---
         window.gererAffichageDates = () => {
             const moment = document.getElementById('moment_absence').value;
             const dateFin = document.getElementById('date_fin');
@@ -513,20 +501,18 @@
             calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
                 initialView: 'dayGridMonth', 
                 locale: 'fr',
-                firstDay: 1, // Commence la semaine le Lundi
-                slotMinTime: '06:00:00', // Vue semaine de 6h à 22h
+                firstDay: 1, 
+                slotMinTime: '06:00:00', 
                 slotMaxTime: '22:00:00',
-                headerToolbar: { left: 'prev,next', center: 'title', right: 'dayGridMonth,timeGridWeek' },
+                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
                 
-                // Clic direct sur une journée du calendrier pour déclarer une absence
                 dateClick: function(info) {
                     ouvrirModalAbsence(null, 'RTT', info.dateStr, info.dateStr, 'journee');
                 },
 
-                // Affichage des heures travaillées en ronds (style Google Fit) dans chaque case du mois
+                // Style Google Fit pour les bulles de la vue mois (sans texte, taille variable, couleurs conditionnelles)
                 dayCellDidMount: function(info) {
                     const dateStr = info.date.toISOString().split('T')[0];
-                    // Calcule les heures de ce jour précis à partir de pointagesAnnee
                     let msJour = 0; let lastArr = null;
                     pointagesAnnee.filter(p => p.timestamp.startsWith(dateStr)).forEach(pt => {
                         if(pt.type_action === 'arrivee') lastArr = new Date(pt.timestamp);
@@ -534,12 +520,30 @@
                             msJour += (new Date(pt.timestamp) - lastArr); lastArr = null;
                         }
                     });
+                    
                     if(msJour > 0) {
-                        let h = Math.floor(msJour / 3600000); let m = Math.floor((msJour % 3600000) / 60000);
-                        const badge = document.createElement('div');
-                        badge.className = 'day-hours-badge';
-                        badge.textContent = `${h}h${m > 0 ? m.toString().padStart(2,'0') : ''}`;
-                        info.el.querySelector('.fc-daygrid-day-top').appendChild(badge);
+                        const hDec = msJour / 3600000;
+                        const reqHours = userParams.base_horaire / 5; // ex: 7.8h
+
+                        // Couleur : Rouge si > 10h, Bleu si < quota journalier requis, Vert sinon
+                        let color = '#10b981'; // Vert
+                        if (hDec > 10) color = '#ef4444'; // Rouge
+                        else if (hDec < reqHours) color = '#3b82f6'; // Bleu
+
+                        // Diamètre variable selon les heures (entre 12px et 32px)
+                        let diameter = Math.min(32, Math.max(12, Math.round(hDec * 3.2)));
+
+                        const container = document.createElement('div');
+                        container.className = 'fit-bubble-container';
+                        
+                        const bubble = document.createElement('div');
+                        bubble.className = 'fit-bubble';
+                        bubble.style.width = `${diameter}px`;
+                        bubble.style.height = `${diameter}px`;
+                        bubble.style.backgroundColor = color;
+
+                        container.appendChild(bubble);
+                        info.el.querySelector('.fc-daygrid-day-top').appendChild(container);
                     }
                 },
 
@@ -551,14 +555,38 @@
                     chargerSoldes(data);
                     calculerHeuresSupEt1607();
                     
-                    success(data.map(a => {
+                    let eventsList = data.map(a => {
                         let c = '#3b82f6'; if(a.type_absence === 'CP') c = '#14b8a6'; if(a.type_absence === 'Maladie') c = '#ef4444';
                         let titre = a.type_absence; if(a.moment === 'matin') titre += " (Matin)"; if(a.moment === 'aprem') titre += " (Aprem)";
                         return { id: a.id, extendedProps: { type: a.type_absence, moment: a.moment }, title: titre, start: a.date_debut, end: new Date(new Date(a.date_fin).getTime() + 86400000).toISOString().split('T')[0], backgroundColor: c, borderColor: c };
-                    }));
+                    });
+
+                    // Génération automatique des blocs de travail (pauses incluses) pour la vue semaine/jour
+                    const parJour = {};
+                    pointagesAnnee.forEach(p => { const d = p.timestamp.split('T')[0]; if(!parJour[d]) parJour[d] = []; parJour[d].push(p); });
+
+                    for (let jour in parJour) {
+                        let lastArr = null;
+                        parJour[jour].forEach(pt => {
+                            if(pt.type_action === 'arrivee') lastArr = pt.timestamp;
+                            else if((pt.type_action === 'pause' || pt.type_action === 'depart') && lastArr) {
+                                eventsList.push({
+                                    title: 'Travail',
+                                    start: lastArr,
+                                    end: pt.timestamp,
+                                    backgroundColor: '#14b8a6',
+                                    borderColor: '#0d9488'
+                                });
+                                lastArr = null;
+                            }
+                        });
+                    }
+
+                    success(eventsList);
                 },
                 eventClick: function(info) {
-                    info.jsEvent.stopPropagation(); // Évite de déclencher le dateClick en même temps
+                    if(!info.event.extendedProps.type) return; // Ignore les blocs de travail cliqués
+                    info.jsEvent.stopPropagation();
                     const p = info.event.extendedProps;
                     const dateFin = new Date(info.event.end ? info.event.end.getTime() - 86400000 : info.event.start).toISOString().split('T')[0];
                     ouvrirModalAbsence(info.event.id, p.type, info.event.startStr.split('T')[0], dateFin, p.moment || 'journee');
@@ -619,5 +647,3 @@
     </script>
 </body>
 </html>
-  
-      

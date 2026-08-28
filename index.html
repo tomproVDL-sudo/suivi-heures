@@ -33,6 +33,24 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
+        /* Harmonisation des boutons de navigation */
+        .fc .fc-button {
+            height: 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .fc .fc-prev-button, .fc .fc-next-button {
+            width: 32px;
+            padding: 0;
+        }
+        .fc .fc-today-button {
+            height: 32px;
+            padding: 0 12px;
+            /* largeur approximative des deux flèches réunies + gap */
+            min-width: 72px;
+        }
+
         @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .animate-slide-in { animation: slideIn 0.3s ease-out; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
@@ -238,6 +256,7 @@
     <div id="toast" class="hidden fixed bottom-4 right-4 text-white px-6 py-3 rounded-xl shadow-lg z-50">...</div>
 
     <script>
+
         // --- 1. CONFIGURATION ---
 
         const supabaseUrl = 'https://rxqtsguwoqeojsnaagxb.supabase.co';
@@ -373,7 +392,7 @@
         window.pointer = async (type) => {
             try { 
                 await supaClient.from('pointages').insert([{ user_id: currentUser.id, type_action: type }]); 
-                await chargerDonneesGlobalales(); 
+                await chargerDonneesGlobales(); 
                 rafraichirVueJour(); 
                 if(calendar) calendar.refetchEvents();
             } catch(e) { 
@@ -663,9 +682,17 @@
                     ouvrirModalAbsence(null, 'RTT', info.dateStr, info.dateStr, 'journee');
                 },
 
-                // Style Google Fit pour les bulles de la vue mois
+                // Style Google Fit pour les bulles de la vue mois UNIQUEMENT
                 dayCellDidMount: function(info) {
-                    const dateStr = info.date.toISOString().split('T')[0];
+                    // Ne s'exécute que pour la vue mois (dayGridMonth)
+                    if (calendar.view.type !== 'dayGridMonth') return;
+                    
+                    // Utilisation de la date locale pour éviter tout décalage
+                    const year = info.date.getFullYear();
+                    const month = String(info.date.getMonth() + 1).padStart(2, '0');
+                    const day = String(info.date.getDate()).padStart(2, '0');
+                    const dateStr = `${year}-${month}-${day}`;
+                    
                     let msJour = 0; 
                     let lastArr = null;
                     
@@ -683,8 +710,9 @@
                     });
                     
                     // Si toujours en poste aujourd'hui
-                    const today = new Date().toISOString().split('T')[0];
-                    if(dateStr === today && lastArr) {
+                    const today = new Date();
+                    const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+                    if(dateStr === todayStr && lastArr) {
                         msJour += (new Date() - lastArr);
                     }
                     
@@ -750,62 +778,64 @@
                         };
                     });
 
-                    // Génération des blocs de travail pour la vue semaine/jour
-                    const parJour = {};
-                    pointagesAnnee.forEach(p => { 
-                        const d = new Date(p.timestamp).toISOString().split('T')[0]; 
-                        if(!parJour[d]) parJour[d] = []; 
-                        parJour[d].push(p); 
-                    });
-
-                    for (let jour in parJour) {
-                        let lastArr = null;
-                        let blockStart = null;
-                        
-                        parJour[jour].forEach(pt => {
-                            const timestamp = new Date(pt.timestamp);
-                            
-                            if(pt.type_action === 'arrivee') {
-                                lastArr = timestamp;
-                                blockStart = timestamp;
-                            }
-                            else if(pt.type_action === 'pause' && lastArr) {
-                                // Créer un bloc de travail jusqu'à la pause
-                                eventsList.push({
-                                    title: 'Travail',
-                                    start: blockStart,
-                                    end: timestamp,
-                                    backgroundColor: '#14b8a6',
-                                    borderColor: '#0d9488',
-                                    className: 'work-block'
-                                });
-                                blockStart = null;
-                            }
-                            else if(pt.type_action === 'depart' && lastArr) {
-                                // Créer un bloc de travail final
-                                eventsList.push({
-                                    title: 'Travail',
-                                    start: blockStart || lastArr,
-                                    end: timestamp,
-                                    backgroundColor: '#14b8a6',
-                                    borderColor: '#0d9488',
-                                    className: 'work-block'
-                                });
-                                lastArr = null;
-                                blockStart = null;
-                            }
+                    // N'ajouter les événements de travail QUE dans la vue semaine (timeGridWeek)
+                    if (info.view.type === 'timeGridWeek') {
+                        const parJour = {};
+                        pointagesAnnee.forEach(p => { 
+                            const d = new Date(p.timestamp).toISOString().split('T')[0]; 
+                            if(!parJour[d]) parJour[d] = []; 
+                            parJour[d].push(p); 
                         });
-                        
-                        // Si toujours en poste (pas de départ)
-                        if(lastArr) {
-                            eventsList.push({
-                                title: 'Travail en cours',
-                                start: blockStart || lastArr,
-                                end: new Date(), // Jusqu'à maintenant
-                                backgroundColor: '#14b8a6',
-                                borderColor: '#0d9488',
-                                className: 'work-block'
+
+                        for (let jour in parJour) {
+                            let lastArr = null;
+                            let blockStart = null;
+                            
+                            parJour[jour].forEach(pt => {
+                                const timestamp = new Date(pt.timestamp);
+                                
+                                if(pt.type_action === 'arrivee') {
+                                    lastArr = timestamp;
+                                    blockStart = timestamp;
+                                }
+                                else if(pt.type_action === 'pause' && lastArr) {
+                                    // Créer un bloc de travail jusqu'à la pause
+                                    eventsList.push({
+                                        title: 'Travail',
+                                        start: blockStart,
+                                        end: timestamp,
+                                        backgroundColor: '#14b8a6',
+                                        borderColor: '#0d9488',
+                                        className: 'work-block'
+                                    });
+                                    blockStart = null;
+                                }
+                                else if(pt.type_action === 'depart' && lastArr) {
+                                    // Créer un bloc de travail final
+                                    eventsList.push({
+                                        title: 'Travail',
+                                        start: blockStart || lastArr,
+                                        end: timestamp,
+                                        backgroundColor: '#14b8a6',
+                                        borderColor: '#0d9488',
+                                        className: 'work-block'
+                                    });
+                                    lastArr = null;
+                                    blockStart = null;
+                                }
                             });
+                            
+                            // Si toujours en poste (pas de départ)
+                            if(lastArr) {
+                                eventsList.push({
+                                    title: 'Travail en cours',
+                                    start: blockStart || lastArr,
+                                    end: new Date(), // Jusqu'à maintenant
+                                    backgroundColor: '#14b8a6',
+                                    borderColor: '#0d9488',
+                                    className: 'work-block'
+                                });
+                            }
                         }
                     }
 

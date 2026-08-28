@@ -19,8 +19,19 @@
         .fc-event { transition: transform 0.2s; border-radius: 6px; font-size: 0.75rem; }
         
         /* Bulles style Google Fit dans la vue mois */
-        .fit-bubble-container { display: flex; justify-content: center; align-items: center; margin-top: 4px; height: 32px; }
-        .fit-bubble { border-radius: 50%; transition: all 0.2s; }
+        .fit-bubble-container { 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            margin-top: 4px; 
+            height: 32px;
+            pointer-events: none;
+        }
+        .fit-bubble { 
+            border-radius: 50%; 
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
 
         @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .animate-slide-in { animation: slideIn 0.3s ease-out; }
@@ -29,6 +40,7 @@
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #14b8a6; border-radius: 3px; }
         .btn-card { transition: all 0.2s ease; cursor: pointer; }
         .btn-card:active { transform: scale(0.97); }
+        .work-block { opacity: 0.8; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-teal-50 to-gray-100 min-h-screen flex items-center justify-center p-2 md:p-6 font-sans">
@@ -227,6 +239,7 @@
 
     <script>
         // --- 1. CONFIGURATION ---
+
         const supabaseUrl = 'https://rxqtsguwoqeojsnaagxb.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4cXRzZ3V3b3Flb2pzbmFhZ3hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTA4MjcsImV4cCI6MjEwMjcyNjgyN30.FTPTGSe6tqDTieqQdD-GWUqueKlEPUpw4QGiMa4U8AA';
 
@@ -249,19 +262,34 @@
 
         function showToast(msg, isError = false) {
             const t = document.getElementById('toast');
-            t.textContent = msg; t.className = `fixed bottom-4 right-4 text-white px-6 py-3 rounded-xl shadow-lg z-50 animate-slide-in ${isError ? 'bg-red-500' : 'bg-teal-600'}`;
+            t.textContent = msg; 
+            t.className = `fixed bottom-4 right-4 text-white px-6 py-3 rounded-xl shadow-lg z-50 animate-slide-in ${isError ? 'bg-red-500' : 'bg-teal-600'}`;
+            t.classList.remove('hidden');
             setTimeout(() => t.classList.add('hidden'), 3500);
         }
 
         window.login = async function() {
             try {
-                const { data, error } = await supaClient.auth.signInWithPassword({ email: document.getElementById('email').value, password: document.getElementById('password').value });
+                const { data, error } = await supaClient.auth.signInWithPassword({ 
+                    email: document.getElementById('email').value, 
+                    password: document.getElementById('password').value 
+                });
                 if (error) throw error;
                 initialiserApp(data.user);
-            } catch (e) { showToast(e.message, true); }
+            } catch (e) { 
+                showToast(e.message, true); 
+            }
         };
-        window.logout = async () => { await supaClient.auth.signOut(); location.reload(); };
-        window.onload = async () => { const { data: { user } } = await supaClient.auth.getUser(); if (user) initialiserApp(user); };
+        
+        window.logout = async () => { 
+            await supaClient.auth.signOut(); 
+            location.reload(); 
+        };
+        
+        window.onload = async () => { 
+            const { data: { user } } = await supaClient.auth.getUser(); 
+            if (user) initialiserApp(user); 
+        };
 
         async function chargerDonneesGlobales() {
             const { data: pData } = await supaClient.from('parametres').select('*').eq('user_id', currentUser.id).maybeSingle();
@@ -289,24 +317,55 @@
         }
 
         function rafraichirVueJour() {
-            const debutJour = new Date(); debutJour.setHours(0,0,0,0);
+            const debutJour = new Date(); 
+            debutJour.setHours(0,0,0,0);
             currentPointages = pointagesAnnee.filter(p => new Date(p.timestamp) >= debutJour);
             
-            const conteneur = document.getElementById('historique-jour'); conteneur.innerHTML = '';
+            const conteneur = document.getElementById('historique-jour'); 
+            conteneur.innerHTML = '';
+            
             if(currentPointages.length > 0) {
                 calculerStatistiquesJour(currentPointages);
                 currentPointages.forEach(p => {
                     const heure = new Date(p.timestamp).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
-                    let l = p.type_action; let ic = ''; let c = "text-gray-800"; let b = "bg-gray-50";
-                    if(l === 'arrivee') { l="Prise de poste / Reprise"; c="text-teal-600"; ic='🟢'; b="bg-teal-50"; }
-                    if(l === 'pause') { l="Début de pause"; c="text-orange-500"; ic='⏸️'; b="bg-orange-50"; }
-                    if(l === 'depart') { l="Fin de poste"; c="text-slate-600"; ic='🔴'; b="bg-slate-50"; }
+                    let l = p.type_action; 
+                    let ic = ''; 
+                    let c = "text-gray-800"; 
+                    let b = "bg-gray-50";
                     
-                    conteneur.innerHTML += `<div class="flex justify-between items-center py-2.5 px-3 border-b border-gray-100 ${b} rounded-lg mb-2 text-xs md:text-sm"><div class="font-medium ${c}"><span>${ic}</span> ${l}</div><div class="flex gap-3"><span class="font-mono mt-0.5">${heure}</span><button onclick="modifierPointage('${p.id}', '${p.timestamp}')" class="text-blue-500 hover:text-blue-700">✏️</button><button onclick="supprimerPointage('${p.id}')" class="text-red-400 hover:text-red-600">🗑️</button></div></div>`;
+                    if(l === 'arrivee') { 
+                        l="Prise de poste / Reprise"; 
+                        c="text-teal-600"; 
+                        ic='🟢'; 
+                        b="bg-teal-50"; 
+                    }
+                    if(l === 'pause') { 
+                        l="Début de pause"; 
+                        c="text-orange-500"; 
+                        ic='⏸️'; 
+                        b="bg-orange-50"; 
+                    }
+                    if(l === 'depart') { 
+                        l="Fin de poste"; 
+                        c="text-slate-600"; 
+                        ic='🔴'; 
+                        b="bg-slate-50"; 
+                    }
+                    
+                    conteneur.innerHTML += `<div class="flex justify-between items-center py-2.5 px-3 border-b border-gray-100 ${b} rounded-lg mb-2 text-xs md:text-sm">
+                        <div class="font-medium ${c}"><span>${ic}</span> ${l}</div>
+                        <div class="flex gap-3">
+                            <span class="font-mono mt-0.5">${heure}</span>
+                            <button onclick="modifierPointage('${p.id}', '${p.timestamp}')" class="text-blue-500 hover:text-blue-700">✏️</button>
+                            <button onclick="supprimerPointage('${p.id}')" class="text-red-400 hover:text-red-600">🗑️</button>
+                        </div>
+                    </div>`;
                 });
             } else {
                 conteneur.innerHTML = '<div class="text-center text-gray-400 py-8 text-xs">Aucun pointage aujourd\'hui.</div>';
-                document.getElementById('stat-heures').textContent = '0h00'; document.getElementById('stat-pauses').textContent = '0'; document.getElementById('stat-statut').textContent = '--';
+                document.getElementById('stat-heures').textContent = '0h00'; 
+                document.getElementById('stat-pauses').textContent = '0'; 
+                document.getElementById('stat-statut').textContent = '--';
             }
             calculerHeuresSupEt1607();
         }
@@ -314,53 +373,88 @@
         window.pointer = async (type) => {
             try { 
                 await supaClient.from('pointages').insert([{ user_id: currentUser.id, type_action: type }]); 
-                await chargerDonneesGlobales(); rafraichirVueJour(); if(calendar) calendar.refetchEvents();
-            } catch(e) { showToast(e.message, true); }
+                await chargerDonneesGlobalales(); 
+                rafraichirVueJour(); 
+                if(calendar) calendar.refetchEvents();
+            } catch(e) { 
+                showToast(e.message, true); 
+            }
         };
 
         window.modifierPointage = async (id, ancienneDateStr) => {
             const h = prompt("Nouvelle heure (HH:MM) :", new Date(ancienneDateStr).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}));
             if (!h || !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(h)) return showToast("Format invalide", true);
-            const nd = new Date(ancienneDateStr); nd.setHours(...h.split(':'), 0, 0);
+            const nd = new Date(ancienneDateStr); 
+            nd.setHours(...h.split(':'), 0, 0);
             await supaClient.from('pointages').update({ timestamp: nd.toISOString() }).eq('id', id); 
-            await chargerDonneesGlobales(); rafraichirVueJour(); if(calendar) calendar.refetchEvents();
+            await chargerDonneesGlobales(); 
+            rafraichirVueJour(); 
+            if(calendar) calendar.refetchEvents();
         };
 
         window.supprimerPointage = async (id) => {
             if(confirm("Supprimer ce pointage ?")) { 
                 await supaClient.from('pointages').delete().eq('id', id); 
-                await chargerDonneesGlobales(); rafraichirVueJour(); if(calendar) calendar.refetchEvents();
+                await chargerDonneesGlobales(); 
+                rafraichirVueJour(); 
+                if(calendar) calendar.refetchEvents();
             }
         };
 
         function calculerStatistiquesJour(pts) {
-            let totalTravail = 0; let lastArrivee = null; let pauses = 0;
+            let totalTravail = 0; 
+            let lastArrivee = null; 
+            let pauses = 0;
             
             pts.forEach(pt => {
-                if(pt.type_action === 'arrivee') { lastArrivee = new Date(pt.timestamp); }
-                if(pt.type_action === 'pause') { pauses++; if (lastArrivee) { totalTravail += (new Date(pt.timestamp) - lastArrivee); lastArrivee = null; } }
-                if(pt.type_action === 'depart') { if (lastArrivee) { totalTravail += (new Date(pt.timestamp) - lastArrivee); lastArrivee = null; } }
+                if(pt.type_action === 'arrivee') { 
+                    lastArrivee = new Date(pt.timestamp); 
+                }
+                if(pt.type_action === 'pause') { 
+                    pauses++; 
+                    if (lastArrivee) { 
+                        totalTravail += (new Date(pt.timestamp) - lastArrivee); 
+                        lastArrivee = null; 
+                    } 
+                }
+                if(pt.type_action === 'depart') { 
+                    if (lastArrivee) { 
+                        totalTravail += (new Date(pt.timestamp) - lastArrivee); 
+                        lastArrivee = null; 
+                    } 
+                }
             });
-            if (lastArrivee) { totalTravail += (new Date() - lastArrivee); }
+            if (lastArrivee) { 
+                totalTravail += (new Date() - lastArrivee); 
+            }
 
             const spanHeures = document.getElementById('stat-heures');
             if (totalTravail > 0) {
-                let h = Math.floor(totalTravail / 3600000); let m = Math.floor((totalTravail % 3600000) / 60000);
+                let h = Math.floor(totalTravail / 3600000); 
+                let m = Math.floor((totalTravail % 3600000) / 60000);
                 spanHeures.textContent = `${h}h${m.toString().padStart(2, '0')}`;
                 
                 const heuresDec = totalTravail / 3600000;
                 if (userParams.notifs_actives && heuresDec >= userParams.limite_heures_jour) {
-                    spanHeures.classList.remove('text-teal-600'); spanHeures.classList.add('text-red-600');
+                    spanHeures.classList.remove('text-teal-600'); 
+                    spanHeures.classList.add('text-red-600');
                     const today = new Date().toLocaleDateString();
                     if (localStorage.getItem('lastNotifDate') !== today) {
                         showToast(`⚠️ Alerte : Seuil des ${userParams.limite_heures_jour}h atteint !`, true);
                         if ("Notification" in window && Notification.permission === "granted") {
-                            new Notification("Alerte Temps de Travail ⏱️", { body: `Vous avez atteint votre limite journalière de ${userParams.limite_heures_jour}h.` });
+                            new Notification("Alerte Temps de Travail ⏱️", { 
+                                body: `Vous avez atteint votre limite journalière de ${userParams.limite_heures_jour}h.` 
+                            });
                         }
                         localStorage.setItem('lastNotifDate', today);
                     }
-                } else { spanHeures.classList.remove('text-red-600'); spanHeures.classList.add('text-teal-600'); }
-            } else { spanHeures.textContent = '0h00'; }
+                } else { 
+                    spanHeures.classList.remove('text-red-600'); 
+                    spanHeures.classList.add('text-teal-600'); 
+                }
+            } else { 
+                spanHeures.textContent = '0h00'; 
+            }
             
             document.getElementById('stat-pauses').textContent = pauses;
             document.getElementById('stat-statut').textContent = (lastArrivee) ? 'En poste' : (totalTravail > 0 ? 'Terminé' : '--');
@@ -368,22 +462,33 @@
 
         function calculerHeuresSupEt1607() {
             const now = new Date();
-            const getMonday = (d) => { let day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6:1); return new Date(new Date(d).setDate(diff)); };
-            const startWeek = getMonday(now); startWeek.setHours(0,0,0,0);
+            const getMonday = (d) => { 
+                let day = d.getDay(), 
+                diff = d.getDate() - day + (day == 0 ? -6:1); 
+                return new Date(new Date(d).setDate(diff)); 
+            };
+            const startWeek = getMonday(now); 
+            startWeek.setHours(0,0,0,0);
             const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
             const startYear = new Date(now.getFullYear(), 0, 1);
 
             const getMapTempsReelParJour = () => {
                 const map = {};
                 const parJour = {};
-                pointagesAnnee.forEach(p => { const d = p.timestamp.split('T')[0]; if(!parJour[d]) parJour[d] = []; parJour[d].push(p); });
+                pointagesAnnee.forEach(p => { 
+                    const d = p.timestamp.split('T')[0]; 
+                    if(!parJour[d]) parJour[d] = []; 
+                    parJour[d].push(p); 
+                });
                 
                 for (let jour in parJour) {
-                    let totalMs = 0; let lastArr = null;
+                    let totalMs = 0; 
+                    let lastArr = null;
                     parJour[jour].forEach(pt => {
                         if(pt.type_action === 'arrivee') lastArr = new Date(pt.timestamp);
                         else if((pt.type_action === 'pause' || pt.type_action === 'depart') && lastArr) {
-                            totalMs += (new Date(pt.timestamp) - lastArr); lastArr = null;
+                            totalMs += (new Date(pt.timestamp) - lastArr); 
+                            lastArr = null;
                         }
                     });
                     if (lastArr && jour === now.toISOString().split('T')[0]) totalMs += (now - lastArr);
@@ -396,22 +501,28 @@
 
             const getTempsReelTotal = (startDate) => {
                 let total = 0;
-                for(let jour in mapReelJour) { if(new Date(jour) >= startDate) total += mapReelJour[jour]; }
+                for(let jour in mapReelJour) { 
+                    if(new Date(jour) >= startDate) total += mapReelJour[jour]; 
+                }
                 return total;
             };
 
             const getTempsAttendu = (startDate) => {
                 let expected = 0;
                 const hoursPerDay = userParams.base_horaire / 5;
-                let d = new Date(startDate); d.setHours(0,0,0,0);
-                let end = new Date(now); end.setHours(0,0,0,0);
+                let d = new Date(startDate); 
+                d.setHours(0,0,0,0);
+                let end = new Date(now); 
+                end.setHours(0,0,0,0);
 
                 while(d <= end) {
                     const dayOfWeek = d.getDay();
                     if (dayOfWeek !== 0 && dayOfWeek !== 6) {
                         let absence = currentAbsences.find(a => {
-                            const aStart = new Date(a.date_debut); aStart.setHours(0,0,0,0);
-                            const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0);
+                            const aStart = new Date(a.date_debut); 
+                            aStart.setHours(0,0,0,0);
+                            const aEnd = new Date(a.date_fin); 
+                            aEnd.setHours(0,0,0,0);
                             return d >= aStart && d <= aEnd;
                         });
                         if (!absence) expected += hoursPerDay;
@@ -435,7 +546,9 @@
             document.getElementById('hs-mois').textContent = formatterDelta(getTempsReelTotal(startMonth), getTempsAttendu(startMonth));
             document.getElementById('hs-annee').textContent = formatterDelta(getTempsReelTotal(startYear), getTempsAttendu(startYear));
 
-            let cumulAnnee = 0; let dateAtteinte = null; let d = new Date(startYear);
+            let cumulAnnee = 0; 
+            let dateAtteinte = null; 
+            let d = new Date(startYear);
             while(d <= now) {
                 const dateStr = d.toISOString().split('T')[0];
                 cumulAnnee += (mapReelJour[dateStr] || 0);
@@ -447,8 +560,9 @@
             }
 
             const info1607 = document.getElementById('info-1607');
-            if (dateAtteinte) info1607.textContent = `Atteint le ${dateAtteinte} 🎉`;
-            else {
+            if (dateAtteinte) {
+                info1607.textContent = `Atteint le ${dateAtteinte} 🎉`;
+            } else {
                 let reste = (1607 - cumulAnnee).toFixed(0);
                 info1607.textContent = `Reste ~${reste}h (${cumulAnnee.toFixed(0)}h / 1607h)`;
             }
@@ -457,10 +571,22 @@
         window.gererAffichageDates = () => {
             const moment = document.getElementById('moment_absence').value;
             const dateFin = document.getElementById('date_fin');
-            if (moment !== 'journee') { dateFin.value = document.getElementById('date_debut').value; dateFin.disabled = true; dateFin.classList.add('opacity-50'); }
-            else { dateFin.disabled = false; dateFin.classList.remove('opacity-50'); }
+            if (moment !== 'journee') { 
+                dateFin.value = document.getElementById('date_debut').value; 
+                dateFin.disabled = true; 
+                dateFin.classList.add('opacity-50'); 
+            }
+            else { 
+                dateFin.disabled = false; 
+                dateFin.classList.remove('opacity-50'); 
+            }
         };
-        window.synchroniserDates = () => { if(document.getElementById('moment_absence').value !== 'journee') document.getElementById('date_fin').value = document.getElementById('date_debut').value; };
+        
+        window.synchroniserDates = () => { 
+            if(document.getElementById('moment_absence').value !== 'journee') {
+                document.getElementById('date_fin').value = document.getElementById('date_debut').value; 
+            }
+        };
 
         window.ouvrirModalAbsence = (id = null, type = 'RTT', debut = '', fin = '', moment = 'journee') => {
             document.getElementById('absence_id').value = id || '';
@@ -475,24 +601,39 @@
             gererAffichageDates();
             document.getElementById('modal-absence').classList.remove('hidden');
         };
+        
         window.fermerModalAbsence = () => document.getElementById('modal-absence').classList.add('hidden');
 
         window.sauvegarderAbsence = async () => {
             const id = document.getElementById('absence_id').value;
             const payload = {
-                user_id: currentUser.id, type_absence: document.getElementById('type_absence').value, moment: document.getElementById('moment_absence').value, date_debut: document.getElementById('date_debut').value, date_fin: document.getElementById('date_fin').value
+                user_id: currentUser.id, 
+                type_absence: document.getElementById('type_absence').value, 
+                moment: document.getElementById('moment_absence').value, 
+                date_debut: document.getElementById('date_debut').value, 
+                date_fin: document.getElementById('date_fin').value
             };
             try {
                 if (!payload.date_debut || !payload.date_fin) throw new Error("Dates obligatoires");
-                if (id) await supaClient.from('absences').update(payload).eq('id', id); else await supaClient.from('absences').insert([payload]);
-                fermerModalAbsence(); calendar.refetchEvents(); showToast('Absence enregistrée !');
-            } catch (e) { showToast('Erreur : ' + e.message, true); }
+                if (id) {
+                    await supaClient.from('absences').update(payload).eq('id', id); 
+                } else {
+                    await supaClient.from('absences').insert([payload]); 
+                }
+                fermerModalAbsence(); 
+                calendar.refetchEvents(); 
+                showToast('Absence enregistrée !');
+            } catch (e) { 
+                showToast('Erreur : ' + e.message, true); 
+            }
         };
 
         window.supprimerAbsence = async () => {
             if(confirm("Supprimer cette absence du calendrier ?")) {
                 await supaClient.from('absences').delete().eq('id', document.getElementById('absence_id').value);
-                fermerModalAbsence(); calendar.refetchEvents(); showToast("Absence supprimée");
+                fermerModalAbsence(); 
+                calendar.refetchEvents(); 
+                showToast("Absence supprimée");
             }
         };
 
@@ -504,26 +645,52 @@
                 firstDay: 1, 
                 slotMinTime: '06:00:00', 
                 slotMaxTime: '22:00:00',
-                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
+                headerToolbar: { 
+                    left: 'prev,next today', 
+                    center: 'title', 
+                    right: 'dayGridMonth,timeGridWeek' 
+                },
+                navLinks: true,
+                editable: false,
+                dayMaxEvents: true,
+                eventDisplay: 'block',
+                
+                datesSet: function() {
+                    calendar.updateSize();
+                },
                 
                 dateClick: function(info) {
                     ouvrirModalAbsence(null, 'RTT', info.dateStr, info.dateStr, 'journee');
                 },
 
-                // Style Google Fit pour les bulles de la vue mois (sans texte, taille variable, couleurs conditionnelles)
+                // Style Google Fit pour les bulles de la vue mois
                 dayCellDidMount: function(info) {
                     const dateStr = info.date.toISOString().split('T')[0];
-                    let msJour = 0; let lastArr = null;
-                    pointagesAnnee.filter(p => p.timestamp.startsWith(dateStr)).forEach(pt => {
-                        if(pt.type_action === 'arrivee') lastArr = new Date(pt.timestamp);
+                    let msJour = 0; 
+                    let lastArr = null;
+                    
+                    pointagesAnnee.filter(p => {
+                        const pDate = new Date(p.timestamp).toISOString().split('T')[0];
+                        return pDate === dateStr;
+                    }).forEach(pt => {
+                        if(pt.type_action === 'arrivee') {
+                            lastArr = new Date(pt.timestamp);
+                        }
                         else if((pt.type_action === 'pause' || pt.type_action === 'depart') && lastArr) {
-                            msJour += (new Date(pt.timestamp) - lastArr); lastArr = null;
+                            msJour += (new Date(pt.timestamp) - lastArr); 
+                            lastArr = null;
                         }
                     });
                     
+                    // Si toujours en poste aujourd'hui
+                    const today = new Date().toISOString().split('T')[0];
+                    if(dateStr === today && lastArr) {
+                        msJour += (new Date() - lastArr);
+                    }
+                    
                     if(msJour > 0) {
                         const hDec = msJour / 3600000;
-                        const reqHours = userParams.base_horaire / 5; // ex: 7.8h
+                        const reqHours = userParams.base_horaire / 5;
 
                         // Couleur : Rouge si > 10h, Bleu si < quota journalier requis, Vert sinon
                         let color = '#10b981'; // Vert
@@ -541,9 +708,19 @@
                         bubble.style.width = `${diameter}px`;
                         bubble.style.height = `${diameter}px`;
                         bubble.style.backgroundColor = color;
+                        bubble.style.opacity = '0.8';
 
                         container.appendChild(bubble);
-                        info.el.querySelector('.fc-daygrid-day-top').appendChild(container);
+                        
+                        // Insertion au bon endroit dans la cellule
+                        const dayFrame = info.el.querySelector('.fc-daygrid-day-frame');
+                        if (dayFrame) {
+                            // Supprimer les anciennes bulles si elles existent
+                            const oldBubble = dayFrame.querySelector('.fit-bubble-container');
+                            if (oldBubble) oldBubble.remove();
+                            
+                            dayFrame.appendChild(container);
+                        }
                     }
                 },
 
@@ -556,34 +733,85 @@
                     calculerHeuresSupEt1607();
                     
                     let eventsList = data.map(a => {
-                        let c = '#3b82f6'; if(a.type_absence === 'CP') c = '#14b8a6'; if(a.type_absence === 'Maladie') c = '#ef4444';
-                        let titre = a.type_absence; if(a.moment === 'matin') titre += " (Matin)"; if(a.moment === 'aprem') titre += " (Aprem)";
-                        return { id: a.id, extendedProps: { type: a.type_absence, moment: a.moment }, title: titre, start: a.date_debut, end: new Date(new Date(a.date_fin).getTime() + 86400000).toISOString().split('T')[0], backgroundColor: c, borderColor: c };
+                        let c = '#3b82f6'; 
+                        if(a.type_absence === 'CP') c = '#14b8a6'; 
+                        if(a.type_absence === 'Maladie') c = '#ef4444';
+                        let titre = a.type_absence; 
+                        if(a.moment === 'matin') titre += " (Matin)"; 
+                        if(a.moment === 'aprem') titre += " (Aprem)";
+                        return { 
+                            id: a.id, 
+                            extendedProps: { type: a.type_absence, moment: a.moment }, 
+                            title: titre, 
+                            start: a.date_debut, 
+                            end: new Date(new Date(a.date_fin).getTime() + 86400000).toISOString().split('T')[0], 
+                            backgroundColor: c, 
+                            borderColor: c 
+                        };
                     });
 
-                    // Génération automatique des blocs de travail (pauses incluses) pour la vue semaine/jour
+                    // Génération des blocs de travail pour la vue semaine/jour
                     const parJour = {};
-                    pointagesAnnee.forEach(p => { const d = p.timestamp.split('T')[0]; if(!parJour[d]) parJour[d] = []; parJour[d].push(p); });
+                    pointagesAnnee.forEach(p => { 
+                        const d = new Date(p.timestamp).toISOString().split('T')[0]; 
+                        if(!parJour[d]) parJour[d] = []; 
+                        parJour[d].push(p); 
+                    });
 
                     for (let jour in parJour) {
                         let lastArr = null;
+                        let blockStart = null;
+                        
                         parJour[jour].forEach(pt => {
-                            if(pt.type_action === 'arrivee') lastArr = pt.timestamp;
-                            else if((pt.type_action === 'pause' || pt.type_action === 'depart') && lastArr) {
+                            const timestamp = new Date(pt.timestamp);
+                            
+                            if(pt.type_action === 'arrivee') {
+                                lastArr = timestamp;
+                                blockStart = timestamp;
+                            }
+                            else if(pt.type_action === 'pause' && lastArr) {
+                                // Créer un bloc de travail jusqu'à la pause
                                 eventsList.push({
                                     title: 'Travail',
-                                    start: lastArr,
-                                    end: pt.timestamp,
+                                    start: blockStart,
+                                    end: timestamp,
                                     backgroundColor: '#14b8a6',
-                                    borderColor: '#0d9488'
+                                    borderColor: '#0d9488',
+                                    className: 'work-block'
+                                });
+                                blockStart = null;
+                            }
+                            else if(pt.type_action === 'depart' && lastArr) {
+                                // Créer un bloc de travail final
+                                eventsList.push({
+                                    title: 'Travail',
+                                    start: blockStart || lastArr,
+                                    end: timestamp,
+                                    backgroundColor: '#14b8a6',
+                                    borderColor: '#0d9488',
+                                    className: 'work-block'
                                 });
                                 lastArr = null;
+                                blockStart = null;
                             }
                         });
+                        
+                        // Si toujours en poste (pas de départ)
+                        if(lastArr) {
+                            eventsList.push({
+                                title: 'Travail en cours',
+                                start: blockStart || lastArr,
+                                end: new Date(), // Jusqu'à maintenant
+                                backgroundColor: '#14b8a6',
+                                borderColor: '#0d9488',
+                                className: 'work-block'
+                            });
+                        }
                     }
 
                     success(eventsList);
                 },
+                
                 eventClick: function(info) {
                     if(!info.event.extendedProps.type) return; // Ignore les blocs de travail cliqués
                     info.jsEvent.stopPropagation();
@@ -596,16 +824,24 @@
         }
 
         function chargerSoldes(absences) {
-            let cpCons = 0; let rttCons = 0; let joursNF = 0;
+            let cpCons = 0; 
+            let rttCons = 0; 
+            let joursNF = 0;
+            
             absences.forEach(a => {
                 let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1;
-                if(a.type_absence === 'CP') { cpCons += j; for(let d=new Date(a.date_debut); d<=new Date(a.date_fin); d.setDate(d.getDate()+1)) { if([10,11,0,1].includes(d.getMonth())) joursNF++; } }
+                if(a.type_absence === 'CP') { 
+                    cpCons += j; 
+                    for(let d = new Date(a.date_debut); d <= new Date(a.date_fin); d.setDate(d.getDate() + 1)) { 
+                        if([10, 11, 0, 1].includes(d.getMonth())) joursNF++; 
+                    } 
+                }
                 if(a.type_absence === 'RTT') rttCons += j;
             });
 
             document.getElementById('cpt-cp').textContent = (userParams.cp_initial - cpCons) + ' j';
             document.getElementById('cpt-rtt').textContent = (userParams.rtt_initial - rttCons) + ' j';
-            document.getElementById('alerte-rtt').classList.toggle('hidden', (userParams.rtt_initial - rttCons) <= 0);
+            document.getElementById('alerte-rtt').classList.toggle('hidden', (userParams.rtt_initial - rttCons) > 0);
             document.getElementById('cpt-fractionnement').textContent = '+' + (joursNF >= 8 ? 2 : (joursNF >= 6 ? 1 : 0)) + ' j';
         }
 
@@ -622,27 +858,47 @@
         
         window.sauvegarderParametres = async () => {
             const notifsOn = document.getElementById('input_notifs').checked;
-            if (notifsOn && "Notification" in window && Notification.permission !== "granted") await Notification.requestPermission();
+            if (notifsOn && "Notification" in window && Notification.permission !== "granted") {
+                await Notification.requestPermission();
+            }
 
             try {
-                const p = { user_id: currentUser.id, base_horaire: parseFloat(document.getElementById('input_base_horaire').value), cp_initial: parseFloat(document.getElementById('input_cp').value), rtt_initial: parseFloat(document.getElementById('input_rtt').value), limite_heures_jour: parseFloat(document.getElementById('input_limite_heures').value), notifs_actives: notifsOn };
+                const p = { 
+                    user_id: currentUser.id, 
+                    base_horaire: parseFloat(document.getElementById('input_base_horaire').value), 
+                    cp_initial: parseFloat(document.getElementById('input_cp').value), 
+                    rtt_initial: parseFloat(document.getElementById('input_rtt').value), 
+                    limite_heures_jour: parseFloat(document.getElementById('input_limite_heures').value), 
+                    notifs_actives: notifsOn 
+                };
                 const { error } = await supaClient.from('parametres').upsert(p);
                 if(error) throw error;
                 
                 userParams = p; 
                 fermerModalParametres(); 
-                if(calendar) calendar.refetchEvents(); 
+                if(calendar) {
+                    calendar.refetchEvents(); 
+                }
                 calculerHeuresSupEt1607();
                 showToast('Paramètres sauvés');
-            } catch(e) { showToast(e.message, true); }
+            } catch(e) { 
+                showToast(e.message, true); 
+            }
         };
 
         window.switchTab = (tab) => {
             ['pointage', 'planning'].forEach(t => {
-                document.getElementById('view-'+t).classList.toggle('hidden', t !== tab); document.getElementById('view-'+t).classList.toggle('flex', t === tab);
-                document.getElementById('btn-'+t).classList.toggle('bg-teal-50', t === tab); document.getElementById('btn-'+t).classList.toggle('text-teal-700', t === tab);
+                document.getElementById('view-' + t).classList.toggle('hidden', t !== tab); 
+                document.getElementById('view-' + t).classList.toggle('flex', t === tab);
+                document.getElementById('btn-' + t).classList.toggle('bg-teal-50', t === tab); 
+                document.getElementById('btn-' + t).classList.toggle('text-teal-700', t === tab);
             });
-            if(tab === 'pointage') rafraichirVueJour(); else if(calendar) { calendar.render(); calendar.updateSize(); }
+            if(tab === 'pointage') {
+                rafraichirVueJour(); 
+            } else if(calendar) { 
+                calendar.render(); 
+                calendar.updateSize(); 
+            }
         };
     </script>
 </body>

@@ -13,18 +13,36 @@
 
     <style>
         .fc { font-family: inherit; cursor: pointer; font-size: 0.85rem; }
-        .fc-button-primary { background-color: #14b8a6 !important; border-color: #14b8a6 !important; font-size: 0.75rem !important; padding: 4px 8px !important; }
+        .fc-button-primary { background-color: #14b8a6 !important; border-color: #14b8a6 !important; font-size: 0.75rem !important; }
         .fc-button-primary:hover { background-color: #0d9488 !important; border-color: #0d9488 !important; }
         .fc-button-active { background-color: #0f766e !important; }
         .fc-event { transition: transform 0.2s; border-radius: 6px; font-size: 0.75rem; }
         
-        /* Bulles style Google Fit dans la vue mois */
+        /* Harmonisation des boutons de navigation et du bouton Today */
+        .fc .fc-button {
+            height: 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            padding: 0 10px;
+        }
+        .fc .fc-prev-button, .fc .fc-next-button {
+            width: 32px;
+            padding: 0;
+        }
+        .fc .fc-today-button {
+            height: 32px;
+            line-height: 32px;
+            padding: 0 12px;
+        }
+        
+        /* Bulles style Google Fit dans la vue mois uniquement */
         .fit-bubble-container { 
             display: flex; 
             justify-content: center; 
             align-items: center; 
-            margin-top: 4px; 
-            height: 32px;
+            margin-top: 2px; 
             pointer-events: none;
         }
         .fit-bubble { 
@@ -40,7 +58,7 @@
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #14b8a6; border-radius: 3px; }
         .btn-card { transition: all 0.2s ease; cursor: pointer; }
         .btn-card:active { transform: scale(0.97); }
-        .work-block { opacity: 0.8; }
+        .work-block { opacity: 0.85; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-teal-50 to-gray-100 min-h-screen flex items-center justify-center p-2 md:p-6 font-sans">
@@ -374,7 +392,7 @@
         window.pointer = async (type) => {
             try { 
                 await supaClient.from('pointages').insert([{ user_id: currentUser.id, type_action: type }]); 
-                await chargerDonneesGlobalales(); 
+                await chargerDonneesGlobales(); 
                 rafraichirVueJour(); 
                 if(calendar) calendar.refetchEvents();
             } catch(e) { 
@@ -551,7 +569,11 @@
             let dateAtteinte = null; 
             let d = new Date(startYear);
             while(d <= now) {
-                const dateStr = d.toISOString().split('T')[0];
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                const dateStr = `${year}-${month}-${day}`;
+
                 cumulAnnee += (mapReelJour[dateStr] || 0);
                 if (cumulAnnee >= 1607) {
                     dateAtteinte = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -592,13 +614,18 @@
         window.ouvrirModalAbsence = (id = null, type = 'RTT', debut = '', fin = '', moment = 'journee') => {
             document.getElementById('absence_id').value = id || '';
             document.getElementById('titre-modal-absence').textContent = id ? "Modifier l'absence" : "Nouvelle absence";
-            document.getElementById('btn-sauvegarder-absence').textContent = id ? "Mettre à jour" : "Valider";
             document.getElementById('btn-supprimer-absence').classList.toggle('hidden', !id);
             
             document.getElementById('type_absence').value = type;
             document.getElementById('moment_absence').value = moment;
-            document.getElementById('date_debut').value = debut || new Date().toISOString().split('T')[0];
-            document.getElementById('date_fin').value = fin || new Date().toISOString().split('T')[0];
+            
+            const todayStr = (() => {
+                const t = new Date();
+                return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+            })();
+
+            document.getElementById('date_debut').value = debut || todayStr;
+            document.getElementById('date_fin').value = fin || todayStr;
             gererAffichageDates();
             document.getElementById('modal-absence').classList.remove('hidden');
         };
@@ -664,15 +691,24 @@
                     ouvrirModalAbsence(null, 'RTT', info.dateStr, info.dateStr, 'journee');
                 },
 
-                // Style Google Fit pour les bulles de la vue mois
+                // Bulles style Google Fit strictes pour la vue mois
                 dayCellDidMount: function(info) {
-                    const dateStr = info.date.toISOString().split('T')[0];
+                    if (!calendar || calendar.view.type !== 'dayGridMonth') return;
+                    
+                    const year = info.date.getFullYear();
+                    const month = String(info.date.getMonth() + 1).padStart(2, '0');
+                    const day = String(info.date.getDate()).padStart(2, '0');
+                    const dateStr = `${year}-${month}-${day}`;
+                    
                     let msJour = 0; 
                     let lastArr = null;
                     
                     pointagesAnnee.filter(p => {
-                        const pDate = new Date(p.timestamp).toISOString().split('T')[0];
-                        return pDate === dateStr;
+                        const pDateObj = new Date(p.timestamp);
+                        const pYear = pDateObj.getFullYear();
+                        const pMonth = String(pDateObj.getMonth() + 1).padStart(2, '0');
+                        const pDay = String(pDateObj.getDate()).padStart(2, '0');
+                        return `${pYear}-${pMonth}-${pDay}` === dateStr;
                     }).forEach(pt => {
                         if(pt.type_action === 'arrivee') {
                             lastArr = new Date(pt.timestamp);
@@ -683,9 +719,9 @@
                         }
                     });
                     
-                    // Si toujours en poste aujourd'hui
-                    const today = new Date().toISOString().split('T')[0];
-                    if(dateStr === today && lastArr) {
+                    const todayObj = new Date();
+                    const todayStr = `${todayObj.getFullYear()}-${String(todayObj.getMonth()+1).padStart(2,'0')}-${String(todayObj.getDate()).padStart(2,'0')}`;
+                    if(dateStr === todayStr && lastArr) {
                         msJour += (new Date() - lastArr);
                     }
                     
@@ -693,13 +729,11 @@
                         const hDec = msJour / 3600000;
                         const reqHours = userParams.base_horaire / 5;
 
-                        // Couleur : Rouge si > 10h, Bleu si < quota journalier requis, Vert sinon
                         let color = '#10b981'; // Vert
                         if (hDec > 10) color = '#ef4444'; // Rouge
                         else if (hDec < reqHours) color = '#3b82f6'; // Bleu
 
-                        // Diamètre variable selon les heures (entre 12px et 32px)
-                        let diameter = Math.min(32, Math.max(12, Math.round(hDec * 3.2)));
+                        let diameter = Math.min(30, Math.max(12, Math.round(hDec * 3)));
 
                         const container = document.createElement('div');
                         container.className = 'fit-bubble-container';
@@ -709,18 +743,15 @@
                         bubble.style.width = `${diameter}px`;
                         bubble.style.height = `${diameter}px`;
                         bubble.style.backgroundColor = color;
-                        bubble.style.opacity = '0.8';
+                        bubble.style.opacity = '0.85';
 
                         container.appendChild(bubble);
                         
-                        // Insertion au bon endroit dans la cellule
-                        const dayFrame = info.el.querySelector('.fc-daygrid-day-frame');
-                        if (dayFrame) {
-                            // Supprimer les anciennes bulles si elles existent
-                            const oldBubble = dayFrame.querySelector('.fit-bubble-container');
+                        const dayTop = info.el.querySelector('.fc-daygrid-day-top');
+                        if (dayTop) {
+                            const oldBubble = dayTop.querySelector('.fit-bubble-container');
                             if (oldBubble) oldBubble.remove();
-                            
-                            dayFrame.appendChild(container);
+                            dayTop.appendChild(container);
                         }
                     }
                 },
@@ -740,73 +771,78 @@
                         let titre = a.type_absence; 
                         if(a.moment === 'matin') titre += " (Matin)"; 
                         if(a.moment === 'aprem') titre += " (Aprem)";
+                        
+                        const endDateObj = new Date(new Date(a.date_fin).getTime() + 86400000);
+                        const endStr = `${endDateObj.getFullYear()}-${String(endDateObj.getMonth()+1).padStart(2,'0')}-${String(endDateObj.getDate()).padStart(2,'0')}`;
+
                         return { 
                             id: a.id, 
                             extendedProps: { type: a.type_absence, moment: a.moment }, 
                             title: titre, 
                             start: a.date_debut, 
-                            end: new Date(new Date(a.date_fin).getTime() + 86400000).toISOString().split('T')[0], 
+                            end: endStr, 
                             backgroundColor: c, 
                             borderColor: c 
                         };
                     });
 
-                    // Génération des blocs de travail pour la vue semaine/jour
-                    const parJour = {};
-                    pointagesAnnee.forEach(p => { 
-                        const d = new Date(p.timestamp).toISOString().split('T')[0]; 
-                        if(!parJour[d]) parJour[d] = []; 
-                        parJour[d].push(p); 
-                    });
-
-                    for (let jour in parJour) {
-                        let lastArr = null;
-                        let blockStart = null;
-                        
-                        parJour[jour].forEach(pt => {
-                            const timestamp = new Date(pt.timestamp);
-                            
-                            if(pt.type_action === 'arrivee') {
-                                lastArr = timestamp;
-                                blockStart = timestamp;
-                            }
-                            else if(pt.type_action === 'pause' && lastArr) {
-                                // Créer un bloc de travail jusqu'à la pause
-                                eventsList.push({
-                                    title: 'Travail',
-                                    start: blockStart,
-                                    end: timestamp,
-                                    backgroundColor: '#14b8a6',
-                                    borderColor: '#0d9488',
-                                    className: 'work-block'
-                                });
-                                blockStart = null;
-                            }
-                            else if(pt.type_action === 'depart' && lastArr) {
-                                // Créer un bloc de travail final
-                                eventsList.push({
-                                    title: 'Travail',
-                                    start: blockStart || lastArr,
-                                    end: timestamp,
-                                    backgroundColor: '#14b8a6',
-                                    borderColor: '#0d9488',
-                                    className: 'work-block'
-                                });
-                                lastArr = null;
-                                blockStart = null;
-                            }
+                    // Créneaux travaillés affichés UNIQUEMENT dans la vue semaine (timeGridWeek)
+                    if (info.view.type === 'timeGridWeek') {
+                        const parJour = {};
+                        pointagesAnnee.forEach(p => { 
+                            const pDateObj = new Date(p.timestamp);
+                            const d = `${pDateObj.getFullYear()}-${String(pDateObj.getMonth()+1).padStart(2,'0')}-${String(pDateObj.getDate()).padStart(2,'0')}`;
+                            if(!parJour[d]) parJour[d] = []; 
+                            parJour[d].push(p); 
                         });
-                        
-                        // Si toujours en poste (pas de départ)
-                        if(lastArr) {
-                            eventsList.push({
-                                title: 'Travail en cours',
-                                start: blockStart || lastArr,
-                                end: new Date(), // Jusqu'à maintenant
-                                backgroundColor: '#14b8a6',
-                                borderColor: '#0d9488',
-                                className: 'work-block'
+
+                        for (let jour in parJour) {
+                            let lastArr = null;
+                            let blockStart = null;
+                            
+                            parJour[jour].forEach(pt => {
+                                const timestamp = new Date(pt.timestamp);
+                                
+                                if(pt.type_action === 'arrivee') {
+                                    lastArr = timestamp;
+                                    blockStart = timestamp;
+                                }
+                                else if(pt.type_action === 'pause' && lastArr) {
+                                    eventsList.push({
+                                        title: 'Travail',
+                                        start: blockStart,
+                                        end: timestamp,
+                                        backgroundColor: '#14b8a6',
+                                        borderColor: '#0d9488',
+                                        className: 'work-block'
+                                    });
+                                    lastArr = null;
+                                    blockStart = null;
+                                }
+                                else if(pt.type_action === 'depart' && lastArr) {
+                                    eventsList.push({
+                                        title: 'Travail',
+                                        start: blockStart || lastArr,
+                                        end: timestamp,
+                                        backgroundColor: '#14b8a6',
+                                        borderColor: '#0d9488',
+                                        className: 'work-block'
+                                    });
+                                    lastArr = null;
+                                    blockStart = null;
+                                }
                             });
+                            
+                            if(lastArr) {
+                                eventsList.push({
+                                    title: 'Travail en cours',
+                                    start: blockStart || lastArr,
+                                    end: new Date(),
+                                    backgroundColor: '#14b8a6',
+                                    borderColor: '#0d9488',
+                                    className: 'work-block'
+                                });
+                            }
                         }
                     }
 
@@ -817,8 +853,14 @@
                     if(!info.event.extendedProps.type) return; // Ignore les blocs de travail cliqués
                     info.jsEvent.stopPropagation();
                     const p = info.event.extendedProps;
-                    const dateFin = new Date(info.event.end ? info.event.end.getTime() - 86400000 : info.event.start).toISOString().split('T')[0];
-                    ouvrirModalAbsence(info.event.id, p.type, info.event.startStr.split('T')[0], dateFin, p.moment || 'journee');
+                    
+                    const endObj = info.event.end ? new Date(info.event.end.getTime() - 86400000) : info.event.start;
+                    const dateFin = `${endObj.getFullYear()}-${String(endObj.getMonth()+1).padStart(2,'0')}-${String(endObj.getDate()).padStart(2,'0')}`;
+                    
+                    const startObj = info.event.start;
+                    const dateDebut = `${startObj.getFullYear()}-${String(startObj.getMonth()+1).padStart(2,'0')}-${String(startObj.getDate()).padStart(2,'0')}`;
+
+                    ouvrirModalAbsence(info.event.id, p.type, dateDebut, dateFin, p.moment || 'journee');
                 }
             });
             calendar.render();

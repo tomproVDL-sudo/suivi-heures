@@ -16,7 +16,7 @@
         .fc-button-primary { background-color: #14b8a6 !important; border-color: #14b8a6 !important; font-size: 0.75rem !important; }
         .fc-button-primary:hover { background-color: #0d9488 !important; border-color: #0d9488 !important; }
         .fc-button-active { background-color: #0f766e !important; }
-        .fc-event { transition: transform 0.2s; border-radius: 6px; font-size: 0.75rem; }
+        .fc-event { transition: transform 0.2s; border-radius: 6px; font-size: 0.75rem; z-index: 5; }
         
         /* Harmonisation des boutons de navigation et du bouton Today */
         .fc .fc-button {
@@ -37,18 +37,23 @@
             padding: 0 12px;
         }
         
-        /* Bulles style Google Fit dans la vue mois uniquement */
+        /* Bulles style Google Fit centrées dans la case du jour */
+        .fc-daygrid-day-frame {
+            position: relative !important;
+        }
         .fit-bubble-container { 
+            position: absolute;
+            inset: 0;
             display: flex; 
             justify-content: center; 
             align-items: center; 
-            margin-top: 2px; 
             pointer-events: none;
+            z-index: 1;
         }
         .fit-bubble { 
             border-radius: 50%; 
             transition: all 0.2s;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
         }
 
         @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -256,7 +261,6 @@
     <div id="toast" class="hidden fixed bottom-4 right-4 text-white px-6 py-3 rounded-xl shadow-lg z-50">...</div>
 
     <script>
-        // --- 1. CONFIGURATION ---
 // --- 1. CONFIGURATION ---
         const supabaseUrl = 'https://rxqtsguwoqeojsnaagxb.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4cXRzZ3V3b3Flb2pzbmFhZ3hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTA4MjcsImV4cCI6MjEwMjcyNjgyN30.FTPTGSe6tqDTieqQdD-GWUqueKlEPUpw4QGiMa4U8AA';
@@ -691,7 +695,7 @@
                     ouvrirModalAbsence(null, 'RTT', info.dateStr, info.dateStr, 'journee');
                 },
 
-                // Bulles style Google Fit strictes pour la vue mois
+                // Bulles style Google Fit parfaitement centrées dans chaque case de la vue mois
                 dayCellDidMount: function(info) {
                     if (!calendar || calendar.view.type !== 'dayGridMonth') return;
                     
@@ -733,7 +737,7 @@
                         if (hDec > 10) color = '#ef4444'; // Rouge
                         else if (hDec < reqHours) color = '#3b82f6'; // Bleu
 
-                        let diameter = Math.min(30, Math.max(12, Math.round(hDec * 3)));
+                        let diameter = Math.min(42, Math.max(16, Math.round(hDec * 4)));
 
                         const container = document.createElement('div');
                         container.className = 'fit-bubble-container';
@@ -743,15 +747,15 @@
                         bubble.style.width = `${diameter}px`;
                         bubble.style.height = `${diameter}px`;
                         bubble.style.backgroundColor = color;
-                        bubble.style.opacity = '0.85';
+                        bubble.style.opacity = '0.35'; // Douce transparence pour laisser les événements visibles par-dessus
 
                         container.appendChild(bubble);
                         
-                        const dayTop = info.el.querySelector('.fc-daygrid-day-top');
-                        if (dayTop) {
-                            const oldBubble = dayTop.querySelector('.fit-bubble-container');
+                        const dayFrame = info.el.querySelector('.fc-daygrid-day-frame');
+                        if (dayFrame) {
+                            const oldBubble = dayFrame.querySelector('.fit-bubble-container');
                             if (oldBubble) oldBubble.remove();
-                            dayTop.appendChild(container);
+                            dayFrame.appendChild(container);
                         }
                     }
                 },

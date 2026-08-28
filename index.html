@@ -611,7 +611,7 @@
                 firstDay: 1, 
                 slotMinTime: '06:00:00', slotMaxTime: '22:00:00',
                 headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
-                navLinks: false, // <-- ICI : Cela DÉSACTIVE complètement la vue "Jour" au clic sur le numéro
+                navLinks: false, // DÉSACTIVE la vue "Jour" au clic sur le numéro
                 editable: false, dayMaxEvents: true, eventDisplay: 'block',
                 
                 datesSet: function() { calendar.updateSize(); },
@@ -636,14 +636,34 @@
                     
                     if(msJour > 0) {
                         const hDec = msJour / 3600000; const reqHours = userParams.base_horaire / 5;
-                        let color = '#10b981'; if (hDec > 10) color = '#ef4444'; else if (hDec < reqHours) color = '#3b82f6';
-                        let diameter = Math.min(46, Math.max(16, Math.round(hDec * 4.5)));
+                        
+                        // Détermination des couleurs
+                        let color = '#10b981'; // Vert par défaut
+                        let textColor = '#047857'; // Vert foncé pour le texte
+                        if (hDec > 10) { color = '#ef4444'; textColor = '#b91c1c'; } // Rouge si dépassement
+                        else if (hDec < reqHours) { color = '#3b82f6'; textColor = '#1d4ed8'; } // Bleu si incomplet
+                        
+                        // Taille du cercle adaptée (min 34px pour que le texte rentre bien)
+                        let diameter = Math.min(50, Math.max(34, Math.round(hDec * 5)));
 
                         const container = document.createElement('div'); container.className = 'fit-bubble-container';
+                        
+                        // Le cercle Google Fit
                         const bubble = document.createElement('div'); bubble.className = 'fit-bubble';
                         bubble.style.width = `${diameter}px`; bubble.style.height = `${diameter}px`;
                         bubble.style.backgroundColor = color; bubble.style.opacity = '0.35';
                         container.appendChild(bubble);
+                        
+                        // Le texte au centre (Heures et minutes)
+                        const textL = document.createElement('span');
+                        let h = Math.floor(hDec);
+                        let m = Math.floor((msJour % 3600000) / 60000);
+                        textL.textContent = m === 0 ? `${h}h` : `${h}h${m.toString().padStart(2, '0')}`;
+                        textL.style.position = 'absolute';
+                        textL.style.fontSize = '0.65rem';
+                        textL.style.fontWeight = '700';
+                        textL.style.color = textColor; // Couleur assortie
+                        container.appendChild(textL);
                         
                         const dayFrame = info.el.querySelector('.fc-daygrid-day-frame');
                         if (dayFrame) { const oldBubble = dayFrame.querySelector('.fit-bubble-container'); if (oldBubble) oldBubble.remove(); dayFrame.appendChild(container); }

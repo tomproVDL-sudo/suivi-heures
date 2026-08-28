@@ -16,7 +16,7 @@
         .fc-button-primary { background-color: #14b8a6 !important; border-color: #14b8a6 !important; font-size: 0.75rem !important; }
         .fc-button-primary:hover { background-color: #0d9488 !important; border-color: #0d9488 !important; }
         .fc-button-active { background-color: #0f766e !important; }
-        .fc-event { transition: transform 0.2s; border-radius: 6px; font-size: 0.75rem; z-index: 5; }
+        .fc-event { transition: transform 0.2s; border-radius: 6px; font-size: 0.75rem; }
         
         /* Harmonisation des boutons de navigation et du bouton Today */
         .fc .fc-button {
@@ -37,15 +37,14 @@
             padding: 0 12px;
         }
         
-        /* Bulles style Google Fit centrées dans l'arrière-plan de la cellule */
+        /* Bulles style Google Fit centrées dans le conteneur d'arrière-plan natif */
         .fit-bubble-container { 
-            position: absolute;
-            inset: 0;
             display: flex; 
             justify-content: center; 
             align-items: center; 
+            height: 100%;
+            width: 100%;
             pointer-events: none;
-            z-index: 0;
         }
         .fit-bubble { 
             border-radius: 50%; 
@@ -259,7 +258,6 @@
 
     <script>
         // --- 1. CONFIGURATION ---
-// --- 1. CONFIGURATION ---
         const supabaseUrl = 'https://rxqtsguwoqeojsnaagxb.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4cXRzZ3V3b3Flb2pzbmFhZ3hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTA4MjcsImV4cCI6MjEwMjcyNjgyN30.FTPTGSe6tqDTieqQdD-GWUqueKlEPUpw4QGiMa4U8AA';
 
@@ -693,7 +691,7 @@
                     ouvrirModalAbsence(null, 'RTT', info.dateStr, info.dateStr, 'journee');
                 },
 
-                // Rendu des bulles Google Fit dans l'arrière-plan de la cellule (vue mois uniquement)
+                // Rendu des bulles style Google Fit en arrière-plan (vue mois uniquement) via la div native de FullCalendar
                 dayCellDidMount: function(info) {
                     if (!calendar || calendar.view.type !== 'dayGridMonth') return;
                     
@@ -735,7 +733,7 @@
                         if (hDec > 10) color = '#ef4444'; // Rouge
                         else if (hDec < reqHours) color = '#3b82f6'; // Bleu
 
-                        let diameter = Math.min(50, Math.max(18, Math.round(hDec * 4.5)));
+                        let diameter = Math.min(46, Math.max(16, Math.round(hDec * 4.5)));
 
                         const container = document.createElement('div');
                         container.className = 'fit-bubble-container';
@@ -745,14 +743,14 @@
                         bubble.style.width = `${diameter}px`;
                         bubble.style.height = `${diameter}px`;
                         bubble.style.backgroundColor = color;
-                        bubble.style.opacity = '0.35';
+                        bubble.style.opacity = '0.35'; // Douce transparence pour laisser passer les événements par-dessus
 
                         container.appendChild(bubble);
                         
+                        // Injection dans l'arrière-plan officiel de FullCalendar pour ne rien décaler
                         const dayBg = info.el.querySelector('.fc-daygrid-day-bg');
                         if (dayBg) {
-                            const oldBubble = dayBg.querySelector('.fit-bubble-container');
-                            if (oldBubble) oldBubble.remove();
+                            dayBg.innerHTML = ''; // Sécurité au re-rendu
                             dayBg.appendChild(container);
                         }
                     }
@@ -766,7 +764,7 @@
                     chargerSoldes(data);
                     calculerHeuresSupEt1607();
                     
-                    // Chargement des absences (RTT, CP, Maladie...) pour toutes les vues
+                    // Chargement des absences (RTT, CP, Maladie...) pour TOUTES les vues
                     let eventsList = data.map(a => {
                         let c = '#3b82f6'; 
                         if(a.type_absence === 'CP') c = '#14b8a6'; 
@@ -949,3 +947,4 @@
     </script>
 </body>
 </html>
+       

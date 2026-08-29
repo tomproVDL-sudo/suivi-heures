@@ -10,6 +10,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+    
+    <!-- Bibliothèques pour les Exports (Excel & PDF) -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <style>
         .fc { font-family: inherit; font-size: 0.85rem; }
@@ -19,58 +24,33 @@
         .fc-event { transition: transform 0.2s; border-radius: 6px; font-size: 0.75rem; border: none; cursor: pointer; }
         
         /* Harmonisation des boutons du calendrier */
-        .fc .fc-button {
-            height: 32px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.75rem;
-            padding: 0 10px;
-        }
+        .fc .fc-button { height: 32px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; padding: 0 10px; }
         .fc .fc-prev-button, .fc .fc-next-button { width: 32px; padding: 0; }
         .fc .fc-today-button { height: 32px; line-height: 32px; padding: 0 12px; }
         
         /* 📱 Interface Mobile Épurée (Header) */
         @media (max-width: 768px) {
-            .fc-toolbar.fc-header-toolbar {
-                display: flex;
-                flex-wrap: wrap;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 1rem !important;
-            }
+            .fc-toolbar.fc-header-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; margin-bottom: 1rem !important; }
             .fc-toolbar-chunk:nth-child(1) { order: 1; display: flex; gap: 4px; } 
             .fc-toolbar-chunk:nth-child(3) { order: 2; display: flex; gap: 4px; } 
             .fc-toolbar-chunk:nth-child(2) { order: 3; width: 100%; text-align: center; margin-top: 12px; }
             .fc .fc-toolbar-title { font-size: 1.35rem !important; }
         }
         
-        /* Bulles style Google Fit - Centrage absolu en arrière-plan */
+        /* Bulles style Google Fit */
         .fc-daygrid-day-frame { position: relative !important; }
         .fc-daygrid-day-bg, .fc-daygrid-day-events, .fc-daygrid-day-top { position: relative; z-index: 1; }
-        
-        .fit-bubble-container { 
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            pointer-events: none;
-            z-index: 0; 
-        }
-        .fit-bubble { 
-            border-radius: 50%; 
-            transition: all 0.2s;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-        }
+        .fit-bubble-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; justify-content: center; align-items: center; pointer-events: none; z-index: 0; }
+        .fit-bubble { border-radius: 50%; transition: all 0.2s; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
 
         @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .animate-slide-in { animation: slideIn 0.3s ease-out; }
+        
+        /* Scrollbar custom */
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #14b8a6; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #14b8a6; border-radius: 6px; }
+        
         .btn-card { transition: all 0.2s ease; cursor: pointer; }
         .btn-card:active { transform: scale(0.97); }
         .work-block { opacity: 0.85; }
@@ -125,7 +105,7 @@
         </div>
 
         <!-- ZONE DROITE -->
-        <div class="flex-1 flex flex-col p-4 md:p-8 relative overflow-hidden">
+        <div class="flex-1 flex flex-col p-4 md:p-8 relative overflow-hidden" id="export-zone-pdf">
             
             <!-- VUE POINTAGE -->
             <div id="view-pointage" class="flex-1 flex flex-col">
@@ -147,15 +127,15 @@
                 </div>
 
                 <div class="grid grid-cols-3 gap-3 md:gap-4 mb-6">
-                    <div onclick="pointer('arrivee')" class="btn-card bg-teal-500 text-white p-3 md:p-4 rounded-xl text-center shadow-md flex flex-col justify-center items-center">
-                        <span class="text-xs md:text-sm font-bold">Arrivée / Reprise</span>
-                        <span class="text-[9px] opacity-80 hidden md:block mt-1">Reprendre le travail</span>
+                    <div onclick="pointer('arrivee')" id="btn-action-arrivee" class="btn-card bg-teal-500 text-white p-3 md:p-4 rounded-xl text-center shadow-md flex flex-col justify-center items-center">
+                        <span class="text-xs md:text-sm font-bold">Arrivée</span>
+                        <span class="text-[9px] opacity-80 hidden md:block mt-1">Prise de poste</span>
                     </div>
-                    <div onclick="pointer('pause')" class="btn-card bg-orange-500 text-white p-3 md:p-4 rounded-xl text-center shadow-md flex flex-col justify-center items-center">
-                        <span class="text-xs md:text-sm font-bold">Pause</span>
-                        <span class="text-[9px] opacity-80 hidden md:block mt-1">Début de pause</span>
+                    <div onclick="pointer('pause')" id="btn-action-pause" class="btn-card bg-orange-500 text-white p-3 md:p-4 rounded-xl text-center shadow-md flex flex-col justify-center items-center transition-colors">
+                        <span class="text-xs md:text-sm font-bold" id="txt-pause-1">Pause</span>
+                        <span class="text-[9px] opacity-80 hidden md:block mt-1" id="txt-pause-2">Début de pause</span>
                     </div>
-                    <div onclick="pointer('depart')" class="btn-card bg-slate-600 text-white p-3 md:p-4 rounded-xl text-center shadow-md flex flex-col justify-center items-center">
+                    <div onclick="pointer('depart')" id="btn-action-depart" class="btn-card bg-slate-600 text-white p-3 md:p-4 rounded-xl text-center shadow-md flex flex-col justify-center items-center">
                         <span class="text-xs md:text-sm font-bold">Départ</span>
                         <span class="text-[9px] opacity-80 hidden md:block mt-1">Fin de poste</span>
                     </div>
@@ -166,11 +146,13 @@
 
             <!-- VUE PLANNING -->
             <div id="view-planning" class="hidden flex-1 flex flex-col h-full">
-                <div class="flex justify-between items-center mb-4">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-4">
                     <h3 class="text-lg font-semibold text-gray-800">Mes soldes & Planning</h3>
-                    <div class="flex gap-2">
-                        <button onclick="ouvrirModalAbsence()" class="bg-slate-800 text-white font-bold py-2 px-3 text-xs md:text-sm rounded-xl shadow-md hover:bg-slate-700 transition">+ Déclarer</button>
-                        <button onclick="ouvrirModalParametres()" class="text-xs md:text-sm text-teal-600 hover:underline py-2 px-2">⚙️ Paramètres</button>
+                    <div class="flex flex-wrap gap-2" id="planning-buttons">
+                        <button onclick="ouvrirModalAbsence()" class="bg-slate-800 text-white font-bold py-1.5 px-3 text-xs md:text-sm rounded-lg shadow-md hover:bg-slate-700 transition">+ Déclarer</button>
+                        <button onclick="ouvrirModalExport()" class="bg-green-600 text-white font-bold py-1.5 px-3 text-xs md:text-sm rounded-lg shadow-md hover:bg-green-700 transition">📊 Excel</button>
+                        <button onclick="exporterPDF()" class="bg-red-500 text-white font-bold py-1.5 px-3 text-xs md:text-sm rounded-lg shadow-md hover:bg-red-600 transition">📄 PDF</button>
+                        <button onclick="ouvrirModalParametres()" class="text-xs md:text-sm bg-gray-200 text-gray-700 font-bold hover:bg-gray-300 py-1.5 px-3 rounded-lg shadow-sm">⚙️ Paramètres</button>
                     </div>
                 </div>
 
@@ -201,19 +183,38 @@
                         <div class="text-[10px] text-blue-600 font-bold uppercase mb-1">RTT Restants</div>
                         <div class="text-lg font-bold text-blue-800" id="cpt-rtt">-- j</div>
                     </div>
-                    <div class="bg-pink-50 p-2.5 rounded-xl border border-pink-200">
-                        <div class="text-[10px] text-pink-600 font-bold uppercase mb-1">Fractionnement</div>
-                        <div class="text-lg font-bold text-pink-800" id="cpt-fractionnement">+0 j</div>
-                    </div>
                     <div class="bg-purple-50 p-2.5 rounded-xl border border-purple-200">
                         <div class="text-[10px] text-purple-600 font-bold uppercase mb-1">CET</div>
                         <div class="text-lg font-bold text-purple-800" id="cpt-cet">-- j</div>
                     </div>
-
+                    <div class="bg-pink-50 p-2.5 rounded-xl border border-pink-200">
+                        <div class="text-[10px] text-pink-600 font-bold uppercase mb-1">Fractionnement</div>
+                        <div class="text-lg font-bold text-pink-800" id="cpt-fractionnement">+0 j</div>
+                    </div>
                 </div>
 
                 <!-- CALENDRIER AGRANDI SUR MOBILE -->
                 <div id="calendar" class="flex-1 min-h-[600px] md:min-h-[450px] shadow-lg rounded-xl border border-gray-200 p-2 bg-white"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL : EXPORT EXCEL -->
+    <div id="modal-export" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-slide-in">
+            <h3 class="text-xl font-bold mb-4">Exporter les données (Excel)</h3>
+            <div class="flex gap-2 mb-4">
+                <button onclick="setExportDates('semaine')" class="flex-1 bg-teal-50 text-teal-700 text-xs font-bold py-2 rounded-lg hover:bg-teal-100">Cette semaine</button>
+                <button onclick="setExportDates('mois')" class="flex-1 bg-teal-50 text-teal-700 text-xs font-bold py-2 rounded-lg hover:bg-teal-100">Ce mois</button>
+                <button onclick="setExportDates('annee')" class="flex-1 bg-teal-50 text-teal-700 text-xs font-bold py-2 rounded-lg hover:bg-teal-100">Cette année</button>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div><label class="text-xs font-bold text-gray-500">Du</label><input type="date" id="export_debut" class="w-full p-2 border rounded-xl mt-1"></div>
+                <div><label class="text-xs font-bold text-gray-500">Au</label><input type="date" id="export_fin" class="w-full p-2 border rounded-xl mt-1"></div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="fermerModalExport()" class="flex-1 bg-gray-200 font-bold py-3 rounded-xl hover:bg-gray-300">Annuler</button>
+                <button onclick="genererExportExcel()" class="flex-1 bg-green-600 text-white font-bold py-3 rounded-xl hover:bg-green-700">Télécharger Excel</button>
             </div>
         </div>
     </div>
@@ -253,58 +254,34 @@
 
     <!-- MODAL : PARAMETRES -->
     <div id="modal-parametres" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-slide-in max-h-[90vh] overflow-y-auto custom-scrollbar">
-            <h3 class="text-xl font-bold mb-4">Mes Paramètres & Soldes</h3>
+        <!-- Structure corrigée pour l'ascenseur à l'intérieur des bords arrondis -->
+        <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-slide-in overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="p-6 border-b border-gray-100 bg-white z-10"><h3 class="text-xl font-bold">Mes Paramètres & Soldes</h3></div>
             
-            <div class="p-4 bg-gray-50 rounded-xl mb-4">
-                <h4 class="font-bold text-gray-700 mb-3 text-sm">Temps de travail & Notifications</h4>
-                <div class="mb-3">
-                    <label class="text-xs font-bold text-gray-500 block">Objectif annuel (Heures)</label>
-                    <div class="flex items-center gap-2"><input type="number" id="input_objectif_annuel" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="1607"></div>
+            <div class="p-6 overflow-y-auto custom-scrollbar flex-1 bg-white">
+                <div class="p-4 bg-gray-50 rounded-xl mb-4">
+                    <h4 class="font-bold text-gray-700 mb-3 text-sm">Temps de travail & Notifications</h4>
+                    <div class="mb-3"><label class="text-xs font-bold text-gray-500 block">Objectif annuel (Heures)</label><div class="flex items-center gap-2"><input type="number" id="input_objectif_annuel" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="1607"></div></div>
+                    <div class="mb-3"><label class="text-xs font-bold text-gray-500 block">Base hebdomadaire</label><div class="flex items-center gap-2"><input type="number" id="input_base_horaire" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="39"></div></div>
+                    <div class="mb-3"><label class="text-xs font-bold text-gray-500 block">Alerte dépassement quotidien (Max 10h)</label><div class="flex items-center gap-2"><input type="number" step="0.5" max="10" id="input_limite_heures" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="10"></div></div>
+                    <div class="flex items-center gap-2 mt-4"><input type="checkbox" id="input_notifs" class="w-5 h-5 text-teal-600 rounded cursor-pointer"><label class="text-sm font-bold text-gray-700 cursor-pointer" for="input_notifs">Activer les notifications</label></div>
                 </div>
-                <div class="mb-3">
-                    <label class="text-xs font-bold text-gray-500 block">Base hebdomadaire</label>
-                    <div class="flex items-center gap-2"><input type="number" id="input_base_horaire" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="39"></div>
-                </div>
-                <div class="mb-3">
-                    <label class="text-xs font-bold text-gray-500 block">Alerte dépassement quotidien (Max 10h)</label>
-                    <div class="flex items-center gap-2"><input type="number" step="0.5" max="10" id="input_limite_heures" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="10"></div>
-                </div>
-                <div class="flex items-center gap-2 mt-4">
-                    <input type="checkbox" id="input_notifs" class="w-5 h-5 text-teal-600 rounded cursor-pointer">
-                    <label class="text-sm font-bold text-gray-700 cursor-pointer" for="input_notifs">Activer les notifications</label>
-                </div>
-            </div>
 
-            <div class="p-4 bg-gray-50 rounded-xl mb-6">
-                <h4 class="font-bold text-gray-700 mb-3 text-sm">Soldes initiaux acquis & Reliquats</h4>
-                <div class="grid grid-cols-2 gap-3 mb-3">
-                    <div>
-                        <label class="text-xs font-bold text-gray-500 block">Congés Payés N</label>
-                        <input type="number" step="0.5" id="input_cp" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="25">
+                <div class="p-4 bg-gray-50 rounded-xl mb-2">
+                    <h4 class="font-bold text-gray-700 mb-3 text-sm">Soldes initiaux acquis & Reliquats</h4>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div><label class="text-xs font-bold text-gray-500 block">Congés Payés N</label><input type="number" step="0.5" id="input_cp" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="25"></div>
+                        <div><label class="text-xs font-bold text-gray-500 block">Reliquat C.P N-1</label><input type="number" step="0.5" id="input_reliquat_cp" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="0"></div>
                     </div>
-                    <div>
-                        <label class="text-xs font-bold text-gray-500 block">Reliquat C.P N-1</label>
-                        <input type="number" step="0.5" id="input_reliquat_cp" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="0">
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="text-xs font-bold text-gray-500 block">Date limite du reliquat (N-1)</label>
-                    <input type="date" id="input_date_limite_reliquat" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500">
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="text-xs font-bold text-gray-500 block">RTT</label>
-                        <input type="number" step="0.5" id="input_rtt" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="15">
-                    </div>
-                    <div>
-                        <label class="text-xs font-bold text-gray-500 block">Solde CET</label>
-                        <input type="number" step="0.5" id="input_cet" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="0">
+                    <div class="mb-3"><label class="text-xs font-bold text-gray-500 block">Date limite du reliquat (N-1)</label><input type="date" id="input_date_limite_reliquat" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500"></div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div><label class="text-xs font-bold text-gray-500 block">RTT</label><input type="number" step="0.5" id="input_rtt" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="15"></div>
+                        <div><label class="text-xs font-bold text-gray-500 block">Solde CET</label><input type="number" step="0.5" id="input_cet" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="0"></div>
                     </div>
                 </div>
             </div>
 
-            <div class="flex gap-3">
+            <div class="p-6 bg-white border-t border-gray-100 flex gap-3">
                 <button onclick="fermerModalParametres()" class="flex-1 bg-gray-200 font-bold py-3 rounded-xl hover:bg-gray-300">Annuler</button>
                 <button onclick="sauvegarderParametres()" class="flex-1 bg-teal-500 text-white font-bold py-3 rounded-xl hover:bg-teal-600">Enregistrer</button>
             </div>
@@ -334,6 +311,182 @@
             objectif_annuel: 1607, reliquat_cp: 0, date_limite_reliquat: '', cet_initial: 0, annee_maj: null
         };
 
+        // --- EXPORT PDF ---
+        window.exporterPDF = async () => {
+            showToast("Génération du PDF en cours...");
+            const { jsPDF } = window.jspdf;
+            const element = document.getElementById('export-zone-pdf'); // On capture toute la zone droite
+            
+            // Masquer les boutons pour avoir un PDF propre
+            const boutons = document.getElementById('planning-buttons');
+            boutons.style.display = 'none';
+
+            try {
+                const canvas = await html2canvas(element, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff' });
+                boutons.style.display = 'flex'; // Restaure les boutons
+
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                
+                pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, pdfHeight);
+                pdf.save(`Planning_${new Date().toISOString().split('T')[0]}.pdf`);
+                showToast("PDF téléchargé !");
+            } catch (err) {
+                boutons.style.display = 'flex';
+                showToast("Erreur PDF : " + err.message, true);
+            }
+        };
+
+        // --- EXPORT EXCEL ---
+        window.ouvrirModalExport = () => {
+            setExportDates('mois'); // Par défaut : ce mois-ci
+            document.getElementById('modal-export').classList.remove('hidden');
+        };
+        window.fermerModalExport = () => document.getElementById('modal-export').classList.add('hidden');
+        
+        window.setExportDates = (periode) => {
+            const now = new Date();
+            let d1 = new Date(), d2 = new Date();
+            if (periode === 'semaine') {
+                const day = now.getDay(), diff = now.getDate() - day + (day === 0 ? -6 : 1);
+                d1 = new Date(now.setDate(diff));
+                d2 = new Date(d1); d2.setDate(d2.getDate() + 6);
+            } else if (periode === 'mois') {
+                d1 = new Date(now.getFullYear(), now.getMonth(), 1);
+                d2 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            } else if (periode === 'annee') {
+                d1 = new Date(now.getFullYear(), 0, 1);
+                d2 = new Date(now.getFullYear(), 11, 31);
+            }
+            document.getElementById('export_debut').value = d1.toISOString().split('T')[0];
+            document.getElementById('export_fin').value = d2.toISOString().split('T')[0];
+        };
+
+        window.genererExportExcel = () => {
+            const startStr = document.getElementById('export_debut').value;
+            const endStr = document.getElementById('export_fin').value;
+            if (!startStr || !endStr) return showToast("Dates invalides", true);
+            
+            const startD = new Date(startStr); startD.setHours(0,0,0,0);
+            const endD = new Date(endStr); endD.setHours(23,59,59,999);
+            
+            // Regrouper les pointages par jour
+            const pointagesPariode = pointagesAnnee.filter(p => {
+                const d = new Date(p.timestamp); return d >= startD && d <= endD;
+            });
+            const parJour = {};
+            pointagesPariode.forEach(p => {
+                const dateStr = p.timestamp.split('T')[0];
+                if(!parJour[dateStr]) parJour[dateStr] = [];
+                parJour[dateStr].push(p);
+            });
+
+            const dataToExport = [["Date", "Début", "Pauses", "Fin", "Heures Travaillées", "Écart"]];
+            
+            let totalTravailléMs = 0;
+            let totalPauseMs = 0;
+            let nbPausesReelles = 0;
+            const hoursPerDay = (userParams.base_horaire / 5);
+
+            for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().split('T')[0];
+                const dayOfWeek = d.getDay();
+                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                
+                let strDebut = "--"; let strPauses = "--"; let strFin = "--"; let valTravail = "0h00"; let valEcart = "0h00";
+                let tMs = 0; let expected = isWeekend ? 0 : hoursPerDay * 3600000;
+                
+                // Gestion des absences pour déduire l'attendu
+                let absence = currentAbsences.find(a => {
+                    const aStart = new Date(a.date_debut); aStart.setHours(0,0,0,0);
+                    const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0);
+                    return d >= aStart && d <= aEnd;
+                });
+                if (absence) expected = (absence.moment === 'journee') ? 0 : (expected / 2);
+
+                if (parJour[dateStr]) {
+                    const events = parJour[dateStr].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+                    const formatH = (ts) => new Date(ts).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+                    
+                    let lastArr = null; let lstPauses = []; let pauseStart = null;
+                    
+                    events.forEach(pt => {
+                        if(pt.type_action === 'arrivee') { 
+                            lastArr = new Date(pt.timestamp); 
+                            if(strDebut === "--") strDebut = formatH(pt.timestamp);
+                            if(pauseStart) { // Fin d'une pause
+                                const pEnd = new Date(pt.timestamp);
+                                const diffPause = pEnd - pauseStart;
+                                totalPauseMs += diffPause; nbPausesReelles++;
+                                lstPauses.push(`${formatH(pauseStart)} - ${formatH(pEnd)}`);
+                                pauseStart = null;
+                            }
+                        }
+                        if(pt.type_action === 'pause') {
+                            pauseStart = new Date(pt.timestamp);
+                            if(lastArr) { tMs += (pauseStart - lastArr); lastArr = null; }
+                        }
+                        if(pt.type_action === 'depart') {
+                            const pEnd = new Date(pt.timestamp);
+                            strFin = formatH(pt.timestamp);
+                            if(lastArr) { tMs += (pEnd - lastArr); lastArr = null; }
+                        }
+                    });
+                    
+                    if (lstPauses.length > 0) strPauses = lstPauses.join(" | ");
+                    
+                    totalTravailléMs += tMs;
+                    
+                    let hT = Math.floor(tMs / 3600000); let mT = Math.floor((tMs % 3600000) / 60000);
+                    valTravail = `${hT}h${mT.toString().padStart(2, '0')}`;
+                    
+                    let deltaMs = tMs - expected;
+                    let sign = deltaMs >= 0 ? '+' : '-'; let aDelta = Math.abs(deltaMs);
+                    let hD = Math.floor(aDelta / 3600000); let mD = Math.round((aDelta % 3600000) / 60000);
+                    valEcart = `${sign}${hD}h${mD.toString().padStart(2, '0')}`;
+                } else if (absence) {
+                    strDebut = absence.type_absence; strFin = absence.moment;
+                }
+
+                dataToExport.push([ d.toLocaleDateString('fr-FR'), strDebut, strPauses, strFin, valTravail, valEcart ]);
+            }
+
+            // Statistiques globales fin de tableau
+            dataToExport.push([]);
+            dataToExport.push(["RÉCAPITULATIF SUR LA PÉRIODE", "", "", "", "", ""]);
+            
+            // Calcul moyen pause
+            let moyPause = "0 min";
+            if (nbPausesReelles > 0) {
+                let mAvg = Math.round((totalPauseMs / nbPausesReelles) / 60000);
+                if(mAvg > 60) moyPause = `${Math.floor(mAvg/60)}h${(mAvg%60).toString().padStart(2,'0')}`;
+                else moyPause = `${mAvg} min`;
+            }
+            dataToExport.push(["Durée moyenne de pause", moyPause, "", "", "", ""]);
+            
+            // Restes de congés (En récupérant ce qui est à l'écran)
+            dataToExport.push([]);
+            dataToExport.push(["SOLDES RESTANTS A CE JOUR", "", "", "", "", ""]);
+            dataToExport.push(["CP Restants", document.getElementById('cpt-cp').textContent]);
+            dataToExport.push(["Reliquat N-1", document.getElementById('cpt-reliquat').textContent]);
+            dataToExport.push(["RTT Restants", document.getElementById('cpt-rtt').textContent]);
+            dataToExport.push(["CET", document.getElementById('cpt-cet').textContent]);
+
+            // Génération fichier
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(dataToExport);
+            
+            // Largeur colonnes
+            ws['!cols'] = [{wch:12}, {wch:8}, {wch:30}, {wch:8}, {wch:15}, {wch:10}];
+            
+            XLSX.utils.book_append_sheet(wb, ws, "Export");
+            XLSX.writeFile(wb, `Export_SIRH_${startStr}_au_${endStr}.xlsx`);
+            fermerModalExport();
+        };
+
+        // --- LOGIQUE INTERNE DE DEMARRAGE ---
         setInterval(() => {
             const now = new Date();
             document.getElementById('time-display').textContent = now.toLocaleTimeString('fr-FR');
@@ -368,49 +521,24 @@
             if (pData) userParams = { ...userParams, ...pData };
 
             const currentYear = new Date().getFullYear();
-            
-            // --- AUTOMATISATION DU PASSAGE D'ANNEE ---
             if (!userParams.annee_maj) {
                 userParams.annee_maj = currentYear;
                 await supaClient.from('parametres').upsert({ user_id: currentUser.id, annee_maj: currentYear });
             } else if (userParams.annee_maj < currentYear) {
-                // Il y a eu un changement d'année ! On calcule les restes de l'année précédente
-                const { data: absPrecedentes } = await supaClient.from('absences')
-                    .select('*')
-                    .eq('user_id', currentUser.id)
-                    .eq('type_absence', 'CP')
-                    .gte('date_debut', `${userParams.annee_maj}-01-01`)
-                    .lte('date_debut', `${userParams.annee_maj}-12-31`);
-                    
-                let cpConsBeforeLimit = 0;
-                let cpConsAfterLimit = 0;
-                const limiteDateStr = userParams.date_limite_reliquat;
-                const limiteDate = limiteDateStr ? new Date(limiteDateStr + 'T23:59:59') : null;
-                
+                const { data: absPrecedentes } = await supaClient.from('absences').select('*').eq('user_id', currentUser.id).eq('type_absence', 'CP').gte('date_debut', `${userParams.annee_maj}-01-01`).lte('date_debut', `${userParams.annee_maj}-12-31`);
+                let cpConsBeforeLimit = 0; let cpConsAfterLimit = 0;
+                const limiteDateStr = userParams.date_limite_reliquat; const limiteDate = limiteDateStr ? new Date(limiteDateStr + 'T23:59:59') : null;
                 (absPrecedentes || []).forEach(a => {
                     let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1;
-                    if (limiteDate && new Date(a.date_debut) > limiteDate) cpConsAfterLimit += j;
-                    else cpConsBeforeLimit += j;
+                    if (limiteDate && new Date(a.date_debut) > limiteDate) cpConsAfterLimit += j; else cpConsBeforeLimit += j;
                 });
-                
                 let ancienReliquat = userParams.reliquat_cp || 0;
                 let cpRestantsN = userParams.cp_initial - Math.max(0, cpConsBeforeLimit - ancienReliquat) - cpConsAfterLimit;
                 
-                // Le nouveau reliquat N-1 devient ce qu'il restait en CP 
-                userParams.reliquat_cp = Math.max(0, cpRestantsN);
-                userParams.annee_maj = currentYear;
+                userParams.reliquat_cp = Math.max(0, cpRestantsN); userParams.annee_maj = currentYear;
+                if (userParams.date_limite_reliquat) { let d = new Date(userParams.date_limite_reliquat); d.setFullYear(currentYear); userParams.date_limite_reliquat = `${currentYear}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
                 
-                // Décale la date limite d'un an pour la nouvelle année
-                if (userParams.date_limite_reliquat) {
-                    let d = new Date(userParams.date_limite_reliquat);
-                    d.setFullYear(currentYear);
-                    userParams.date_limite_reliquat = `${currentYear}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                }
-                
-                await supaClient.from('parametres').upsert({ 
-                    user_id: currentUser.id, annee_maj: currentYear,
-                    reliquat_cp: userParams.reliquat_cp, date_limite_reliquat: userParams.date_limite_reliquat
-                });
+                await supaClient.from('parametres').upsert({ user_id: currentUser.id, annee_maj: currentYear, reliquat_cp: userParams.reliquat_cp, date_limite_reliquat: userParams.date_limite_reliquat });
                 showToast("Nouvelle année : Reliquat calculé automatiquement !");
             }
 
@@ -429,10 +557,7 @@
             document.getElementById('app-section').classList.remove('hidden', 'flex');
             document.getElementById('app-section').classList.add('flex');
             
-            chargerDonneesGlobales().then(() => {
-                rafraichirVueJour();
-                initCalendar();
-            });
+            chargerDonneesGlobales().then(() => { rafraichirVueJour(); initCalendar(); });
         }
 
         function rafraichirVueJour() {
@@ -440,6 +565,27 @@
             currentPointages = pointagesAnnee.filter(p => new Date(p.timestamp) >= debutJour);
             const conteneur = document.getElementById('historique-jour'); conteneur.innerHTML = '';
             
+            // MODIFICATION LOGIQUE BOUTON PAUSE/REPRISE
+            const btnPause = document.getElementById('btn-action-pause');
+            const txtPause1 = document.getElementById('txt-pause-1');
+            const txtPause2 = document.getElementById('txt-pause-2');
+            
+            let lastAction = currentPointages.length > 0 ? currentPointages[currentPointages.length - 1].type_action : null;
+            
+            if (lastAction === 'pause') {
+                // Si on est en pause -> Bouton Vert "Reprise" (qui envoie un pointage "arrivee" derrière)
+                btnPause.className = 'btn-card bg-emerald-500 text-white p-3 md:p-4 rounded-xl text-center shadow-md flex flex-col justify-center items-center transition-colors';
+                txtPause1.textContent = 'Reprise';
+                txtPause2.textContent = 'Reprendre le travail';
+                btnPause.onclick = () => pointer('arrivee');
+            } else {
+                // Sinon (travail ou pas commencé) -> Bouton Orange "Pause"
+                btnPause.className = 'btn-card bg-orange-500 text-white p-3 md:p-4 rounded-xl text-center shadow-md flex flex-col justify-center items-center transition-colors';
+                txtPause1.textContent = 'Pause';
+                txtPause2.textContent = 'Début de pause';
+                btnPause.onclick = () => pointer('pause');
+            }
+
             if(currentPointages.length > 0) {
                 calculerStatistiquesJour(currentPointages);
                 currentPointages.forEach(p => {
@@ -589,7 +735,6 @@
             document.getElementById('date_debut').value = debut || todayStr; document.getElementById('date_fin').value = fin || todayStr;
             gererAffichageDates(); document.getElementById('modal-absence').classList.remove('hidden');
         };
-        
         window.fermerModalAbsence = () => document.getElementById('modal-absence').classList.add('hidden');
 
         window.sauvegarderAbsence = async () => {
@@ -607,17 +752,11 @@
         // --- CALENDRIER ---
         function initCalendar() {
             calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
-                initialView: 'dayGridMonth', 
-                locale: 'fr',
-                firstDay: 1, 
-                slotMinTime: '06:00:00', slotMaxTime: '22:00:00',
+                initialView: 'dayGridMonth', locale: 'fr', firstDay: 1, slotMinTime: '06:00:00', slotMaxTime: '22:00:00',
                 headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
-                navLinks: false, // DÉSACTIVE la vue "Jour" au clic sur le numéro
-                editable: false, dayMaxEvents: true, eventDisplay: 'block',
-                
+                navLinks: false, editable: false, dayMaxEvents: true, eventDisplay: 'block',
                 datesSet: function() { calendar.updateSize(); },
                 dateClick: function(info) { ouvrirModalAbsence(null, 'RTT', info.dateStr, info.dateStr, 'journee'); },
-
                 eventDidMount: function(info) { if (info.view.type === 'dayGridMonth' && info.event.extendedProps.isWork) { info.el.style.display = 'none'; } },
 
                 dayCellDidMount: function(info) {
@@ -637,33 +776,22 @@
                     
                     if(msJour > 0) {
                         const hDec = msJour / 3600000; const reqHours = userParams.base_horaire / 5;
+                        let color = '#10b981'; let textColor = '#047857'; 
+                        if (hDec > 10) { color = '#ef4444'; textColor = '#b91c1c'; } 
+                        else if (hDec < reqHours) { color = '#3b82f6'; textColor = '#1d4ed8'; } 
                         
-                        // Détermination des couleurs
-                        let color = '#10b981'; // Vert par défaut
-                        let textColor = '#047857'; // Vert foncé pour le texte
-                        if (hDec > 10) { color = '#ef4444'; textColor = '#b91c1c'; } // Rouge si dépassement
-                        else if (hDec < reqHours) { color = '#3b82f6'; textColor = '#1d4ed8'; } // Bleu si incomplet
-                        
-                        // Taille du cercle adaptée (min 34px pour que le texte rentre bien)
                         let diameter = Math.min(50, Math.max(34, Math.round(hDec * 5)));
-
                         const container = document.createElement('div'); container.className = 'fit-bubble-container';
                         
-                        // Le cercle Google Fit
                         const bubble = document.createElement('div'); bubble.className = 'fit-bubble';
                         bubble.style.width = `${diameter}px`; bubble.style.height = `${diameter}px`;
                         bubble.style.backgroundColor = color; bubble.style.opacity = '0.35';
                         container.appendChild(bubble);
                         
-                        // Le texte au centre (Heures et minutes)
                         const textL = document.createElement('span');
-                        let h = Math.floor(hDec);
-                        let m = Math.floor((msJour % 3600000) / 60000);
+                        let h = Math.floor(hDec); let m = Math.floor((msJour % 3600000) / 60000);
                         textL.textContent = m === 0 ? `${h}h` : `${h}h${m.toString().padStart(2, '0')}`;
-                        textL.style.position = 'absolute';
-                        textL.style.fontSize = '0.65rem';
-                        textL.style.fontWeight = '700';
-                        textL.style.color = textColor; // Couleur assortie
+                        textL.style.position = 'absolute'; textL.style.fontSize = '0.65rem'; textL.style.fontWeight = '700'; textL.style.color = textColor;
                         container.appendChild(textL);
                         
                         const dayFrame = info.el.querySelector('.fc-daygrid-day-frame');
@@ -715,34 +843,22 @@
 
         function chargerSoldes(absences) {
             let cpConsBeforeLimit = 0; let cpConsAfterLimit = 0; let rttCons = 0; let cetCons = 0; let joursNF = 0;
-
-            const currentYear = new Date().getFullYear();
-            const now = new Date();
+            const currentYear = new Date().getFullYear(); const now = new Date();
             const limiteDate = userParams.date_limite_reliquat ? new Date(userParams.date_limite_reliquat + 'T23:59:59') : null;
 
             absences.forEach(a => {
-                // FILTRE : On ne calcule les compteurs que pour l'année en cours
-                const startYear = new Date(a.date_debut).getFullYear();
-                if (startYear !== currentYear) return;
-
+                const startYear = new Date(a.date_debut).getFullYear(); if (startYear !== currentYear) return;
                 let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1;
                 
                 if(a.type_absence === 'CP') { 
-                    if (limiteDate && new Date(a.date_debut) > limiteDate) { cpConsAfterLimit += j; } 
-                    else { cpConsBeforeLimit += j; }
+                    if (limiteDate && new Date(a.date_debut) > limiteDate) { cpConsAfterLimit += j; } else { cpConsBeforeLimit += j; }
                     for(let d = new Date(a.date_debut); d <= new Date(a.date_fin); d.setDate(d.getDate() + 1)) { if([10, 11, 0, 1].includes(d.getMonth())) joursNF++; } 
                 }
-                if(a.type_absence === 'RTT') rttCons += j;
-                if(a.type_absence === 'CET') cetCons += j;
+                if(a.type_absence === 'RTT') rttCons += j; if(a.type_absence === 'CET') cetCons += j;
             });
             
-            // Calcul Reliquat Intelligent
-            let reliquatConfig = userParams.reliquat_cp || 0;
-            let reliquatRestant = 0;
-            let cpRestants = 0;
-
+            let reliquatConfig = userParams.reliquat_cp || 0; let reliquatRestant = 0; let cpRestants = 0;
             if (limiteDate) {
-                // Si la date limite est passée, le reliquat tombe à 0
                 reliquatRestant = (now > limiteDate) ? 0 : Math.max(0, reliquatConfig - cpConsBeforeLimit);
                 cpRestants = userParams.cp_initial - Math.max(0, cpConsBeforeLimit - reliquatConfig) - cpConsAfterLimit;
             } else {
@@ -751,9 +867,7 @@
             }
 
             document.getElementById('cpt-reliquat').textContent = reliquatRestant + ' j';
-            if (userParams.date_limite_reliquat) {
-                const dateLim = new Date(userParams.date_limite_reliquat);
-                document.getElementById('date-reliquat').textContent = 'Avant le ' + dateLim.toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit'});
+            if (userParams.date_limite_reliquat) { const dateLim = new Date(userParams.date_limite_reliquat); document.getElementById('date-reliquat').textContent = 'Avant le ' + dateLim.toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit'});
             } else { document.getElementById('date-reliquat').textContent = ''; }
             
             document.getElementById('cpt-cp').textContent = cpRestants + ' j';
@@ -764,18 +878,13 @@
         }
 
         window.ouvrirModalParametres = async () => {
-            document.getElementById('input_objectif_annuel').value = userParams.objectif_annuel || 1607;
-            document.getElementById('input_base_horaire').value = userParams.base_horaire || 39;
-            document.getElementById('input_limite_heures').value = userParams.limite_heures_jour || 10;
-            document.getElementById('input_notifs').checked = userParams.notifs_actives || false;
-            document.getElementById('input_cp').value = userParams.cp_initial || 25;
-            document.getElementById('input_reliquat_cp').value = userParams.reliquat_cp || 0;
+            document.getElementById('input_objectif_annuel').value = userParams.objectif_annuel || 1607; document.getElementById('input_base_horaire').value = userParams.base_horaire || 39;
+            document.getElementById('input_limite_heures').value = userParams.limite_heures_jour || 10; document.getElementById('input_notifs').checked = userParams.notifs_actives || false;
+            document.getElementById('input_cp').value = userParams.cp_initial || 25; document.getElementById('input_reliquat_cp').value = userParams.reliquat_cp || 0;
             document.getElementById('input_date_limite_reliquat').value = userParams.date_limite_reliquat || '';
-            document.getElementById('input_rtt').value = userParams.rtt_initial || 15;
-            document.getElementById('input_cet').value = userParams.cet_initial || 0;
+            document.getElementById('input_rtt').value = userParams.rtt_initial || 15; document.getElementById('input_cet').value = userParams.cet_initial || 0;
             document.getElementById('modal-parametres').classList.remove('hidden');
         };
-        
         window.fermerModalParametres = () => document.getElementById('modal-parametres').classList.add('hidden');
         
         window.sauvegarderParametres = async () => {

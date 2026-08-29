@@ -579,6 +579,7 @@
             // 4. Capture et export jsPDF
             setTimeout(async () => {
                 try {
+                    const { jsPDF } = window.jspdf;
                     const element = document.getElementById('pdf-export-container');
                     const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
                     const imgData = canvas.toDataURL('image/png');

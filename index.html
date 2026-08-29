@@ -11,12 +11,11 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
     
-    <!-- Bibliothèques (Excel, PDF, Graphiques, Drag&Drop) -->
+    <!-- Bibliothèques pour les Exports (Excel & PDF & Graphiques) -->
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
     <style>
         .fc { font-family: inherit; font-size: 0.85rem; }
@@ -24,6 +23,7 @@
         .fc-button-primary:hover { background-color: #0d9488 !important; border-color: #0d9488 !important; }
         .fc-button-active { background-color: #0f766e !important; }
         .fc-event { transition: transform 0.2s; border-radius: 6px; font-size: 0.75rem; border: none; cursor: pointer; }
+        
         .fc .fc-button { height: 32px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; padding: 0 10px; }
         .fc .fc-prev-button, .fc .fc-next-button { width: 32px; padding: 0; }
         .fc .fc-today-button { height: 32px; line-height: 32px; padding: 0 12px; }
@@ -52,18 +52,7 @@
         .btn-card:active { transform: scale(0.97); }
         .work-block { opacity: 0.85; }
 
-        /* Styles pour l'édition des compteurs */
-        @keyframes wiggle {
-            0%, 100% { transform: rotate(0deg); }
-            25% { transform: rotate(-1.5deg); }
-            75% { transform: rotate(1.5deg); }
-        }
-        .mode-edition .case-compteur { animation: wiggle 0.3s infinite; cursor: grab; }
-        .case-compteur { position: relative; user-select: none; transition: opacity 0.2s; }
-        .btn-hide-cpt { display: none; position: absolute; top: -6px; right: -6px; background: #ef4444; color: white; border-radius: 50%; width: 22px; height: 22px; text-align: center; line-height: 20px; font-weight: bold; font-size: 12px; cursor: pointer; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-        .mode-edition .btn-hide-cpt { display: block; }
-        .sortable-ghost { opacity: 0.4; }
-
+        /* Conteneur caché pour générer le PDF proprement */
         #pdf-export-container { width: 900px; padding: 40px; background: white; position: fixed; left: -9999px; top: 0; z-index: -10; color: #1f2937; }
     </style>
 </head>
@@ -121,34 +110,48 @@
             <!-- VUE POINTAGE -->
             <div id="view-pointage" class="flex-1 flex flex-col">
                 <h2 class="text-2xl font-medium text-gray-800 text-center mb-6">Suivi d'activité</h2>
-                <!-- [...] MÊME CODE POUR POINTAGE (Boutons Arrivée/Pause/Départ) -->
+                
                 <div class="grid grid-cols-3 gap-3 md:gap-4 mb-4">
-                    <div class="bg-teal-50 p-3 md:p-4 rounded-xl text-center"><div class="text-xl md:text-2xl font-bold text-teal-600" id="stat-heures">0h00</div><div class="text-[10px] md:text-xs text-gray-600 mt-1">Travaillé</div></div>
-                    <div class="bg-orange-50 p-3 md:p-4 rounded-xl text-center"><div class="text-xl md:text-2xl font-bold text-orange-600" id="stat-pauses">0</div><div class="text-[10px] md:text-xs text-gray-600 mt-1">Pauses</div></div>
-                    <div class="bg-blue-50 p-3 md:p-4 rounded-xl text-center"><div class="text-xl md:text-2xl font-bold text-blue-600 truncate" id="stat-statut">--</div><div class="text-[10px] md:text-xs text-gray-600 mt-1">Statut</div></div>
+                    <div class="bg-teal-50 p-3 md:p-4 rounded-xl text-center transition-colors duration-300">
+                        <div class="text-xl md:text-2xl font-bold text-teal-600 transition-colors duration-300" id="stat-heures">0h00</div>
+                        <div class="text-[10px] md:text-xs text-gray-600 mt-1">Travaillé</div>
+                    </div>
+                    <div class="bg-orange-50 p-3 md:p-4 rounded-xl text-center">
+                        <div class="text-xl md:text-2xl font-bold text-orange-600" id="stat-pauses">0</div>
+                        <div class="text-[10px] md:text-xs text-gray-600 mt-1">Pauses</div>
+                    </div>
+                    <div class="bg-blue-50 p-3 md:p-4 rounded-xl text-center">
+                        <div class="text-xl md:text-2xl font-bold text-blue-600 truncate" id="stat-statut">--</div>
+                        <div class="text-[10px] md:text-xs text-gray-600 mt-1">Statut</div>
+                    </div>
                 </div>
+
                 <div class="grid grid-cols-3 gap-3 md:gap-4 mb-6">
-                    <div onclick="pointer('arrivee')" id="btn-action-arrivee" class="btn-card bg-teal-500 text-white p-3 md:p-4 rounded-xl text-center shadow-md flex flex-col justify-center items-center"><span class="text-xs md:text-sm font-bold">Arrivée</span></div>
-                    <div onclick="pointer('pause')" id="btn-action-pause" class="btn-card bg-orange-500 text-white p-3 md:p-4 rounded-xl text-center shadow-md flex flex-col justify-center items-center"><span class="text-xs md:text-sm font-bold" id="txt-pause-1">Pause</span></div>
-                    <div onclick="pointer('depart')" id="btn-action-depart" class="btn-card bg-slate-600 text-white p-3 md:p-4 rounded-xl text-center shadow-md flex flex-col justify-center items-center"><span class="text-xs md:text-sm font-bold">Départ</span></div>
+                    <div onclick="pointer('arrivee')" id="btn-action-arrivee" class="btn-card bg-teal-500 text-white p-3 md:p-4 rounded-xl text-center shadow-md flex flex-col justify-center items-center">
+                        <span class="text-xs md:text-sm font-bold">Arrivée</span>
+                        <span class="text-[9px] opacity-80 hidden md:block mt-1">Prise de poste</span>
+                    </div>
+                    <div onclick="pointer('pause')" id="btn-action-pause" class="btn-card bg-orange-500 text-white p-3 md:p-4 rounded-xl text-center shadow-md flex flex-col justify-center items-center transition-colors">
+                        <span class="text-xs md:text-sm font-bold" id="txt-pause-1">Pause</span>
+                        <span class="text-[9px] opacity-80 hidden md:block mt-1" id="txt-pause-2">Début de pause</span>
+                    </div>
+                    <div onclick="pointer('depart')" id="btn-action-depart" class="btn-card bg-slate-600 text-white p-3 md:p-4 rounded-xl text-center shadow-md flex flex-col justify-center items-center">
+                        <span class="text-xs md:text-sm font-bold">Départ</span>
+                        <span class="text-[9px] opacity-80 hidden md:block mt-1">Fin de poste</span>
+                    </div>
                 </div>
+
                 <div class="flex-1 overflow-y-auto custom-scrollbar mb-4 px-2 space-y-2 border-t border-b border-gray-100 py-4" id="historique-jour"></div>
             </div>
 
             <!-- VUE PLANNING -->
             <div id="view-planning" class="hidden flex-1 flex flex-col h-full">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-4">
-                    <h3 class="text-lg font-semibold text-gray-800">Mes soldes & Planning <span id="hint-edit" class="text-xs font-normal text-gray-400 ml-2">(Appui long pour organiser)</span></h3>
-                    
-                    <div class="flex flex-wrap gap-2 items-center" id="planning-buttons">
-                        <!-- Boutons classiques -->
+                    <h3 class="text-lg font-semibold text-gray-800">Mes soldes & Planning</h3>
+                    <div class="flex flex-wrap gap-2" id="planning-buttons">
                         <button onclick="ouvrirModalAbsence()" class="bg-slate-800 text-white font-bold py-1.5 px-3 text-xs md:text-sm rounded-lg shadow-md hover:bg-slate-700 transition">+ Déclarer</button>
-                        <button onclick="ouvrirModalExport()" class="bg-indigo-600 text-white font-bold py-1.5 px-3 text-xs md:text-sm rounded-lg shadow-md hover:bg-indigo-700 transition">📊 Exporter</button>
+                        <button onclick="ouvrirModalExport()" class="bg-indigo-600 text-white font-bold py-1.5 px-3 text-xs md:text-sm rounded-lg shadow-md hover:bg-indigo-700 transition">⬆️ Exporter</button>
                         <button onclick="ouvrirModalParametres()" class="text-xs md:text-sm bg-gray-200 text-gray-700 font-bold hover:bg-gray-300 py-1.5 px-3 rounded-lg shadow-sm">⚙️ Paramètres</button>
-                        
-                        <!-- Boutons Mode Édition (Cachés par défaut) -->
-                        <button id="btn-add-cpt" onclick="ouvrirMenuAjoutCompteur()" class="hidden bg-green-500 text-white font-bold py-1.5 px-3 text-xs rounded-lg shadow hover:bg-green-600 transition">➕ Ajouter un compteur</button>
-                        <button id="btn-end-edit" onclick="desactiverModeEdition()" class="hidden bg-red-500 text-white font-bold py-1.5 px-3 text-xs rounded-lg shadow hover:bg-red-600 transition">✅ Terminer</button>
                     </div>
                 </div>
 
@@ -158,9 +161,13 @@
                     <div><span class="text-[10px] text-teal-700 font-bold uppercase block">H. Sup Année</span><span class="font-bold text-teal-800 text-base" id="hs-annee">--</span></div>
                 </div>
 
-                <!-- GRILLE DES COMPTEURS DYNAMIQUE -->
-                <div id="grille-compteurs" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-                    <!-- Les cases sont insérées via JS pour gérer l'ordre -->
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+                    <div class="bg-gray-50 p-2.5 rounded-xl border border-gray-200 flex flex-col justify-between"><div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Objectif <span id="lbl-objectif">1607</span>h</div><div class="text-xs font-bold text-gray-800 leading-tight" id="info-1607">Calcul...</div></div>
+                    <div class="bg-gray-50 p-2.5 rounded-xl border border-gray-200"><div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Reliquat N-1</div><div class="text-lg font-bold text-gray-800" id="cpt-reliquat">-- j</div><div class="text-[9px] text-red-500 font-bold mt-0.5" id="date-reliquat"></div></div>
+                    <div class="bg-teal-50 p-2.5 rounded-xl border border-teal-200"><div class="text-[10px] text-teal-600 font-bold uppercase mb-1">CP Restants</div><div class="text-lg font-bold text-teal-800" id="cpt-cp">-- j</div></div>
+                    <div class="bg-blue-50 p-2.5 rounded-xl border border-blue-200 relative"><div class="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full animate-pulse hidden" id="alerte-rtt">À poser !</div><div class="text-[10px] text-blue-600 font-bold uppercase mb-1">RTT Restants</div><div class="text-lg font-bold text-blue-800" id="cpt-rtt">-- j</div></div>
+                    <div class="bg-purple-50 p-2.5 rounded-xl border border-purple-200"><div class="text-[10px] text-purple-600 font-bold uppercase mb-1">CET</div><div class="text-lg font-bold text-purple-800" id="cpt-cet">-- j</div></div>
+                    <div class="bg-pink-50 p-2.5 rounded-xl border border-pink-200"><div class="text-[10px] text-pink-600 font-bold uppercase mb-1">Fractionnement</div><div class="text-lg font-bold text-pink-800" id="cpt-fractionnement">+0 j</div></div>
                 </div>
 
                 <div id="calendar" class="flex-1 min-h-[600px] md:min-h-[450px] shadow-lg rounded-xl border border-gray-200 p-2 bg-white"></div>
@@ -168,11 +175,14 @@
         </div>
     </div>
 
-    <!-- [MODALS RESTANT INCHANGÉS OU LÉGÈREMENT ADAPTÉS : Export, Edition pointage...] -->
-    <!-- MODAL : EXPORT -->
+    <!-- MODAL : EXPORT (Choix de la période et du format) -->
     <div id="modal-export" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-slide-in">
-            <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Exporter les données</h3><button onclick="fermerModalExport()" class="text-gray-400 hover:text-gray-700 text-xl font-bold">&times;</button></div>
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Exporter les données</h3>
+                <button onclick="fermerModalExport()" class="text-gray-400 hover:text-gray-700 text-xl font-bold">&times;</button>
+            </div>
+            
             <div class="flex gap-2 mb-4">
                 <button onclick="setExportDates('semaine')" class="flex-1 bg-indigo-50 text-indigo-700 text-xs font-bold py-2 rounded-lg hover:bg-indigo-100">Cette semaine</button>
                 <button onclick="setExportDates('mois')" class="flex-1 bg-indigo-50 text-indigo-700 text-xs font-bold py-2 rounded-lg hover:bg-indigo-100">Ce mois</button>
@@ -189,7 +199,24 @@
         </div>
     </div>
 
-    <!-- MODAL : GESTION ABSENCE (Mise à jour de la liste) -->
+    <!-- MODAL CONTEXTUEL : MODIFIER/SUPPRIMER POINTAGE -->
+    <div id="modal-pointage-edit" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-slide-in text-center">
+            <h3 class="text-lg font-bold mb-4 text-gray-800">Modifier l'horaire</h3>
+            <input type="hidden" id="edit_pointage_id">
+            <input type="hidden" id="edit_pointage_date">
+            
+            <input type="time" id="edit_pointage_time" class="w-full text-center text-2xl p-4 bg-gray-50 border border-gray-200 rounded-xl mb-6 font-mono focus:ring-2 focus:ring-teal-500 focus:outline-none">
+            
+            <div class="flex flex-col gap-2">
+                <button onclick="sauvegarderModificationPointage()" class="w-full bg-teal-500 text-white font-bold py-3 rounded-xl hover:bg-teal-600">Enregistrer</button>
+                <button onclick="confirmerSuppressionPointage()" class="w-full bg-red-100 text-red-600 font-bold py-3 rounded-xl hover:bg-red-200">Supprimer ce pointage</button>
+                <button onclick="fermerModalPointage()" class="w-full bg-gray-100 text-gray-600 font-bold py-3 rounded-xl hover:bg-gray-200 mt-2">Annuler</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL : GESTION ABSENCE -->
     <div id="modal-absence" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-slide-in">
             <h3 class="text-xl font-bold mb-4" id="titre-modal-absence">Nouvelle absence</h3>
@@ -199,9 +226,8 @@
                 <option value="RTT">RTT</option>
                 <option value="CP">Congé Payé</option>
                 <option value="CET">Compte Épargne Temps (CET)</option>
-                <option value="AEA">Autorisation Except. (AEA)</option>
-                <option value="Formation">Formation</option>
                 <option value="Maladie">Arrêt Maladie</option>
+                <option value="Formation">Formation</option>
             </select>
 
             <select id="moment_absence" class="w-full p-3 border border-gray-300 rounded-xl mb-4 focus:ring-2 focus:ring-teal-500" onchange="gererAffichageDates()">
@@ -223,7 +249,7 @@
         </div>
     </div>
 
-    <!-- MODAL : PARAMETRES (Ajout des nouveaux champs) -->
+    <!-- MODAL : PARAMETRES -->
     <div id="modal-parametres" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-slide-in overflow-hidden flex flex-col max-h-[90vh]">
             <div class="p-6 border-b border-gray-100 bg-white z-10"><h3 class="text-xl font-bold">Mes Paramètres & Soldes</h3></div>
@@ -231,24 +257,22 @@
             <div class="p-6 overflow-y-auto custom-scrollbar flex-1 bg-white">
                 <div class="p-4 bg-gray-50 rounded-xl mb-4">
                     <h4 class="font-bold text-gray-700 mb-3 text-sm">Temps de travail & Notifications</h4>
-                    <div class="mb-3"><label class="text-xs font-bold text-gray-500 block">Objectif annuel (Heures)</label><input type="number" id="input_objectif_annuel" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500"></div>
-                    <div class="mb-3"><label class="text-xs font-bold text-gray-500 block">Base hebdomadaire</label><input type="number" id="input_base_horaire" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500"></div>
-                    <div class="mb-3"><label class="text-xs font-bold text-gray-500 block">Alerte dépassement quotidien (Max 10h)</label><input type="number" step="0.5" max="10" id="input_limite_heures" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500"></div>
+                    <div class="mb-3"><label class="text-xs font-bold text-gray-500 block">Objectif annuel (Heures)</label><div class="flex items-center gap-2"><input type="number" id="input_objectif_annuel" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="1607"></div></div>
+                    <div class="mb-3"><label class="text-xs font-bold text-gray-500 block">Base hebdomadaire</label><div class="flex items-center gap-2"><input type="number" id="input_base_horaire" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="39"></div></div>
+                    <div class="mb-3"><label class="text-xs font-bold text-gray-500 block">Alerte dépassement quotidien (Max 10h)</label><div class="flex items-center gap-2"><input type="number" step="0.5" max="10" id="input_limite_heures" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="10"></div></div>
+                    <div class="flex items-center gap-2 mt-4"><input type="checkbox" id="input_notifs" class="w-5 h-5 text-teal-600 rounded cursor-pointer"><label class="text-sm font-bold text-gray-700 cursor-pointer" for="input_notifs">Activer les notifications</label></div>
                 </div>
 
                 <div class="p-4 bg-gray-50 rounded-xl mb-2">
-                    <h4 class="font-bold text-gray-700 mb-3 text-sm">Soldes & Nouveaux compteurs</h4>
+                    <h4 class="font-bold text-gray-700 mb-3 text-sm">Soldes initiaux acquis & Reliquats</h4>
                     <div class="grid grid-cols-2 gap-3 mb-3">
-                        <div><label class="text-xs font-bold text-gray-500 block">Congés Payés N</label><input type="number" step="0.5" id="input_cp" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500"></div>
-                        <div><label class="text-xs font-bold text-gray-500 block">Reliquat C.P N-1</label><input type="number" step="0.5" id="input_reliquat_cp" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500"></div>
+                        <div><label class="text-xs font-bold text-gray-500 block">Congés Payés N</label><input type="number" step="0.5" id="input_cp" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="25"></div>
+                        <div><label class="text-xs font-bold text-gray-500 block">Reliquat C.P N-1</label><input type="number" step="0.5" id="input_reliquat_cp" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="0"></div>
                     </div>
-                    <div class="grid grid-cols-2 gap-3 mb-3">
-                        <div><label class="text-xs font-bold text-gray-500 block">RTT</label><input type="number" step="0.5" id="input_rtt" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500"></div>
-                        <div><label class="text-xs font-bold text-gray-500 block">Solde CET</label><input type="number" step="0.5" id="input_cet" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500"></div>
-                    </div>
+                    <div class="mb-3"><label class="text-xs font-bold text-gray-500 block">Date limite du reliquat (N-1)</label><input type="date" id="input_date_limite_reliquat" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500"></div>
                     <div class="grid grid-cols-2 gap-3">
-                        <div><label class="text-xs font-bold text-gray-500 block">Heures à récup.</label><input type="number" step="0.5" id="input_recup" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="Ex: 5.5"></div>
-                        <div><label class="text-xs font-bold text-gray-500 block">Don de jours (+/-)</label><input type="number" step="0.5" id="input_don" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="Ex: -2 ou 1"></div>
+                        <div><label class="text-xs font-bold text-gray-500 block">RTT</label><input type="number" step="0.5" id="input_rtt" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="15"></div>
+                        <div><label class="text-xs font-bold text-gray-500 block">Solde CET</label><input type="number" step="0.5" id="input_cet" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500" value="0"></div>
                     </div>
                 </div>
             </div>
@@ -260,260 +284,763 @@
         </div>
     </div>
 
-    <!-- MODAL : AJOUT DE COMPTEUR (Menu contextuel) -->
-    <div id="modal-ajout-cpt" class="hidden fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-slide-in">
-            <h3 class="text-lg font-bold mb-4">Réactiver un compteur</h3>
-            <div id="liste-cpt-masques" class="flex flex-col gap-2 mb-4"></div>
-            <button onclick="fermerMenuAjoutCompteur()" class="w-full bg-gray-200 font-bold py-2 rounded-xl hover:bg-gray-300">Fermer</button>
+    <!-- TOAST -->
+    <div id="toast" class="hidden fixed bottom-4 right-4 text-white px-6 py-3 rounded-xl shadow-lg z-50">...</div>
+
+    <!-- CONTENEUR CACHÉ POUR LA GÉNÉRATION DU PDF -->
+    <div id="pdf-export-container">
+        <div class="border-b-2 border-indigo-600 pb-4 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">Rapport d'Activité RH</h1>
+            <h2 class="text-lg text-gray-500 mt-1" id="pdf-periode-texte">Période : ...</h2>
+        </div>
+        
+        <!-- Stats globales -->
+        <div class="grid grid-cols-4 gap-4 mb-8">
+            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Heures Travaillées</div>
+                <div class="text-2xl font-bold text-indigo-700" id="pdf-stat-total">--</div>
+                <div class="text-xs text-gray-500 mt-1" id="pdf-stat-moy-jour">-- / jour</div>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Écart (Sup / Manquant)</div>
+                <div class="text-2xl font-bold text-teal-600" id="pdf-stat-ecart">--</div>
+                <div class="text-xs text-gray-500 mt-1" id="pdf-stat-moy-ecart">-- / jour</div>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Pauses (Total)</div>
+                <div class="text-2xl font-bold text-orange-500" id="pdf-stat-pause-nb">--</div>
+                <div class="text-xs text-gray-500 mt-1" id="pdf-stat-pause-moy">-- en moyenne</div>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Absences Posées</div>
+                <div class="text-sm font-medium text-gray-700 leading-tight" id="pdf-stat-absences">
+                    --
+                </div>
+            </div>
+        </div>
+
+        <!-- Ligne d'objectif (Rappel) -->
+        <div class="bg-indigo-50 text-indigo-800 p-3 rounded-lg text-sm mb-6 flex justify-between">
+            <span><strong>Base de calcul :</strong> <span id="pdf-rappel-base">--</span>h / jour attendues.</span>
+            <span><strong>Pause de référence :</strong> 45 min le midi.</span>
+        </div>
+
+        <!-- Graphiques -->
+        <div class="space-y-8">
+            <div>
+                <h3 class="text-md font-bold text-gray-700 mb-2">Évolution du temps de travail et des pauses</h3>
+                <div class="h-64 w-full bg-white relative"><canvas id="pdf-chart-evolution"></canvas></div>
+            </div>
+            <div>
+                <h3 class="text-md font-bold text-gray-700 mb-2">Répartition (Heures Normales, Sup, Manquantes)</h3>
+                <div class="h-64 w-full bg-white relative"><canvas id="pdf-chart-repartition"></canvas></div>
+            </div>
         </div>
     </div>
 
-    <!-- TOAST -->
-    <div id="toast" class="hidden fixed bottom-4 right-4 text-white px-6 py-3 rounded-xl shadow-lg z-50">...</div>
-    <div id="pdf-export-container"></div> <!-- Raccourci pour gagner de la place, la div PDF est gérée en JS -->
-
     <script>
         // --- 1. CONFIGURATION ---
+
         const supabaseUrl = 'https://rxqtsguwoqeojsnaagxb.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4cXRzZ3V3b3Flb2pzbmFhZ3hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTA4MjcsImV4cCI6MjEwMjcyNjgyN30.FTPTGSe6tqDTieqQdD-GWUqueKlEPUpw4QGiMa4U8AA';
 
         const supaClient = window.supabase.createClient(supabaseUrl, supabaseKey);
         
-        let currentUser = null; let calendar = null; let currentPointages = []; let pointagesAnnee = []; let currentAbsences = [];
+        let currentUser = null; 
+        let calendar = null;
+        let currentPointages = []; 
+        let pointagesAnnee = []; 
+        let currentAbsences = [];
+        let pdfCharts = []; // Pour détruire les anciens graphiques PDF
         
-        let userParams = { cp_initial: 25, rtt_initial: 15, base_horaire: 39, limite_heures_jour: 10, objectif_annuel: 1607, reliquat_cp: 0, cet_initial: 0, recup_initial: 0, don_jours: 0 };
+        let userParams = { cp_initial: 25, rtt_initial: 15, base_horaire: 39, limite_heures_jour: 10, notifs_actives: false, objectif_annuel: 1607, reliquat_cp: 0, date_limite_reliquat: '', cet_initial: 0, annee_maj: null };
 
-        // --- GESTION DES COMPTEURS & DRAG/DROP ---
-        const defCompteurs = {
-            '1607': { bg: 'bg-gray-50', border: 'border-gray-200', titleColor: 'text-gray-500', valColor: 'text-gray-800', title: 'Objectif', innerHtml: '<div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Objectif <span id="lbl-objectif">1607</span>h</div><div class="text-xs font-bold text-gray-800 leading-tight" id="info-1607">Calcul...</div>' },
-            'reliquat': { bg: 'bg-gray-50', border: 'border-gray-200', titleColor: 'text-gray-500', valColor: 'text-gray-800', title: 'Reliquat N-1', innerHtml: '<div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Reliquat N-1</div><div class="text-lg font-bold text-gray-800" id="cpt-reliquat">-- j</div>' },
-            'cp': { bg: 'bg-teal-50', border: 'border-teal-200', titleColor: 'text-teal-600', valColor: 'text-teal-800', title: 'CP Restants', innerHtml: '<div class="text-[10px] text-teal-600 font-bold uppercase mb-1">CP Restants</div><div class="text-lg font-bold text-teal-800" id="cpt-cp">-- j</div>' },
-            'rtt': { bg: 'bg-blue-50', border: 'border-blue-200', titleColor: 'text-blue-600', valColor: 'text-blue-800', title: 'RTT Restants', innerHtml: '<div class="text-[10px] text-blue-600 font-bold uppercase mb-1">RTT Restants</div><div class="text-lg font-bold text-blue-800" id="cpt-rtt">-- j</div>' },
-            'cet': { bg: 'bg-purple-50', border: 'border-purple-200', titleColor: 'text-purple-600', valColor: 'text-purple-800', title: 'CET', innerHtml: '<div class="text-[10px] text-purple-600 font-bold uppercase mb-1">CET</div><div class="text-lg font-bold text-purple-800" id="cpt-cet">-- j</div>' },
-            'fractionnement': { bg: 'bg-pink-50', border: 'border-pink-200', titleColor: 'text-pink-600', valColor: 'text-pink-800', title: 'Fractionnement', innerHtml: '<div class="text-[10px] text-pink-600 font-bold uppercase mb-1">Fractionnement</div><div class="text-lg font-bold text-pink-800" id="cpt-fractionnement">+0 j</div>' },
-            'recup': { bg: 'bg-amber-50', border: 'border-amber-200', titleColor: 'text-amber-600', valColor: 'text-amber-800', title: 'H. à récupérer', innerHtml: '<div class="text-[10px] text-amber-600 font-bold uppercase mb-1">H. à récupérer</div><div class="text-lg font-bold text-amber-800" id="cpt-recup">-- h</div>' },
-            'aea': { bg: 'bg-cyan-50', border: 'border-cyan-200', titleColor: 'text-cyan-600', valColor: 'text-cyan-800', title: 'AEA (Pris)', innerHtml: '<div class="text-[10px] text-cyan-600 font-bold uppercase mb-1">AEA (Pris)</div><div class="text-lg font-bold text-cyan-800" id="cpt-aea">0 j</div>' },
-            'formation': { bg: 'bg-lime-50', border: 'border-lime-200', titleColor: 'text-lime-700', valColor: 'text-lime-900', title: 'Formation', innerHtml: '<div class="text-[10px] text-lime-700 font-bold uppercase mb-1">Formation</div><div class="text-lg font-bold text-lime-900" id="cpt-formation">0 j</div>' },
-            'don': { bg: 'bg-rose-50', border: 'border-rose-200', titleColor: 'text-rose-600', valColor: 'text-rose-800', title: 'Don de jours', innerHtml: '<div class="text-[10px] text-rose-600 font-bold uppercase mb-1">Don de jours</div><div class="text-lg font-bold text-rose-800" id="cpt-don">0 j</div>' }
+        // --- GESTION DES EXPORTS ---
+        window.ouvrirModalExport = () => {
+            setExportDates('mois');
+            document.getElementById('modal-export').classList.remove('hidden');
+        };
+        window.fermerModalExport = () => document.getElementById('modal-export').classList.add('hidden');
+        
+        window.setExportDates = (periode) => {
+            const now = new Date(); let d1 = new Date(), d2 = new Date();
+            if (periode === 'semaine') {
+                const day = now.getDay(), diff = now.getDate() - day + (day === 0 ? -6 : 1);
+                d1 = new Date(now.setDate(diff)); d2 = new Date(d1); d2.setDate(d2.getDate() + 6);
+            } else if (periode === 'mois') {
+                d1 = new Date(now.getFullYear(), now.getMonth(), 1); d2 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            } else if (periode === 'annee') {
+                d1 = new Date(now.getFullYear(), 0, 1); d2 = new Date(now.getFullYear(), 11, 31);
+            }
+            document.getElementById('export_debut').value = d1.toISOString().split('T')[0];
+            document.getElementById('export_fin').value = d2.toISOString().split('T')[0];
         };
 
-        let defaultOrder = ['1607', 'reliquat', 'cp', 'rtt', 'cet', 'fractionnement', 'recup', 'aea', 'formation', 'don'];
-        let gridOrder = JSON.parse(localStorage.getItem('sirh_order')) || defaultOrder;
-        let hiddenCounters = JSON.parse(localStorage.getItem('sirh_hidden')) || ['recup', 'aea', 'formation', 'don']; // Cachés par défaut
-        let sortableInstance = null;
-
-        function initGrilleCompteurs() {
-            const grille = document.getElementById('grille-compteurs'); grille.innerHTML = '';
+        // --- GÉNÉRATION EXCEL ---
+        window.genererExportExcel = () => {
+            const startStr = document.getElementById('export_debut').value; const endStr = document.getElementById('export_fin').value;
+            if (!startStr || !endStr) return showToast("Dates invalides", true);
             
-            // On s'assure que tous les compteurs existent dans l'ordre (en cas de mise à jour du code)
-            defaultOrder.forEach(id => { if(!gridOrder.includes(id)) gridOrder.push(id); });
+            const startD = new Date(startStr); startD.setHours(0,0,0,0); const endD = new Date(endStr); endD.setHours(23,59,59,999);
+            
+            const pointagesPariode = pointagesAnnee.filter(p => { const d = new Date(p.timestamp); return d >= startD && d <= endD; });
+            const parJour = {};
+            pointagesPariode.forEach(p => { const dateStr = p.timestamp.split('T')[0]; if(!parJour[dateStr]) parJour[dateStr] = []; parJour[dateStr].push(p); });
 
-            gridOrder.forEach(id => {
-                if(!defCompteurs[id]) return;
-                const def = defCompteurs[id];
-                const div = document.createElement('div');
-                div.className = `case-compteur ${def.bg} p-2.5 rounded-xl border ${def.border} flex flex-col justify-between`;
-                div.id = `box-${id}`;
-                div.dataset.id = id;
-                if (hiddenCounters.includes(id)) div.style.display = 'none';
+            const dataToExport = [["Date", "Début", "Pauses", "Fin", "Heures Travaillées", "Écart"]];
+            let totalTravailléMs = 0; let totalPauseMs = 0; let nbPausesReelles = 0; const hoursPerDay = (userParams.base_horaire / 5);
 
-                div.innerHTML = `<div class="btn-hide-cpt" onclick="masquerCompteur('${id}')">X</div>` + def.innerHtml;
-
-                // Logique Appui Long
-                let pressTimer;
-                const startPress = () => { pressTimer = setTimeout(activerModeEdition, 700); };
-                const endPress = () => { clearTimeout(pressTimer); };
-                div.addEventListener('touchstart', startPress, {passive: true}); div.addEventListener('touchend', endPress);
-                div.addEventListener('mousedown', startPress); div.addEventListener('mouseup', endPress); div.addEventListener('mouseleave', endPress);
+            for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().split('T')[0]; const dayOfWeek = d.getDay(); const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                let strDebut = "--"; let strPauses = "--"; let strFin = "--"; let valTravail = "0h00"; let valEcart = "0h00";
+                let tMs = 0; let expected = isWeekend ? 0 : hoursPerDay * 3600000;
                 
-                grille.appendChild(div);
-            });
+                let absence = currentAbsences.find(a => {
+                    const aStart = new Date(a.date_debut); aStart.setHours(0,0,0,0); const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0); return d >= aStart && d <= aEnd;
+                });
+                if (absence) expected = (absence.moment === 'journee') ? 0 : (expected / 2);
 
-            // Initialiser Sortable (Désactivé tant qu'on n'est pas en mode édition)
-            sortableInstance = new Sortable(grille, {
-                animation: 150, disabled: true,
-                onEnd: () => {
-                    gridOrder = Array.from(grille.children).map(c => c.dataset.id);
-                    localStorage.setItem('sirh_order', JSON.stringify(gridOrder));
+                if (parJour[dateStr]) {
+                    const events = parJour[dateStr].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+                    const formatH = (ts) => new Date(ts).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+                    let lastArr = null; let lstPauses = []; let pauseStart = null;
+                    
+                    events.forEach(pt => {
+                        if(pt.type_action === 'arrivee') { 
+                            lastArr = new Date(pt.timestamp); if(strDebut === "--") strDebut = formatH(pt.timestamp);
+                            if(pauseStart) { const pEnd = new Date(pt.timestamp); const diffPause = pEnd - pauseStart; totalPauseMs += diffPause; nbPausesReelles++; lstPauses.push(`${formatH(pauseStart)} - ${formatH(pEnd)}`); pauseStart = null; }
+                        }
+                        if(pt.type_action === 'pause') { pauseStart = new Date(pt.timestamp); if(lastArr) { tMs += (pauseStart - lastArr); lastArr = null; } }
+                        if(pt.type_action === 'depart') { const pEnd = new Date(pt.timestamp); strFin = formatH(pt.timestamp); if(lastArr) { tMs += (pEnd - lastArr); lastArr = null; } }
+                    });
+                    
+                    if (lstPauses.length > 0) strPauses = lstPauses.join(" | ");
+                    totalTravailléMs += tMs;
+                    let hT = Math.floor(tMs / 3600000); let mT = Math.floor((tMs % 3600000) / 60000); valTravail = `${hT}h${mT.toString().padStart(2, '0')}`;
+                    
+                    let deltaMs = tMs - expected; let sign = deltaMs >= 0 ? '+' : '-'; let aDelta = Math.abs(deltaMs);
+                    let hD = Math.floor(aDelta / 3600000); let mD = Math.round((aDelta % 3600000) / 60000); valEcart = `${sign}${hD}h${mD.toString().padStart(2, '0')}`;
+                } else if (absence) { strDebut = absence.type_absence; strFin = absence.moment; }
+                dataToExport.push([ d.toLocaleDateString('fr-FR'), strDebut, strPauses, strFin, valTravail, valEcart ]);
+            }
+
+            dataToExport.push([]); dataToExport.push(["RÉCAPITULATIF SUR LA PÉRIODE", "", "", "", "", ""]);
+            let moyPause = "0 min";
+            if (nbPausesReelles > 0) {
+                let mAvg = Math.round((totalPauseMs / nbPausesReelles) / 60000);
+                if(mAvg > 60) moyPause = `${Math.floor(mAvg/60)}h${(mAvg%60).toString().padStart(2,'0')}`; else moyPause = `${mAvg} min`;
+            }
+            dataToExport.push(["Durée moyenne de pause", moyPause, "", "", "", ""]);
+            
+            dataToExport.push([]); dataToExport.push(["SOLDES RESTANTS A CE JOUR", "", "", "", "", ""]);
+            dataToExport.push(["CP Restants", document.getElementById('cpt-cp').textContent]);
+            dataToExport.push(["Reliquat N-1", document.getElementById('cpt-reliquat').textContent]);
+            dataToExport.push(["RTT Restants", document.getElementById('cpt-rtt').textContent]);
+            dataToExport.push(["CET", document.getElementById('cpt-cet').textContent]);
+
+            const wb = XLSX.utils.book_new(); const ws = XLSX.utils.aoa_to_sheet(dataToExport);
+            ws['!cols'] = [{wch:12}, {wch:8}, {wch:30}, {wch:8}, {wch:15}, {wch:10}];
+            XLSX.utils.book_append_sheet(wb, ws, "Export"); XLSX.writeFile(wb, `Export_SIRH_${startStr}_au_${endStr}.xlsx`);
+            fermerModalExport();
+        };
+
+        // --- GÉNÉRATION PDF ANALYTIQUE (CHART.JS) ---
+        window.genererExportPDF = async () => {
+            const startStr = document.getElementById('export_debut').value; const endStr = document.getElementById('export_fin').value;
+            if (!startStr || !endStr) return showToast("Dates invalides", true);
+            fermerModalExport(); showToast("Analyse et génération du PDF...");
+
+            const startD = new Date(startStr); startD.setHours(0,0,0,0); const endD = new Date(endStr); endD.setHours(23,59,59,999);
+            const diffDays = Math.round((endD - startD) / 86400000);
+            const groupMode = diffDays > 60 ? 'week' : 'day'; // Si > 2 mois, on groupe par semaine
+
+            const hoursPerDay = (userParams.base_horaire / 5);
+            document.getElementById('pdf-rappel-base').textContent = hoursPerDay;
+            document.getElementById('pdf-periode-texte').textContent = `Du ${startD.toLocaleDateString('fr-FR')} au ${endD.toLocaleDateString('fr-FR')} (${groupMode === 'week' ? 'Par semaine' : 'Par jour'})`;
+
+            // 1. Agréger les données brutes
+            let totalTravailléMs = 0; let totalEcartMs = 0; let totalPauseMs = 0; let nbPausesReelles = 0; let joursTravaillesReels = 0;
+            
+            // Stats Absences
+            let absStats = { 'CP':0, 'RTT':0, 'CET':0, 'Maladie':0, 'Formation':0 };
+            currentAbsences.forEach(a => {
+                const d = new Date(a.date_debut);
+                if (d >= startD && d <= endD) {
+                    let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1;
+                    if(absStats[a.type_absence] !== undefined) absStats[a.type_absence] += j;
                 }
             });
+
+            // Données pour les graphiques
+            const chartLabels = [];
+            const dataWorked = []; const dataPause = [];
+            const dataNormale = []; const dataSup = []; const dataManque = [];
+            const dataExpected = []; const dataPauseExp = [];
+
+            // Groupement (Par jour ou semaine)
+            const mapGrouped = {};
+            const getWeekStr = (d) => { const first = new Date(d.getFullYear(), 0, 1); const days = Math.floor((d - first) / 86400000); return `S${Math.ceil((d.getDay() + 1 + days) / 7)} ${d.getFullYear()}`; };
+
+            for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().split('T')[0];
+                const key = groupMode === 'week' ? getWeekStr(d) : dateStr;
+                if(!mapGrouped[key]) mapGrouped[key] = { label: (groupMode==='week' ? key : d.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'})), workMs: 0, expectedMs: 0, pauseMs: 0 };
+                
+                const dayOfWeek = d.getDay(); const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                let expected = isWeekend ? 0 : hoursPerDay * 3600000;
+                
+                let absence = currentAbsences.find(a => { const aS = new Date(a.date_debut); aS.setHours(0,0,0,0); const aE = new Date(a.date_fin); aE.setHours(0,0,0,0); return d >= aS && d <= aE; });
+                if (absence) expected = (absence.moment === 'journee') ? 0 : (expected / 2);
+                mapGrouped[key].expectedMs += expected;
+
+                const pts = pointagesAnnee.filter(p => p.timestamp.startsWith(dateStr)).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+                if(pts.length > 0) {
+                    let lastArr = null; let pauseStart = null; let tMs = 0; let pMs = 0;
+                    pts.forEach(pt => {
+                        if(pt.type_action === 'arrivee') { lastArr = new Date(pt.timestamp); if(pauseStart) { const diff = new Date(pt.timestamp) - pauseStart; pMs += diff; totalPauseMs += diff; nbPausesReelles++; pauseStart = null; } }
+                        if(pt.type_action === 'pause') { pauseStart = new Date(pt.timestamp); if(lastArr) { tMs += (pauseStart - lastArr); lastArr = null; } }
+                        if(pt.type_action === 'depart') { const pEnd = new Date(pt.timestamp); if(lastArr) { tMs += (pEnd - lastArr); lastArr = null; } }
+                    });
+                    mapGrouped[key].workMs += tMs; mapGrouped[key].pauseMs += pMs;
+                    totalTravailléMs += tMs; totalEcartMs += (tMs - expected); joursTravaillesReels++;
+                } else {
+                    totalEcartMs += (0 - expected); // Jour non travaillé, on retire l'attendu s'il y en avait
+                }
+            }
+
+            // Remplissage des tableaux Chart.js
+            for (let key in mapGrouped) {
+                const g = mapGrouped[key];
+                const hw = g.workMs / 3600000; const he = g.expectedMs / 3600000; const hp = g.pauseMs / 3600000;
+                
+                chartLabels.push(g.label);
+                dataWorked.push(hw); dataPause.push(hp);
+                dataExpected.push(he); dataPauseExp.push(0.75); // Ligne d'obj pause (45 min)
+
+                // Logique Histogramme Empilé (Normale vs Sup vs Manquant)
+                if (hw > he) {
+                    dataNormale.push(he); dataSup.push(hw - he); dataManque.push(0);
+                } else {
+                    dataNormale.push(hw); dataSup.push(0); dataManque.push(he - hw);
+                }
+            }
+
+            // 2. MAJ du DOM (Cartes Stats)
+            const fmtH = (ms) => { let sign = ms < 0 ? '-' : ''; let a = Math.abs(ms); let h = Math.floor(a/3600000); let m = Math.round((a%3600000)/60000); return `${sign}${h}h${m.toString().padStart(2,'0')}`; };
+            
+            document.getElementById('pdf-stat-total').textContent = fmtH(totalTravailléMs);
+            document.getElementById('pdf-stat-moy-jour').textContent = joursTravaillesReels > 0 ? fmtH(totalTravailléMs / joursTravaillesReels) + ' / j (en moy.)' : '--';
+            
+            let ecartEl = document.getElementById('pdf-stat-ecart'); ecartEl.textContent = fmtH(totalEcartMs);
+            ecartEl.className = totalEcartMs >= 0 ? "text-2xl font-bold text-teal-600" : "text-2xl font-bold text-red-500";
+            document.getElementById('pdf-stat-moy-ecart').textContent = joursTravaillesReels > 0 ? fmtH(totalEcartMs / joursTravaillesReels) + ' / j (en moy.)' : '--';
+
+            document.getElementById('pdf-stat-pause-nb').textContent = nbPausesReelles;
+            let mAvg = nbPausesReelles > 0 ? Math.round((totalPauseMs / nbPausesReelles) / 60000) : 0;
+            document.getElementById('pdf-stat-pause-moy').textContent = mAvg > 60 ? `${Math.floor(mAvg/60)}h${(mAvg%60).toString().padStart(2,'0')} en moy.` : `${mAvg} min en moy.`;
+
+            let txtAbs = [];
+            for (let t in absStats) { if(absStats[t] > 0) txtAbs.push(`${t}: ${absStats[t]}j`); }
+            document.getElementById('pdf-stat-absences').innerHTML = txtAbs.length > 0 ? txtAbs.join('<br>') : '<span class="text-gray-400">Aucune absence</span>';
+
+            // 3. Dessiner les graphiques Chart.js (Sans animations pour capture instantanée)
+            pdfCharts.forEach(c => c.destroy()); pdfCharts = [];
+            
+            Chart.defaults.font.family = 'sans-serif';
+            const ctxEvol = document.getElementById('pdf-chart-evolution').getContext('2d');
+            pdfCharts.push(new Chart(ctxEvol, {
+                type: 'bar',
+                data: {
+                    labels: chartLabels,
+                    datasets: [
+                        { label: 'Heures travaillées', data: dataWorked, backgroundColor: '#4f46e5', order: 2, borderRadius: 4 },
+                        { label: 'Objectif Travail', data: dataExpected, type: 'line', borderColor: '#9ca3af', borderDash: [5, 5], borderWidth: 2, pointRadius: 0, fill: false, order: 1 },
+                        { label: 'Durée Pauses', data: dataPause, type: 'line', borderColor: '#f97316', backgroundColor: '#f97316', borderWidth: 2, order: 0 },
+                        { label: 'Réf. Pause (45m)', data: dataPauseExp, type: 'line', borderColor: '#fdba74', borderDash: [2, 2], borderWidth: 1, pointRadius: 0, fill: false, order: 3 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { beginAtZero: true, title: { display: true, text: 'Heures' } } } }
+            }));
+
+            const ctxRepart = document.getElementById('pdf-chart-repartition').getContext('2d');
+            pdfCharts.push(new Chart(ctxRepart, {
+                type: 'bar',
+                data: {
+                    labels: chartLabels,
+                    datasets: [
+                        { label: 'Heures Normales (Travaillé)', data: dataNormale, backgroundColor: '#14b8a6', stack: 'Stack 0' },
+                        { label: 'Heures Sup.', data: dataSup, backgroundColor: '#84cc16', stack: 'Stack 0' }, // Vert pomme pour le bonus
+                        { label: 'Heures Manquantes', data: dataManque, backgroundColor: '#fca5a5', stack: 'Stack 0' } // Rouge clair posé par dessus pour atteindre l'objectif
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Heures' } } } }
+            }));
+
+            // 4. Capture et export jsPDF
+            setTimeout(async () => {
+                try {
+                    const { jsPDF } = window.jspdf;
+                    const element = document.getElementById('pdf-export-container');
+                    const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdf = new jsPDF('p', 'mm', 'a4');
+                    const pdfW = pdf.internal.pageSize.getWidth();
+                    const pdfH = (canvas.height * pdfW) / canvas.width;
+                    
+                    pdf.addImage(imgData, 'PNG', 0, 10, pdfW, pdfH);
+                    pdf.save(`Rapport_SIRH_${startStr}_au_${endStr}.pdf`);
+                    showToast("PDF téléchargé avec succès !");
+                } catch(e) {
+                    showToast("Erreur lors de la création du PDF : " + e.message, true);
+                }
+            }, 300); // Léger délai pour s'assurer que Chart.js a bien fini de rendre l'image dans le DOM caché
+        };
+
+
+        // --- MODAL POINTAGE (MODIF/SUPPRESSION SANS PROMPT) ---
+        window.ouvrirModalPointage = (id, dateStr) => {
+            const d = new Date(dateStr);
+            const hhmm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+            document.getElementById('edit_pointage_id').value = id;
+            document.getElementById('edit_pointage_date').value = dateStr;
+            document.getElementById('edit_pointage_time').value = hhmm;
+            document.getElementById('modal-pointage-edit').classList.remove('hidden');
+        };
+        
+        window.fermerModalPointage = () => document.getElementById('modal-pointage-edit').classList.add('hidden');
+
+        window.sauvegarderModificationPointage = async () => {
+            const id = document.getElementById('edit_pointage_id').value;
+            const oldDateStr = document.getElementById('edit_pointage_date').value;
+            const newTime = document.getElementById('edit_pointage_time').value;
+            
+            if (!newTime) return showToast("Heure invalide", true);
+            const [h, m] = newTime.split(':');
+            const nd = new Date(oldDateStr); nd.setHours(h, m, 0);
+            
+            try {
+                await supaClient.from('pointages').update({ timestamp: nd.toISOString() }).eq('id', id); 
+                await chargerDonneesGlobales(); rafraichirVueJour(); if(calendar) calendar.refetchEvents();
+                fermerModalPointage(); showToast("Horaire modifié");
+            } catch(e) { showToast(e.message, true); }
+        };
+
+        window.confirmerSuppressionPointage = async () => {
+            const id = document.getElementById('edit_pointage_id').value;
+            try {
+                await supaClient.from('pointages').delete().eq('id', id); 
+                await chargerDonneesGlobales(); rafraichirVueJour(); if(calendar) calendar.refetchEvents();
+                fermerModalPointage(); showToast("Pointage supprimé");
+            } catch(e) { showToast(e.message, true); }
+        };
+
+
+        // --- LOGIQUE INTERNE DE DEMARRAGE ---
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('time-display').textContent = now.toLocaleTimeString('fr-FR');
+            document.getElementById('date-display').textContent = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+            if(currentPointages.length > 0) calculerStatistiquesJour(currentPointages);
+        }, 1000);
+
+        function showToast(msg, isError = false) {
+            const t = document.getElementById('toast');
+            t.textContent = msg; 
+            t.className = `fixed bottom-4 right-4 text-white px-6 py-3 rounded-xl shadow-lg z-50 animate-slide-in ${isError ? 'bg-red-500' : 'bg-teal-600'}`;
+            t.classList.remove('hidden');
+            setTimeout(() => t.classList.add('hidden'), 3500);
         }
 
-        window.activerModeEdition = () => {
-            document.getElementById('grille-compteurs').classList.add('mode-edition');
-            sortableInstance.option('disabled', false);
-            document.getElementById('btn-add-cpt').classList.remove('hidden');
-            document.getElementById('btn-end-edit').classList.remove('hidden');
-            document.getElementById('hint-edit').classList.add('hidden');
+        window.login = async function() {
+            try {
+                const { data, error } = await supaClient.auth.signInWithPassword({ email: document.getElementById('email').value, password: document.getElementById('password').value });
+                if (error) throw error; initialiserApp(data.user);
+            } catch (e) { showToast(e.message, true); }
         };
-
-        window.desactiverModeEdition = () => {
-            document.getElementById('grille-compteurs').classList.remove('mode-edition');
-            sortableInstance.option('disabled', true);
-            document.getElementById('btn-add-cpt').classList.add('hidden');
-            document.getElementById('btn-end-edit').classList.add('hidden');
-            document.getElementById('hint-edit').classList.remove('hidden');
-        };
-
-        window.masquerCompteur = (id) => {
-            if(!hiddenCounters.includes(id)) hiddenCounters.push(id);
-            localStorage.setItem('sirh_hidden', JSON.stringify(hiddenCounters));
-            document.getElementById(`box-${id}`).style.display = 'none';
-        };
-
-        window.ouvrirMenuAjoutCompteur = () => {
-            const liste = document.getElementById('liste-cpt-masques'); liste.innerHTML = '';
-            if(hiddenCounters.length === 0) { liste.innerHTML = '<p class="text-sm text-gray-500 text-center">Tous les compteurs sont visibles.</p>'; }
-            hiddenCounters.forEach(id => {
-                const btn = document.createElement('button');
-                btn.className = `w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 font-bold ${defCompteurs[id].valColor}`;
-                btn.textContent = `+ Ajouter : ${defCompteurs[id].title}`;
-                btn.onclick = () => { 
-                    hiddenCounters = hiddenCounters.filter(c => c !== id);
-                    localStorage.setItem('sirh_hidden', JSON.stringify(hiddenCounters));
-                    document.getElementById(`box-${id}`).style.display = 'flex';
-                    fermerMenuAjoutCompteur();
-                };
-                liste.appendChild(btn);
-            });
-            document.getElementById('modal-ajout-cpt').classList.remove('hidden');
-        };
-        window.fermerMenuAjoutCompteur = () => document.getElementById('modal-ajout-cpt').classList.add('hidden');
-
-
-        // --- LOGIQUE PRINCIPALE & DEMARRAGE ---
+        
+        window.logout = async () => { await supaClient.auth.signOut(); location.reload(); };
+        
         window.onload = async () => { 
-            initGrilleCompteurs();
             const { data: { user } } = await supaClient.auth.getUser(); 
             if (user) initialiserApp(user); 
         };
 
-        function initialiserApp(user) {
-            currentUser = user;
-            document.getElementById('auth-section').classList.add('hidden');
-            document.getElementById('app-section').classList.remove('hidden', 'flex'); document.getElementById('app-section').classList.add('flex');
-            chargerDonneesGlobales().then(() => { rafraichirVueJour(); initCalendar(); });
-        }
-
         async function chargerDonneesGlobales() {
             const { data: pData } = await supaClient.from('parametres').select('*').eq('user_id', currentUser.id).maybeSingle();
             if (pData) userParams = { ...userParams, ...pData };
-            const curY = new Date().getFullYear();
-            const { data: ptData } = await supaClient.from('pointages').select('*').eq('user_id', currentUser.id).gte('timestamp', `${curY}-01-01`).order('timestamp');
+
+            const currentYear = new Date().getFullYear();
+            if (!userParams.annee_maj) {
+                userParams.annee_maj = currentYear;
+                await supaClient.from('parametres').upsert({ user_id: currentUser.id, annee_maj: currentYear });
+            } else if (userParams.annee_maj < currentYear) {
+                const { data: absPrecedentes } = await supaClient.from('absences').select('*').eq('user_id', currentUser.id).eq('type_absence', 'CP').gte('date_debut', `${userParams.annee_maj}-01-01`).lte('date_debut', `${userParams.annee_maj}-12-31`);
+                let cpConsBeforeLimit = 0; let cpConsAfterLimit = 0;
+                const limiteDateStr = userParams.date_limite_reliquat; const limiteDate = limiteDateStr ? new Date(limiteDateStr + 'T23:59:59') : null;
+                (absPrecedentes || []).forEach(a => {
+                    let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1;
+                    if (limiteDate && new Date(a.date_debut) > limiteDate) cpConsAfterLimit += j; else cpConsBeforeLimit += j;
+                });
+                let ancienReliquat = userParams.reliquat_cp || 0;
+                let cpRestantsN = userParams.cp_initial - Math.max(0, cpConsBeforeLimit - ancienReliquat) - cpConsAfterLimit;
+                
+                userParams.reliquat_cp = Math.max(0, cpRestantsN); userParams.annee_maj = currentYear;
+                if (userParams.date_limite_reliquat) { let d = new Date(userParams.date_limite_reliquat); d.setFullYear(currentYear); userParams.date_limite_reliquat = `${currentYear}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+                
+                await supaClient.from('parametres').upsert({ user_id: currentUser.id, annee_maj: currentYear, reliquat_cp: userParams.reliquat_cp, date_limite_reliquat: userParams.date_limite_reliquat });
+                showToast("Nouvelle année : Reliquat calculé automatiquement !");
+            }
+
+            const debutAnnee = new Date(currentYear, 0, 1).toISOString();
+            const { data: ptData } = await supaClient.from('pointages').select('*').eq('user_id', currentUser.id).gte('timestamp', debutAnnee).order('timestamp', { ascending: true });
             if (ptData) pointagesAnnee = ptData;
         }
 
-        // --- GESTION SOLDES ET CALENDRIER ---
-        function chargerSoldes(absences) {
-            let cpCons = 0, rttCons = 0, cetCons = 0, aeaCons = 0, formationCons = 0, joursNF = 0;
-            const currentYear = new Date().getFullYear(); 
-
-            absences.forEach(a => {
-                if (new Date(a.date_debut).getFullYear() !== currentYear) return;
-                let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1;
-                if(a.type_absence === 'CP') { cpCons += j; for(let d = new Date(a.date_debut); d <= new Date(a.date_fin); d.setDate(d.getDate() + 1)) { if([10, 11, 0, 1].includes(d.getMonth())) joursNF++; } }
-                if(a.type_absence === 'RTT') rttCons += j; 
-                if(a.type_absence === 'CET') cetCons += j;
-                if(a.type_absence === 'AEA') aeaCons += j;
-                if(a.type_absence === 'Formation') formationCons += j;
-            });
+        function initialiserApp(user) {
+            currentUser = user;
+            document.getElementById('user-initials').textContent = user.email.substring(0, 2).toUpperCase();
+            document.getElementById('user-name').textContent = user.email.split('@')[0];
+            document.getElementById('user-email').textContent = user.email;
             
-            let reliquat = userParams.reliquat_cp || 0;
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('app-section').classList.remove('hidden', 'flex');
+            document.getElementById('app-section').classList.add('flex');
             
-            // Mise à jour des textes dans la grille
-            if(document.getElementById('cpt-reliquat')) document.getElementById('cpt-reliquat').textContent = reliquat + ' j';
-            if(document.getElementById('cpt-cp')) document.getElementById('cpt-cp').textContent = (userParams.cp_initial - cpCons) + ' j';
-            if(document.getElementById('cpt-rtt')) document.getElementById('cpt-rtt').textContent = (userParams.rtt_initial - rttCons) + ' j';
-            if(document.getElementById('cpt-cet')) document.getElementById('cpt-cet').textContent = (userParams.cet_initial - cetCons) + ' j';
-            if(document.getElementById('cpt-fractionnement')) document.getElementById('cpt-fractionnement').textContent = '+' + (joursNF >= 8 ? 2 : (joursNF >= 6 ? 1 : 0)) + ' j';
-            
-            // Nouveaux compteurs
-            if(document.getElementById('cpt-aea')) document.getElementById('cpt-aea').textContent = aeaCons + ' j';
-            if(document.getElementById('cpt-formation')) document.getElementById('cpt-formation').textContent = formationCons + ' j';
-            if(document.getElementById('cpt-recup')) document.getElementById('cpt-recup').textContent = (userParams.recup_initial || 0) + ' h';
-            
-            let txtDon = (userParams.don_jours || 0);
-            if(document.getElementById('cpt-don')) document.getElementById('cpt-don').textContent = (txtDon > 0 ? '+' : '') + txtDon + ' j';
+            chargerDonneesGlobales().then(() => { rafraichirVueJour(); initCalendar(); });
         }
 
-        // --- CALENDAR INIT (Version allégée pour lisibilité, conserve la logique d'avant) ---
+        function rafraichirVueJour() {
+            const debutJour = new Date(); debutJour.setHours(0,0,0,0);
+            currentPointages = pointagesAnnee.filter(p => new Date(p.timestamp) >= debutJour);
+            const conteneur = document.getElementById('historique-jour'); conteneur.innerHTML = '';
+            
+            const btnPause = document.getElementById('btn-action-pause');
+            const txtPause1 = document.getElementById('txt-pause-1');
+            const txtPause2 = document.getElementById('txt-pause-2');
+            
+            let lastAction = currentPointages.length > 0 ? currentPointages[currentPointages.length - 1].type_action : null;
+            
+            if (lastAction === 'pause') {
+                btnPause.className = 'btn-card bg-emerald-500 text-white p-3 md:p-4 rounded-xl text-center shadow-md flex flex-col justify-center items-center transition-colors';
+                txtPause1.textContent = 'Reprise'; txtPause2.textContent = 'Reprendre le travail';
+                btnPause.onclick = () => pointer('arrivee');
+            } else {
+                btnPause.className = 'btn-card bg-orange-500 text-white p-3 md:p-4 rounded-xl text-center shadow-md flex flex-col justify-center items-center transition-colors';
+                txtPause1.textContent = 'Pause'; txtPause2.textContent = 'Début de pause';
+                btnPause.onclick = () => pointer('pause');
+            }
+
+            if(currentPointages.length > 0) {
+                calculerStatistiquesJour(currentPointages);
+                currentPointages.forEach(p => {
+                    const heure = new Date(p.timestamp).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
+                    let l = p.type_action; let ic = ''; let c = "text-gray-800"; let b = "bg-gray-50";
+                    if(l === 'arrivee') { l="Prise de poste / Reprise"; c="text-teal-600"; ic='🟢'; b="bg-teal-50"; }
+                    if(l === 'pause') { l="Début de pause"; c="text-orange-500"; ic='⏸️'; b="bg-orange-50"; }
+                    if(l === 'depart') { l="Fin de poste"; c="text-slate-600"; ic='🔴'; b="bg-slate-50"; }
+                    
+                    // ON UTILISE DESORMAIS LE MODAL POUR MODIFIER
+                    conteneur.innerHTML += `<div class="flex justify-between items-center py-2.5 px-3 border-b border-gray-100 ${b} rounded-lg mb-2 text-xs md:text-sm">
+                        <div class="font-medium ${c}"><span>${ic}</span> ${l}</div>
+                        <div class="flex gap-3"><span class="font-mono mt-0.5">${heure}</span>
+                        <button onclick="ouvrirModalPointage('${p.id}', '${p.timestamp}')" class="text-blue-500 hover:text-blue-700 bg-blue-50 px-2 py-0.5 rounded shadow-sm">✏️ Éditer</button>
+                        </div></div>`;
+                });
+            } else {
+                conteneur.innerHTML = '<div class="text-center text-gray-400 py-8 text-xs">Aucun pointage aujourd\'hui.</div>';
+                document.getElementById('stat-heures').textContent = '0h00'; document.getElementById('stat-pauses').textContent = '0'; document.getElementById('stat-statut').textContent = '--';
+            }
+            calculerHeuresSupEt1607();
+        }
+
+        window.pointer = async (type) => {
+            try { await supaClient.from('pointages').insert([{ user_id: currentUser.id, type_action: type }]); await chargerDonneesGlobales(); rafraichirVueJour(); if(calendar) calendar.refetchEvents(); } catch(e) { showToast(e.message, true); }
+        };
+
+        function calculerStatistiquesJour(pts) {
+            let totalTravail = 0; let lastArrivee = null; let pauses = 0;
+            pts.forEach(pt => {
+                if(pt.type_action === 'arrivee') { lastArrivee = new Date(pt.timestamp); }
+                if(pt.type_action === 'pause') { pauses++; if (lastArrivee) { totalTravail += (new Date(pt.timestamp) - lastArrivee); lastArrivee = null; } }
+                if(pt.type_action === 'depart') { if (lastArrivee) { totalTravail += (new Date(pt.timestamp) - lastArrivee); lastArrivee = null; } }
+            });
+            if (lastArrivee) { totalTravail += (new Date() - lastArrivee); }
+
+            const spanHeures = document.getElementById('stat-heures');
+            if (totalTravail > 0) {
+                let h = Math.floor(totalTravail / 3600000); let m = Math.floor((totalTravail % 3600000) / 60000);
+                spanHeures.textContent = `${h}h${m.toString().padStart(2, '0')}`;
+                const heuresDec = totalTravail / 3600000;
+                if (userParams.notifs_actives && heuresDec >= userParams.limite_heures_jour) {
+                    spanHeures.classList.remove('text-teal-600'); spanHeures.classList.add('text-red-600');
+                    const today = new Date().toLocaleDateString();
+                    if (localStorage.getItem('lastNotifDate') !== today) {
+                        showToast(`⚠️ Alerte : Seuil des ${userParams.limite_heures_jour}h atteint !`, true);
+                        if ("Notification" in window && Notification.permission === "granted") { new Notification("Alerte Temps de Travail ⏱️", { body: `Limite journalière de ${userParams.limite_heures_jour}h atteinte.` }); }
+                        localStorage.setItem('lastNotifDate', today);
+                    }
+                } else { spanHeures.classList.remove('text-red-600'); spanHeures.classList.add('text-teal-600'); }
+            } else { spanHeures.textContent = '0h00'; }
+            
+            document.getElementById('stat-pauses').textContent = pauses;
+            document.getElementById('stat-statut').textContent = (lastArrivee) ? 'En poste' : (totalTravail > 0 ? 'Terminé' : '--');
+        }
+
+        function calculerHeuresSupEt1607() {
+            const objAnnuel = userParams.objectif_annuel || 1607;
+            document.getElementById('lbl-objectif').textContent = objAnnuel;
+            const now = new Date();
+            const getMonday = (d) => { let day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6:1); return new Date(new Date(d).setDate(diff)); };
+            const startWeek = getMonday(now); startWeek.setHours(0,0,0,0);
+            const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const startYear = new Date(now.getFullYear(), 0, 1);
+
+            const getMapTempsReelParJour = () => {
+                const map = {}; const parJour = {};
+                pointagesAnnee.forEach(p => { const d = p.timestamp.split('T')[0]; if(!parJour[d]) parJour[d] = []; parJour[d].push(p); });
+                for (let jour in parJour) {
+                    let totalMs = 0; let lastArr = null;
+                    parJour[jour].forEach(pt => {
+                        if(pt.type_action === 'arrivee') lastArr = new Date(pt.timestamp);
+                        else if((pt.type_action === 'pause' || pt.type_action === 'depart') && lastArr) { totalMs += (new Date(pt.timestamp) - lastArr); lastArr = null; }
+                    });
+                    if (lastArr && jour === now.toISOString().split('T')[0]) totalMs += (now - lastArr);
+                    map[jour] = totalMs / 3600000;
+                }
+                return map;
+            };
+
+            const mapReelJour = getMapTempsReelParJour();
+            const getTempsReelTotal = (startDate) => { let total = 0; for(let jour in mapReelJour) { if(new Date(jour) >= startDate) total += mapReelJour[jour]; } return total; };
+
+            const getTempsAttendu = (startDate) => {
+                let expected = 0; const hoursPerDay = userParams.base_horaire / 5;
+                let d = new Date(startDate); d.setHours(0,0,0,0); let end = new Date(now); end.setHours(0,0,0,0);
+                while(d <= end) {
+                    const dayOfWeek = d.getDay();
+                    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                        let absence = currentAbsences.find(a => {
+                            const aStart = new Date(a.date_debut); aStart.setHours(0,0,0,0); const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0);
+                            return d >= aStart && d <= aEnd;
+                        });
+                        if (!absence) expected += hoursPerDay; else if (absence.moment === 'matin' || absence.moment === 'aprem') expected += (hoursPerDay / 2);
+                    }
+                    d.setDate(d.getDate() + 1);
+                }
+                return expected;
+            };
+
+            const formatterDelta = (reel, attendu) => {
+                let diff = reel - attendu; let sign = diff >= 0 ? '+' : '-'; diff = Math.abs(diff);
+                let h = Math.floor(diff); let m = Math.round((diff - h) * 60); return `${sign}${h}h${m.toString().padStart(2, '0')}`;
+            };
+
+            document.getElementById('hs-semaine').textContent = formatterDelta(getTempsReelTotal(startWeek), getTempsAttendu(startWeek));
+            document.getElementById('hs-mois').textContent = formatterDelta(getTempsReelTotal(startMonth), getTempsAttendu(startMonth));
+            document.getElementById('hs-annee').textContent = formatterDelta(getTempsReelTotal(startYear), getTempsAttendu(startYear));
+
+            let cumulAnnee = 0; let dateAtteinte = null; let d = new Date(startYear);
+            while(d <= now) {
+                const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                cumulAnnee += (mapReelJour[dateStr] || 0);
+                if (cumulAnnee >= objAnnuel) { dateAtteinte = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); break; }
+                d.setDate(d.getDate() + 1);
+            }
+
+            const info1607 = document.getElementById('info-1607');
+            if (dateAtteinte) { info1607.textContent = `Atteint le ${dateAtteinte} 🎉`; } 
+            else { info1607.textContent = `Reste ~${(objAnnuel - cumulAnnee).toFixed(0)}h`; }
+        }
+
+        window.gererAffichageDates = () => {
+            const moment = document.getElementById('moment_absence').value; const dateFin = document.getElementById('date_fin');
+            if (moment !== 'journee') { dateFin.value = document.getElementById('date_debut').value; dateFin.disabled = true; dateFin.classList.add('opacity-50'); }
+            else { dateFin.disabled = false; dateFin.classList.remove('opacity-50'); }
+        };
+        
+        window.synchroniserDates = () => { if(document.getElementById('moment_absence').value !== 'journee') { document.getElementById('date_fin').value = document.getElementById('date_debut').value; } };
+
+        window.ouvrirModalAbsence = (id = null, type = 'RTT', debut = '', fin = '', moment = 'journee') => {
+            document.getElementById('absence_id').value = id || '';
+            document.getElementById('titre-modal-absence').textContent = id ? "Modifier l'absence" : "Nouvelle absence";
+            document.getElementById('btn-supprimer-absence').classList.toggle('hidden', !id);
+            document.getElementById('type_absence').value = type; document.getElementById('moment_absence').value = moment;
+            const todayStr = (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`; })();
+            document.getElementById('date_debut').value = debut || todayStr; document.getElementById('date_fin').value = fin || todayStr;
+            gererAffichageDates(); document.getElementById('modal-absence').classList.remove('hidden');
+        };
+        window.fermerModalAbsence = () => document.getElementById('modal-absence').classList.add('hidden');
+
+        window.sauvegarderAbsence = async () => {
+            const id = document.getElementById('absence_id').value;
+            const payload = { user_id: currentUser.id, type_absence: document.getElementById('type_absence').value, moment: document.getElementById('moment_absence').value, date_debut: document.getElementById('date_debut').value, date_fin: document.getElementById('date_fin').value };
+            try {
+                if (!payload.date_debut || !payload.date_fin) throw new Error("Dates obligatoires");
+                if (id) { await supaClient.from('absences').update(payload).eq('id', id); } else { await supaClient.from('absences').insert([payload]); }
+                fermerModalAbsence(); calendar.refetchEvents(); showToast('Absence enregistrée !');
+            } catch (e) { showToast('Erreur : ' + e.message, true); }
+        };
+
+        window.supprimerAbsence = async () => { if(confirm("Supprimer cette absence ?")) { await supaClient.from('absences').delete().eq('id', document.getElementById('absence_id').value); fermerModalAbsence(); calendar.refetchEvents(); showToast("Absence supprimée"); } };
+
+        // --- CALENDRIER ---
         function initCalendar() {
             calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
-                initialView: 'dayGridMonth', locale: 'fr', firstDay: 1,
+                initialView: 'dayGridMonth', locale: 'fr', firstDay: 1, slotMinTime: '06:00:00', slotMaxTime: '22:00:00',
                 headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
+                navLinks: false, editable: false, dayMaxEvents: true, eventDisplay: 'block',
+                datesSet: function() { calendar.updateSize(); },
+                dateClick: function(info) { ouvrirModalAbsence(null, 'RTT', info.dateStr, info.dateStr, 'journee'); },
+                eventDidMount: function(info) { if (info.view.type === 'dayGridMonth' && info.event.extendedProps.isWork) { info.el.style.display = 'none'; } },
+
+                dayCellDidMount: function(info) {
+                    if (!calendar || calendar.view.type !== 'dayGridMonth') return;
+                    const dateStr = `${info.date.getFullYear()}-${String(info.date.getMonth() + 1).padStart(2, '0')}-${String(info.date.getDate()).padStart(2, '0')}`;
+                    let msJour = 0; let lastArr = null;
+                    
+                    pointagesAnnee.filter(p => {
+                        const dObj = new Date(p.timestamp); return `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, '0')}-${String(dObj.getDate()).padStart(2, '0')}` === dateStr;
+                    }).forEach(pt => {
+                        if(pt.type_action === 'arrivee') lastArr = new Date(pt.timestamp);
+                        else if((pt.type_action === 'pause' || pt.type_action === 'depart') && lastArr) { msJour += (new Date(pt.timestamp) - lastArr); lastArr = null; }
+                    });
+                    
+                    const todayObj = new Date(); const todayStr = `${todayObj.getFullYear()}-${String(todayObj.getMonth()+1).padStart(2,'0')}-${String(todayObj.getDate()).padStart(2,'0')}`;
+                    if(dateStr === todayStr && lastArr) msJour += (new Date() - lastArr);
+                    
+                    if(msJour > 0) {
+                        const hDec = msJour / 3600000; const reqHours = userParams.base_horaire / 5;
+                        let color = '#10b981'; let textColor = '#047857'; 
+                        if (hDec > 10) { color = '#ef4444'; textColor = '#b91c1c'; } 
+                        else if (hDec < reqHours) { color = '#3b82f6'; textColor = '#1d4ed8'; } 
+                        
+                        let diameter = Math.min(50, Math.max(34, Math.round(hDec * 5)));
+                        const container = document.createElement('div'); container.className = 'fit-bubble-container';
+                        
+                        const bubble = document.createElement('div'); bubble.className = 'fit-bubble';
+                        bubble.style.width = `${diameter}px`; bubble.style.height = `${diameter}px`;
+                        bubble.style.backgroundColor = color; bubble.style.opacity = '0.35';
+                        container.appendChild(bubble);
+                        
+                        const textL = document.createElement('span');
+                        let h = Math.floor(hDec); let m = Math.floor((msJour % 3600000) / 60000);
+                        textL.textContent = m === 0 ? `${h}h` : `${h}h${m.toString().padStart(2, '0')}`;
+                        textL.style.position = 'absolute'; textL.style.fontSize = '0.65rem'; textL.style.fontWeight = '700'; textL.style.color = textColor;
+                        container.appendChild(textL);
+                        
+                        const dayFrame = info.el.querySelector('.fc-daygrid-day-frame');
+                        if (dayFrame) { const oldBubble = dayFrame.querySelector('.fit-bubble-container'); if (oldBubble) oldBubble.remove(); dayFrame.appendChild(container); }
+                    }
+                },
+
                 events: async function(info, success, fail) {
                     const { data, error } = await supaClient.from('absences').select('*').eq('user_id', currentUser.id);
                     if (error) return fail(error);
-                    currentAbsences = data; chargerSoldes(data); // MAJ Automatique
+                    
+                    currentAbsences = data; chargerSoldes(data); calculerHeuresSupEt1607();
                     
                     let eventsList = data.map(a => {
-                        let c = '#3b82f6'; // RTT Bleu
-                        if(a.type_absence === 'CP') c = '#14b8a6'; 
-                        if(a.type_absence === 'Maladie') c = '#ef4444'; 
-                        if(a.type_absence === 'CET') c = '#8b5cf6';
-                        if(a.type_absence === 'AEA') c = '#06b6d4'; // Cyan
-                        if(a.type_absence === 'Formation') c = '#84cc16'; // Vert lime
-                        
+                        let c = '#3b82f6'; if(a.type_absence === 'CP') c = '#14b8a6'; if(a.type_absence === 'Maladie') c = '#ef4444'; if(a.type_absence === 'CET') c = '#8b5cf6';
+                        let titre = a.type_absence; if(a.moment === 'matin') titre += " (Matin)"; if(a.moment === 'aprem') titre += " (Aprem)";
                         const endDateObj = new Date(new Date(a.date_fin).getTime() + 86400000);
-                        return { id: a.id, extendedProps: { type: a.type_absence, moment: a.moment }, title: a.type_absence, start: a.date_debut, end: endDateObj.toISOString().split('T')[0], backgroundColor: c, borderColor: c, allDay: true };
+                        return { id: a.id, extendedProps: { type: a.type_absence, moment: a.moment }, title: titre, start: a.date_debut, end: `${endDateObj.getFullYear()}-${String(endDateObj.getMonth()+1).padStart(2,'0')}-${String(endDateObj.getDate()).padStart(2,'0')}`, backgroundColor: c, borderColor: c, allDay: true };
                     });
+
+                    const parJour = {};
+                    pointagesAnnee.forEach(p => { const pDateObj = new Date(p.timestamp); const d = `${pDateObj.getFullYear()}-${String(pDateObj.getMonth()+1).padStart(2,'0')}-${String(pDateObj.getDate()).padStart(2,'0')}`; if(!parJour[d]) parJour[d] = []; parJour[d].push(p); });
+
+                    for (let jour in parJour) {
+                        let lastArr = null; let blockStart = null;
+                        parJour[jour].forEach(pt => {
+                            const timestamp = new Date(pt.timestamp);
+                            if(pt.type_action === 'arrivee') { lastArr = timestamp; blockStart = timestamp; }
+                            else if((pt.type_action === 'pause' || pt.type_action === 'depart') && lastArr) {
+                                eventsList.push({ title: 'Travail', start: blockStart, end: timestamp, backgroundColor: '#14b8a6', borderColor: '#0d9488', className: 'work-block', extendedProps: { isWork: true } });
+                                lastArr = null; blockStart = null;
+                            }
+                        });
+                        if(lastArr) { eventsList.push({ title: 'Travail en cours', start: blockStart || lastArr, end: new Date(), backgroundColor: '#14b8a6', borderColor: '#0d9488', className: 'work-block', extendedProps: { isWork: true } }); }
+                    }
                     success(eventsList);
+                },
+                
+                eventClick: function(info) {
+                    if(info.event.extendedProps.isWork) return; 
+                    info.jsEvent.stopPropagation();
+                    const p = info.event.extendedProps;
+                    const endObj = info.event.end ? new Date(info.event.end.getTime() - 86400000) : info.event.start; const startObj = info.event.start;
+                    ouvrirModalAbsence(info.event.id, p.type, `${startObj.getFullYear()}-${String(startObj.getMonth()+1).padStart(2,'0')}-${String(startObj.getDate()).padStart(2,'0')}`, `${endObj.getFullYear()}-${String(endObj.getMonth()+1).padStart(2,'0')}-${String(endObj.getDate()).padStart(2,'0')}`, p.moment || 'journee');
                 }
             });
             calendar.render();
         }
 
-        // --- MODAL PARAMETRES ---
-        window.ouvrirModalParametres = () => {
-            document.getElementById('input_objectif_annuel').value = userParams.objectif_annuel || 1607;
-            document.getElementById('input_base_horaire').value = userParams.base_horaire || 39;
-            document.getElementById('input_limite_heures').value = userParams.limite_heures_jour || 10;
-            document.getElementById('input_cp').value = userParams.cp_initial || 25;
-            document.getElementById('input_reliquat_cp').value = userParams.reliquat_cp || 0;
-            document.getElementById('input_rtt').value = userParams.rtt_initial || 15;
-            document.getElementById('input_cet').value = userParams.cet_initial || 0;
-            document.getElementById('input_recup').value = userParams.recup_initial || 0;
-            document.getElementById('input_don').value = userParams.don_jours || 0;
+        function chargerSoldes(absences) {
+            let cpConsBeforeLimit = 0; let cpConsAfterLimit = 0; let rttCons = 0; let cetCons = 0; let joursNF = 0;
+            const currentYear = new Date().getFullYear(); const now = new Date();
+            const limiteDate = userParams.date_limite_reliquat ? new Date(userParams.date_limite_reliquat + 'T23:59:59') : null;
+
+            absences.forEach(a => {
+                const startYear = new Date(a.date_debut).getFullYear(); if (startYear !== currentYear) return;
+                let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1;
+                
+                if(a.type_absence === 'CP') { 
+                    if (limiteDate && new Date(a.date_debut) > limiteDate) { cpConsAfterLimit += j; } else { cpConsBeforeLimit += j; }
+                    for(let d = new Date(a.date_debut); d <= new Date(a.date_fin); d.setDate(d.getDate() + 1)) { if([10, 11, 0, 1].includes(d.getMonth())) joursNF++; } 
+                }
+                if(a.type_absence === 'RTT') rttCons += j; if(a.type_absence === 'CET') cetCons += j;
+            });
+            
+            let reliquatConfig = userParams.reliquat_cp || 0; let reliquatRestant = 0; let cpRestants = 0;
+            if (limiteDate) {
+                reliquatRestant = (now > limiteDate) ? 0 : Math.max(0, reliquatConfig - cpConsBeforeLimit);
+                cpRestants = userParams.cp_initial - Math.max(0, cpConsBeforeLimit - reliquatConfig) - cpConsAfterLimit;
+            } else {
+                reliquatRestant = Math.max(0, reliquatConfig - (cpConsBeforeLimit + cpConsAfterLimit));
+                cpRestants = userParams.cp_initial - Math.max(0, (cpConsBeforeLimit + cpConsAfterLimit) - reliquatConfig);
+            }
+
+            document.getElementById('cpt-reliquat').textContent = reliquatRestant + ' j';
+            if (userParams.date_limite_reliquat) { const dateLim = new Date(userParams.date_limite_reliquat); document.getElementById('date-reliquat').textContent = 'Avant le ' + dateLim.toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit'});
+            } else { document.getElementById('date-reliquat').textContent = ''; }
+            
+            document.getElementById('cpt-cp').textContent = cpRestants + ' j';
+            document.getElementById('cpt-rtt').textContent = (userParams.rtt_initial - rttCons) + ' j';
+            document.getElementById('cpt-cet').textContent = (userParams.cet_initial - cetCons) + ' j';
+            document.getElementById('alerte-rtt').classList.toggle('hidden', (userParams.rtt_initial - rttCons) > 0);
+            document.getElementById('cpt-fractionnement').textContent = '+' + (joursNF >= 8 ? 2 : (joursNF >= 6 ? 1 : 0)) + ' j';
+        }
+
+        window.ouvrirModalParametres = async () => {
+            document.getElementById('input_objectif_annuel').value = userParams.objectif_annuel || 1607; document.getElementById('input_base_horaire').value = userParams.base_horaire || 39;
+            document.getElementById('input_limite_heures').value = userParams.limite_heures_jour || 10; document.getElementById('input_notifs').checked = userParams.notifs_actives || false;
+            document.getElementById('input_cp').value = userParams.cp_initial || 25; document.getElementById('input_reliquat_cp').value = userParams.reliquat_cp || 0;
+            document.getElementById('input_date_limite_reliquat').value = userParams.date_limite_reliquat || '';
+            document.getElementById('input_rtt').value = userParams.rtt_initial || 15; document.getElementById('input_cet').value = userParams.cet_initial || 0;
             document.getElementById('modal-parametres').classList.remove('hidden');
         };
-
+        window.fermerModalParametres = () => document.getElementById('modal-parametres').classList.add('hidden');
+        
         window.sauvegarderParametres = async () => {
+            const notifsOn = document.getElementById('input_notifs').checked;
+            if (notifsOn && "Notification" in window && Notification.permission !== "granted") { await Notification.requestPermission(); }
             try {
                 const p = { 
-                    user_id: currentUser.id, 
-                    objectif_annuel: parseFloat(document.getElementById('input_objectif_annuel').value),
-                    base_horaire: parseFloat(document.getElementById('input_base_horaire').value), 
-                    cp_initial: parseFloat(document.getElementById('input_cp').value), 
-                    reliquat_cp: parseFloat(document.getElementById('input_reliquat_cp').value), 
-                    rtt_initial: parseFloat(document.getElementById('input_rtt').value), 
-                    cet_initial: parseFloat(document.getElementById('input_cet').value), 
-                    limite_heures_jour: parseFloat(document.getElementById('input_limite_heures').value),
-                    recup_initial: parseFloat(document.getElementById('input_recup').value || 0),
-                    don_jours: parseFloat(document.getElementById('input_don').value || 0)
+                    user_id: currentUser.id, objectif_annuel: parseFloat(document.getElementById('input_objectif_annuel').value),
+                    base_horaire: parseFloat(document.getElementById('input_base_horaire').value), cp_initial: parseFloat(document.getElementById('input_cp').value), 
+                    reliquat_cp: parseFloat(document.getElementById('input_reliquat_cp').value), date_limite_reliquat: document.getElementById('input_date_limite_reliquat').value,
+                    rtt_initial: parseFloat(document.getElementById('input_rtt').value), cet_initial: parseFloat(document.getElementById('input_cet').value), 
+                    limite_heures_jour: parseFloat(document.getElementById('input_limite_heures').value), notifs_actives: notifsOn 
                 };
-                // Optionnel : si ta table Supabase n'a pas les colonnes 'recup_initial' et 'don_jours', cette requête va échouer. 
-                // Assure-toi de les créer dans Supabase (type numeric ou float8).
-                await supaClient.from('parametres').upsert(p);
-                userParams = p; document.getElementById('modal-parametres').classList.add('hidden'); 
-                chargerSoldes(currentAbsences); showToast('Paramètres mis à jour !');
+                const { error } = await supaClient.from('parametres').upsert(p);
+                if(error) throw error;
+                userParams = p; fermerModalParametres(); if(calendar) calendar.refetchEvents(); calculerHeuresSupEt1607(); showToast('Paramètres sauvés');
             } catch(e) { showToast(e.message, true); }
         };
 
-        // Fonction utilitaire Toast
-        function showToast(msg, isError = false) {
-            const t = document.getElementById('toast'); t.textContent = msg; 
-            t.className = `fixed bottom-4 right-4 text-white px-6 py-3 rounded-xl shadow-lg z-50 animate-slide-in ${isError ? 'bg-red-500' : 'bg-teal-600'}`;
-            t.classList.remove('hidden'); setTimeout(() => t.classList.add('hidden'), 3500);
-        }
-        
-        // Navigation d'onglets
         window.switchTab = (tab) => {
-            ['pointage', 'planning'].forEach(t => { 
-                document.getElementById('view-' + t).classList.toggle('hidden', t !== tab); 
-                document.getElementById('view-' + t).classList.toggle('flex', t === tab); 
-            });
-            if(tab === 'planning' && calendar) { calendar.render(); calendar.updateSize(); }
+            ['pointage', 'planning'].forEach(t => { document.getElementById('view-' + t).classList.toggle('hidden', t !== tab); document.getElementById('view-' + t).classList.toggle('flex', t === tab); document.getElementById('btn-' + t).classList.toggle('bg-teal-50', t === tab); document.getElementById('btn-' + t).classList.toggle('text-teal-700', t === tab); });
+            if(tab === 'pointage') rafraichirVueJour(); else if(calendar) { calendar.render(); calendar.updateSize(); }
         };
     </script>
 </body>

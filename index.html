@@ -401,7 +401,7 @@
                 div.innerHTML = `<div class="btn-hide-cpt" onclick="masquerCompteur('${id}')">X</div>` + def.innerHtml;
 
                 let pressTimer;
-                const startPress = () => { pressTimer = setTimeout(activerModeEdition, 700); };
+                const startPress = () => { pressTimer = setTimeout(activerModeEdition, 900); };
                 const endPress = () => { clearTimeout(pressTimer); };
                 div.addEventListener('touchstart', startPress, {passive: true}); div.addEventListener('touchend', endPress);
                 div.addEventListener('mousedown', startPress); div.addEventListener('mouseup', endPress); div.addEventListener('mouseleave', endPress);
@@ -676,9 +676,8 @@
             }
         }
 
-        // --- GESTION SOLDES ET CALENDRIER ---
-        function chargerSoldes(absences) {
-            let cpCons = 0, rttCons = 0, cetCons = 0, aeaCons = 0, formationCons = 0, joursNF = 0;
+       function chargerSoldes(absences) {
+            let cpConsTotal = 0, rttCons = 0, cetCons = 0, aeaCons = 0, formationCons = 0, joursNF = 0;
             const currentYear = new Date().getFullYear(); 
             const now = new Date();
             const limiteDate = userParams.date_limite_reliquat ? new Date(userParams.date_limite_reliquat + 'T23:59:59') : null;
@@ -688,7 +687,7 @@
                 let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1;
                 
                 if(a.type_absence === 'CP') { 
-                    cpCons += j; 
+                    cpConsTotal += j; 
                     for(let d = new Date(a.date_debut); d <= new Date(a.date_fin); d.setDate(d.getDate() + 1)) { if([10, 11, 0, 1].includes(d.getMonth())) joursNF++; } 
                 }
                 if(a.type_absence === 'RTT') rttCons += j; 
@@ -697,21 +696,43 @@
                 if(a.type_absence === 'Formation') formationCons += j;
             });
             
-            let reliquat = userParams.reliquat_cp || 0;
-            
-            if(document.getElementById('cpt-reliquat')) document.getElementById('cpt-reliquat').textContent = reliquat + ' j';
+            // --- LOGIQUE DE DÉCOMPTE PRIORITAIRE DU RELIQUAT N-1 ---
+            let reliquatConfig = userParams.reliquat_cp || 0;
+            let reliquatRestant = 0; 
+            let cpRestantsN = 0;
+
+            if (limiteDate) {
+                // Si une date limite est posée, on regarde si on l'a dépassée ou non
+                let reliquatPerime = now > limiteDate;
+                if (reliquatPerime) {
+                    reliquatRestant = 0; // Expiré, il tombe à 0
+                    cpRestantsN = userParams.cp_initial - cpConsTotal; // Tout est pris sur l'année N
+                } else {
+                    // Le reliquat est prioritaire sur les premiers CP posés
+                    reliquatRestant = Math.max(0, reliquatConfig - cpConsTotal);
+                    let surplusConsomme = Math.max(0, cpConsTotal - reliquatConfig);
+                    cpRestantsN = userParams.cp_initial - surplusConsomme;
+                }
+            } else {
+                // Pas de date limite : le reliquat est consommé en premier quoi qu'il arrive
+                reliquatRestant = Math.max(0, reliquatConfig - cpConsTotal);
+                let surplusConsomme = Math.max(0, cpConsTotal - reliquatConfig);
+                cpRestantsN = userParams.cp_initial - surplusConsomme;
+            }
+            // --------------------------------------------------------
+
+            if(document.getElementById('cpt-reliquat')) document.getElementById('cpt-reliquat').textContent = reliquatRestant + ' j';
             if (userParams.date_limite_reliquat && document.getElementById('date-reliquat')) { 
                 const dateLim = new Date(userParams.date_limite_reliquat); 
                 document.getElementById('date-reliquat').textContent = 'Avant le ' + dateLim.toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit'});
             }
             
-            if(document.getElementById('cpt-cp')) document.getElementById('cpt-cp').textContent = (userParams.cp_initial - cpCons) + ' j';
+            if(document.getElementById('cpt-cp')) document.getElementById('cpt-cp').textContent = cpRestantsN + ' j';
             if(document.getElementById('cpt-rtt')) document.getElementById('cpt-rtt').textContent = (userParams.rtt_initial - rttCons) + ' j';
             if(document.getElementById('cpt-cet')) document.getElementById('cpt-cet').textContent = (userParams.cet_initial - cetCons) + ' j';
             if(document.getElementById('cpt-fractionnement')) document.getElementById('cpt-fractionnement').textContent = '+' + (joursNF >= 8 ? 2 : (joursNF >= 6 ? 1 : 0)) + ' j';
             if(document.getElementById('alerte-rtt')) document.getElementById('alerte-rtt').classList.toggle('hidden', (userParams.rtt_initial - rttCons) > 0);
             
-            // Nouveaux compteurs
             if(document.getElementById('cpt-aea')) document.getElementById('cpt-aea').textContent = aeaCons + ' j';
             if(document.getElementById('cpt-formation')) document.getElementById('cpt-formation').textContent = formationCons + ' j';
             if(document.getElementById('cpt-recup')) document.getElementById('cpt-recup').textContent = (userParams.recup_initial || 0) + ' h';

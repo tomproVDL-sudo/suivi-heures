@@ -11,10 +11,11 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
     
-    <!-- Bibliothèques pour les Exports (Excel & PDF) -->
+    <!-- Bibliothèques pour les Exports (Excel & PDF & Graphiques) -->
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         .fc { font-family: inherit; font-size: 0.85rem; }
@@ -23,12 +24,10 @@
         .fc-button-active { background-color: #0f766e !important; }
         .fc-event { transition: transform 0.2s; border-radius: 6px; font-size: 0.75rem; border: none; cursor: pointer; }
         
-        /* Harmonisation des boutons du calendrier */
         .fc .fc-button { height: 32px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; padding: 0 10px; }
         .fc .fc-prev-button, .fc .fc-next-button { width: 32px; padding: 0; }
         .fc .fc-today-button { height: 32px; line-height: 32px; padding: 0 12px; }
         
-        /* 📱 Interface Mobile Épurée (Header) */
         @media (max-width: 768px) {
             .fc-toolbar.fc-header-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; margin-bottom: 1rem !important; }
             .fc-toolbar-chunk:nth-child(1) { order: 1; display: flex; gap: 4px; } 
@@ -37,7 +36,6 @@
             .fc .fc-toolbar-title { font-size: 1.35rem !important; }
         }
         
-        /* Bulles style Google Fit */
         .fc-daygrid-day-frame { position: relative !important; }
         .fc-daygrid-day-bg, .fc-daygrid-day-events, .fc-daygrid-day-top { position: relative; z-index: 1; }
         .fit-bubble-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; justify-content: center; align-items: center; pointer-events: none; z-index: 0; }
@@ -46,7 +44,6 @@
         @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .animate-slide-in { animation: slideIn 0.3s ease-out; }
         
-        /* Scrollbar custom */
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #14b8a6; border-radius: 6px; }
@@ -54,6 +51,9 @@
         .btn-card { transition: all 0.2s ease; cursor: pointer; }
         .btn-card:active { transform: scale(0.97); }
         .work-block { opacity: 0.85; }
+
+        /* Conteneur caché pour générer le PDF proprement */
+        #pdf-export-container { width: 900px; padding: 40px; background: white; position: fixed; left: -9999px; top: 0; z-index: -10; color: #1f2937; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-teal-50 to-gray-100 min-h-screen flex items-center justify-center p-2 md:p-6 font-sans">
@@ -105,7 +105,7 @@
         </div>
 
         <!-- ZONE DROITE -->
-        <div class="flex-1 flex flex-col p-4 md:p-8 relative overflow-hidden" id="export-zone-pdf">
+        <div class="flex-1 flex flex-col p-4 md:p-8 relative overflow-hidden">
             
             <!-- VUE POINTAGE -->
             <div id="view-pointage" class="flex-1 flex flex-col">
@@ -150,71 +150,68 @@
                     <h3 class="text-lg font-semibold text-gray-800">Mes soldes & Planning</h3>
                     <div class="flex flex-wrap gap-2" id="planning-buttons">
                         <button onclick="ouvrirModalAbsence()" class="bg-slate-800 text-white font-bold py-1.5 px-3 text-xs md:text-sm rounded-lg shadow-md hover:bg-slate-700 transition">+ Déclarer</button>
-                        <button onclick="ouvrirModalExport()" class="bg-green-600 text-white font-bold py-1.5 px-3 text-xs md:text-sm rounded-lg shadow-md hover:bg-green-700 transition">📊 Excel</button>
-                        <button onclick="exporterPDF()" class="bg-red-500 text-white font-bold py-1.5 px-3 text-xs md:text-sm rounded-lg shadow-md hover:bg-red-600 transition">📄 PDF</button>
+                        <button onclick="ouvrirModalExport()" class="bg-indigo-600 text-white font-bold py-1.5 px-3 text-xs md:text-sm rounded-lg shadow-md hover:bg-indigo-700 transition">📊 Exporter</button>
                         <button onclick="ouvrirModalParametres()" class="text-xs md:text-sm bg-gray-200 text-gray-700 font-bold hover:bg-gray-300 py-1.5 px-3 rounded-lg shadow-sm">⚙️ Paramètres</button>
                     </div>
                 </div>
 
-                <!-- 1. BLOC HEURES SUP -->
                 <div class="grid grid-cols-3 gap-2 mb-4 bg-teal-50/60 p-3 rounded-xl border border-teal-200 text-center shadow-sm">
                     <div><span class="text-[10px] text-teal-700 font-bold uppercase block">H. Sup Semaine</span><span class="font-bold text-teal-800 text-base" id="hs-semaine">--</span></div>
                     <div><span class="text-[10px] text-teal-700 font-bold uppercase block">H. Sup Mois</span><span class="font-bold text-teal-800 text-base" id="hs-mois">--</span></div>
                     <div><span class="text-[10px] text-teal-700 font-bold uppercase block">H. Sup Année</span><span class="font-bold text-teal-800 text-base" id="hs-annee">--</span></div>
                 </div>
 
-                <!-- AUTRES SOLDES & RELIQUAT -->
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-                    <div class="bg-gray-50 p-2.5 rounded-xl border border-gray-200 flex flex-col justify-between">
-                        <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Objectif <span id="lbl-objectif">1607</span>h</div>
-                        <div class="text-xs font-bold text-gray-800 leading-tight" id="info-1607">Calcul...</div>
-                    </div>
-                    <div class="bg-gray-50 p-2.5 rounded-xl border border-gray-200">
-                        <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Reliquat N-1</div>
-                        <div class="text-lg font-bold text-gray-800" id="cpt-reliquat">-- j</div>
-                        <div class="text-[9px] text-red-500 font-bold mt-0.5" id="date-reliquat"></div>
-                    </div>
-                    <div class="bg-teal-50 p-2.5 rounded-xl border border-teal-200">
-                        <div class="text-[10px] text-teal-600 font-bold uppercase mb-1">CP Restants</div>
-                        <div class="text-lg font-bold text-teal-800" id="cpt-cp">-- j</div>
-                    </div>
-                    <div class="bg-blue-50 p-2.5 rounded-xl border border-blue-200 relative">
-                        <div class="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full animate-pulse hidden" id="alerte-rtt">À poser !</div>
-                        <div class="text-[10px] text-blue-600 font-bold uppercase mb-1">RTT Restants</div>
-                        <div class="text-lg font-bold text-blue-800" id="cpt-rtt">-- j</div>
-                    </div>
-                    <div class="bg-purple-50 p-2.5 rounded-xl border border-purple-200">
-                        <div class="text-[10px] text-purple-600 font-bold uppercase mb-1">CET</div>
-                        <div class="text-lg font-bold text-purple-800" id="cpt-cet">-- j</div>
-                    </div>
-                    <div class="bg-pink-50 p-2.5 rounded-xl border border-pink-200">
-                        <div class="text-[10px] text-pink-600 font-bold uppercase mb-1">Fractionnement</div>
-                        <div class="text-lg font-bold text-pink-800" id="cpt-fractionnement">+0 j</div>
-                    </div>
+                    <div class="bg-gray-50 p-2.5 rounded-xl border border-gray-200 flex flex-col justify-between"><div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Objectif <span id="lbl-objectif">1607</span>h</div><div class="text-xs font-bold text-gray-800 leading-tight" id="info-1607">Calcul...</div></div>
+                    <div class="bg-gray-50 p-2.5 rounded-xl border border-gray-200"><div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Reliquat N-1</div><div class="text-lg font-bold text-gray-800" id="cpt-reliquat">-- j</div><div class="text-[9px] text-red-500 font-bold mt-0.5" id="date-reliquat"></div></div>
+                    <div class="bg-teal-50 p-2.5 rounded-xl border border-teal-200"><div class="text-[10px] text-teal-600 font-bold uppercase mb-1">CP Restants</div><div class="text-lg font-bold text-teal-800" id="cpt-cp">-- j</div></div>
+                    <div class="bg-blue-50 p-2.5 rounded-xl border border-blue-200 relative"><div class="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full animate-pulse hidden" id="alerte-rtt">À poser !</div><div class="text-[10px] text-blue-600 font-bold uppercase mb-1">RTT Restants</div><div class="text-lg font-bold text-blue-800" id="cpt-rtt">-- j</div></div>
+                    <div class="bg-purple-50 p-2.5 rounded-xl border border-purple-200"><div class="text-[10px] text-purple-600 font-bold uppercase mb-1">CET</div><div class="text-lg font-bold text-purple-800" id="cpt-cet">-- j</div></div>
+                    <div class="bg-pink-50 p-2.5 rounded-xl border border-pink-200"><div class="text-[10px] text-pink-600 font-bold uppercase mb-1">Fractionnement</div><div class="text-lg font-bold text-pink-800" id="cpt-fractionnement">+0 j</div></div>
                 </div>
 
-                <!-- CALENDRIER AGRANDI SUR MOBILE -->
                 <div id="calendar" class="flex-1 min-h-[600px] md:min-h-[450px] shadow-lg rounded-xl border border-gray-200 p-2 bg-white"></div>
             </div>
         </div>
     </div>
 
-    <!-- MODAL : EXPORT EXCEL -->
+    <!-- MODAL : EXPORT (Choix de la période et du format) -->
     <div id="modal-export" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-slide-in">
-            <h3 class="text-xl font-bold mb-4">Exporter les données (Excel)</h3>
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Exporter les données</h3>
+                <button onclick="fermerModalExport()" class="text-gray-400 hover:text-gray-700 text-xl font-bold">&times;</button>
+            </div>
+            
             <div class="flex gap-2 mb-4">
-                <button onclick="setExportDates('semaine')" class="flex-1 bg-teal-50 text-teal-700 text-xs font-bold py-2 rounded-lg hover:bg-teal-100">Cette semaine</button>
-                <button onclick="setExportDates('mois')" class="flex-1 bg-teal-50 text-teal-700 text-xs font-bold py-2 rounded-lg hover:bg-teal-100">Ce mois</button>
-                <button onclick="setExportDates('annee')" class="flex-1 bg-teal-50 text-teal-700 text-xs font-bold py-2 rounded-lg hover:bg-teal-100">Cette année</button>
+                <button onclick="setExportDates('semaine')" class="flex-1 bg-indigo-50 text-indigo-700 text-xs font-bold py-2 rounded-lg hover:bg-indigo-100">Cette semaine</button>
+                <button onclick="setExportDates('mois')" class="flex-1 bg-indigo-50 text-indigo-700 text-xs font-bold py-2 rounded-lg hover:bg-indigo-100">Ce mois</button>
+                <button onclick="setExportDates('annee')" class="flex-1 bg-indigo-50 text-indigo-700 text-xs font-bold py-2 rounded-lg hover:bg-indigo-100">Cette année</button>
             </div>
             <div class="grid grid-cols-2 gap-4 mb-6">
                 <div><label class="text-xs font-bold text-gray-500">Du</label><input type="date" id="export_debut" class="w-full p-2 border rounded-xl mt-1"></div>
                 <div><label class="text-xs font-bold text-gray-500">Au</label><input type="date" id="export_fin" class="w-full p-2 border rounded-xl mt-1"></div>
             </div>
-            <div class="flex gap-2">
-                <button onclick="fermerModalExport()" class="flex-1 bg-gray-200 font-bold py-3 rounded-xl hover:bg-gray-300">Annuler</button>
-                <button onclick="genererExportExcel()" class="flex-1 bg-green-600 text-white font-bold py-3 rounded-xl hover:bg-green-700">Télécharger Excel</button>
+            <div class="flex gap-3">
+                <button onclick="genererExportExcel()" class="flex-1 flex justify-center items-center gap-2 bg-green-600 text-white font-bold py-3 rounded-xl hover:bg-green-700"><span>📊</span> Excel</button>
+                <button onclick="genererExportPDF()" class="flex-1 flex justify-center items-center gap-2 bg-red-500 text-white font-bold py-3 rounded-xl hover:bg-red-600"><span>📄</span> PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL CONTEXTUEL : MODIFIER/SUPPRIMER POINTAGE -->
+    <div id="modal-pointage-edit" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-slide-in text-center">
+            <h3 class="text-lg font-bold mb-4 text-gray-800">Modifier l'horaire</h3>
+            <input type="hidden" id="edit_pointage_id">
+            <input type="hidden" id="edit_pointage_date">
+            
+            <input type="time" id="edit_pointage_time" class="w-full text-center text-2xl p-4 bg-gray-50 border border-gray-200 rounded-xl mb-6 font-mono focus:ring-2 focus:ring-teal-500 focus:outline-none">
+            
+            <div class="flex flex-col gap-2">
+                <button onclick="sauvegarderModificationPointage()" class="w-full bg-teal-500 text-white font-bold py-3 rounded-xl hover:bg-teal-600">Enregistrer</button>
+                <button onclick="confirmerSuppressionPointage()" class="w-full bg-red-100 text-red-600 font-bold py-3 rounded-xl hover:bg-red-200">Supprimer ce pointage</button>
+                <button onclick="fermerModalPointage()" class="w-full bg-gray-100 text-gray-600 font-bold py-3 rounded-xl hover:bg-gray-200 mt-2">Annuler</button>
             </div>
         </div>
     </div>
@@ -254,7 +251,6 @@
 
     <!-- MODAL : PARAMETRES -->
     <div id="modal-parametres" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <!-- Structure corrigée pour l'ascenseur à l'intérieur des bords arrondis -->
         <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-slide-in overflow-hidden flex flex-col max-h-[90vh]">
             <div class="p-6 border-b border-gray-100 bg-white z-10"><h3 class="text-xl font-bold">Mes Paramètres & Soldes</h3></div>
             
@@ -291,6 +287,57 @@
     <!-- TOAST -->
     <div id="toast" class="hidden fixed bottom-4 right-4 text-white px-6 py-3 rounded-xl shadow-lg z-50">...</div>
 
+    <!-- CONTENEUR CACHÉ POUR LA GÉNÉRATION DU PDF -->
+    <div id="pdf-export-container">
+        <div class="border-b-2 border-indigo-600 pb-4 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">Rapport d'Activité RH</h1>
+            <h2 class="text-lg text-gray-500 mt-1" id="pdf-periode-texte">Période : ...</h2>
+        </div>
+        
+        <!-- Stats globales -->
+        <div class="grid grid-cols-4 gap-4 mb-8">
+            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Heures Travaillées</div>
+                <div class="text-2xl font-bold text-indigo-700" id="pdf-stat-total">--</div>
+                <div class="text-xs text-gray-500 mt-1" id="pdf-stat-moy-jour">-- / jour</div>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Écart (Sup / Manquant)</div>
+                <div class="text-2xl font-bold text-teal-600" id="pdf-stat-ecart">--</div>
+                <div class="text-xs text-gray-500 mt-1" id="pdf-stat-moy-ecart">-- / jour</div>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Pauses (Total)</div>
+                <div class="text-2xl font-bold text-orange-500" id="pdf-stat-pause-nb">--</div>
+                <div class="text-xs text-gray-500 mt-1" id="pdf-stat-pause-moy">-- en moyenne</div>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Absences Posées</div>
+                <div class="text-sm font-medium text-gray-700 leading-tight" id="pdf-stat-absences">
+                    --
+                </div>
+            </div>
+        </div>
+
+        <!-- Ligne d'objectif (Rappel) -->
+        <div class="bg-indigo-50 text-indigo-800 p-3 rounded-lg text-sm mb-6 flex justify-between">
+            <span><strong>Base de calcul :</strong> <span id="pdf-rappel-base">--</span>h / jour attendues.</span>
+            <span><strong>Pause de référence :</strong> 45 min le midi.</span>
+        </div>
+
+        <!-- Graphiques -->
+        <div class="space-y-8">
+            <div>
+                <h3 class="text-md font-bold text-gray-700 mb-2">Évolution du temps de travail et des pauses</h3>
+                <div class="h-64 w-full bg-white relative"><canvas id="pdf-chart-evolution"></canvas></div>
+            </div>
+            <div>
+                <h3 class="text-md font-bold text-gray-700 mb-2">Répartition (Heures Normales, Sup, Manquantes)</h3>
+                <div class="h-64 w-full bg-white relative"><canvas id="pdf-chart-repartition"></canvas></div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // --- 1. CONFIGURATION ---
 
@@ -304,187 +351,288 @@
         let currentPointages = []; 
         let pointagesAnnee = []; 
         let currentAbsences = [];
+        let pdfCharts = []; // Pour détruire les anciens graphiques PDF
         
-        let userParams = { 
-            cp_initial: 25, rtt_initial: 15, base_horaire: 39, 
-            limite_heures_jour: 10, notifs_actives: false,
-            objectif_annuel: 1607, reliquat_cp: 0, date_limite_reliquat: '', cet_initial: 0, annee_maj: null
-        };
+        let userParams = { cp_initial: 25, rtt_initial: 15, base_horaire: 39, limite_heures_jour: 10, notifs_actives: false, objectif_annuel: 1607, reliquat_cp: 0, date_limite_reliquat: '', cet_initial: 0, annee_maj: null };
 
-        // --- EXPORT PDF ---
-        window.exporterPDF = async () => {
-            showToast("Génération du PDF en cours...");
-            const { jsPDF } = window.jspdf;
-            const element = document.getElementById('export-zone-pdf'); // On capture toute la zone droite
-            
-            // Masquer les boutons pour avoir un PDF propre
-            const boutons = document.getElementById('planning-buttons');
-            boutons.style.display = 'none';
-
-            try {
-                const canvas = await html2canvas(element, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff' });
-                boutons.style.display = 'flex'; // Restaure les boutons
-
-                const imgData = canvas.toDataURL('image/png');
-                const pdf = new jsPDF('p', 'mm', 'a4');
-                const pdfWidth = pdf.internal.pageSize.getWidth();
-                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-                
-                pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, pdfHeight);
-                pdf.save(`Planning_${new Date().toISOString().split('T')[0]}.pdf`);
-                showToast("PDF téléchargé !");
-            } catch (err) {
-                boutons.style.display = 'flex';
-                showToast("Erreur PDF : " + err.message, true);
-            }
-        };
-
-        // --- EXPORT EXCEL ---
+        // --- GESTION DES EXPORTS ---
         window.ouvrirModalExport = () => {
-            setExportDates('mois'); // Par défaut : ce mois-ci
+            setExportDates('mois');
             document.getElementById('modal-export').classList.remove('hidden');
         };
         window.fermerModalExport = () => document.getElementById('modal-export').classList.add('hidden');
         
         window.setExportDates = (periode) => {
-            const now = new Date();
-            let d1 = new Date(), d2 = new Date();
+            const now = new Date(); let d1 = new Date(), d2 = new Date();
             if (periode === 'semaine') {
                 const day = now.getDay(), diff = now.getDate() - day + (day === 0 ? -6 : 1);
-                d1 = new Date(now.setDate(diff));
-                d2 = new Date(d1); d2.setDate(d2.getDate() + 6);
+                d1 = new Date(now.setDate(diff)); d2 = new Date(d1); d2.setDate(d2.getDate() + 6);
             } else if (periode === 'mois') {
-                d1 = new Date(now.getFullYear(), now.getMonth(), 1);
-                d2 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                d1 = new Date(now.getFullYear(), now.getMonth(), 1); d2 = new Date(now.getFullYear(), now.getMonth() + 1, 0);
             } else if (periode === 'annee') {
-                d1 = new Date(now.getFullYear(), 0, 1);
-                d2 = new Date(now.getFullYear(), 11, 31);
+                d1 = new Date(now.getFullYear(), 0, 1); d2 = new Date(now.getFullYear(), 11, 31);
             }
             document.getElementById('export_debut').value = d1.toISOString().split('T')[0];
             document.getElementById('export_fin').value = d2.toISOString().split('T')[0];
         };
 
+        // --- GÉNÉRATION EXCEL ---
         window.genererExportExcel = () => {
-            const startStr = document.getElementById('export_debut').value;
-            const endStr = document.getElementById('export_fin').value;
+            const startStr = document.getElementById('export_debut').value; const endStr = document.getElementById('export_fin').value;
             if (!startStr || !endStr) return showToast("Dates invalides", true);
             
-            const startD = new Date(startStr); startD.setHours(0,0,0,0);
-            const endD = new Date(endStr); endD.setHours(23,59,59,999);
+            const startD = new Date(startStr); startD.setHours(0,0,0,0); const endD = new Date(endStr); endD.setHours(23,59,59,999);
             
-            // Regrouper les pointages par jour
-            const pointagesPariode = pointagesAnnee.filter(p => {
-                const d = new Date(p.timestamp); return d >= startD && d <= endD;
-            });
+            const pointagesPariode = pointagesAnnee.filter(p => { const d = new Date(p.timestamp); return d >= startD && d <= endD; });
             const parJour = {};
-            pointagesPariode.forEach(p => {
-                const dateStr = p.timestamp.split('T')[0];
-                if(!parJour[dateStr]) parJour[dateStr] = [];
-                parJour[dateStr].push(p);
-            });
+            pointagesPariode.forEach(p => { const dateStr = p.timestamp.split('T')[0]; if(!parJour[dateStr]) parJour[dateStr] = []; parJour[dateStr].push(p); });
 
             const dataToExport = [["Date", "Début", "Pauses", "Fin", "Heures Travaillées", "Écart"]];
-            
-            let totalTravailléMs = 0;
-            let totalPauseMs = 0;
-            let nbPausesReelles = 0;
-            const hoursPerDay = (userParams.base_horaire / 5);
+            let totalTravailléMs = 0; let totalPauseMs = 0; let nbPausesReelles = 0; const hoursPerDay = (userParams.base_horaire / 5);
 
             for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toISOString().split('T')[0];
-                const dayOfWeek = d.getDay();
-                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
-                
+                const dateStr = d.toISOString().split('T')[0]; const dayOfWeek = d.getDay(); const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
                 let strDebut = "--"; let strPauses = "--"; let strFin = "--"; let valTravail = "0h00"; let valEcart = "0h00";
                 let tMs = 0; let expected = isWeekend ? 0 : hoursPerDay * 3600000;
                 
-                // Gestion des absences pour déduire l'attendu
                 let absence = currentAbsences.find(a => {
-                    const aStart = new Date(a.date_debut); aStart.setHours(0,0,0,0);
-                    const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0);
-                    return d >= aStart && d <= aEnd;
+                    const aStart = new Date(a.date_debut); aStart.setHours(0,0,0,0); const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0); return d >= aStart && d <= aEnd;
                 });
                 if (absence) expected = (absence.moment === 'journee') ? 0 : (expected / 2);
 
                 if (parJour[dateStr]) {
                     const events = parJour[dateStr].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
                     const formatH = (ts) => new Date(ts).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
-                    
                     let lastArr = null; let lstPauses = []; let pauseStart = null;
                     
                     events.forEach(pt => {
                         if(pt.type_action === 'arrivee') { 
-                            lastArr = new Date(pt.timestamp); 
-                            if(strDebut === "--") strDebut = formatH(pt.timestamp);
-                            if(pauseStart) { // Fin d'une pause
-                                const pEnd = new Date(pt.timestamp);
-                                const diffPause = pEnd - pauseStart;
-                                totalPauseMs += diffPause; nbPausesReelles++;
-                                lstPauses.push(`${formatH(pauseStart)} - ${formatH(pEnd)}`);
-                                pauseStart = null;
-                            }
+                            lastArr = new Date(pt.timestamp); if(strDebut === "--") strDebut = formatH(pt.timestamp);
+                            if(pauseStart) { const pEnd = new Date(pt.timestamp); const diffPause = pEnd - pauseStart; totalPauseMs += diffPause; nbPausesReelles++; lstPauses.push(`${formatH(pauseStart)} - ${formatH(pEnd)}`); pauseStart = null; }
                         }
-                        if(pt.type_action === 'pause') {
-                            pauseStart = new Date(pt.timestamp);
-                            if(lastArr) { tMs += (pauseStart - lastArr); lastArr = null; }
-                        }
-                        if(pt.type_action === 'depart') {
-                            const pEnd = new Date(pt.timestamp);
-                            strFin = formatH(pt.timestamp);
-                            if(lastArr) { tMs += (pEnd - lastArr); lastArr = null; }
-                        }
+                        if(pt.type_action === 'pause') { pauseStart = new Date(pt.timestamp); if(lastArr) { tMs += (pauseStart - lastArr); lastArr = null; } }
+                        if(pt.type_action === 'depart') { const pEnd = new Date(pt.timestamp); strFin = formatH(pt.timestamp); if(lastArr) { tMs += (pEnd - lastArr); lastArr = null; } }
                     });
                     
                     if (lstPauses.length > 0) strPauses = lstPauses.join(" | ");
-                    
                     totalTravailléMs += tMs;
+                    let hT = Math.floor(tMs / 3600000); let mT = Math.floor((tMs % 3600000) / 60000); valTravail = `${hT}h${mT.toString().padStart(2, '0')}`;
                     
-                    let hT = Math.floor(tMs / 3600000); let mT = Math.floor((tMs % 3600000) / 60000);
-                    valTravail = `${hT}h${mT.toString().padStart(2, '0')}`;
-                    
-                    let deltaMs = tMs - expected;
-                    let sign = deltaMs >= 0 ? '+' : '-'; let aDelta = Math.abs(deltaMs);
-                    let hD = Math.floor(aDelta / 3600000); let mD = Math.round((aDelta % 3600000) / 60000);
-                    valEcart = `${sign}${hD}h${mD.toString().padStart(2, '0')}`;
-                } else if (absence) {
-                    strDebut = absence.type_absence; strFin = absence.moment;
-                }
-
+                    let deltaMs = tMs - expected; let sign = deltaMs >= 0 ? '+' : '-'; let aDelta = Math.abs(deltaMs);
+                    let hD = Math.floor(aDelta / 3600000); let mD = Math.round((aDelta % 3600000) / 60000); valEcart = `${sign}${hD}h${mD.toString().padStart(2, '0')}`;
+                } else if (absence) { strDebut = absence.type_absence; strFin = absence.moment; }
                 dataToExport.push([ d.toLocaleDateString('fr-FR'), strDebut, strPauses, strFin, valTravail, valEcart ]);
             }
 
-            // Statistiques globales fin de tableau
-            dataToExport.push([]);
-            dataToExport.push(["RÉCAPITULATIF SUR LA PÉRIODE", "", "", "", "", ""]);
-            
-            // Calcul moyen pause
+            dataToExport.push([]); dataToExport.push(["RÉCAPITULATIF SUR LA PÉRIODE", "", "", "", "", ""]);
             let moyPause = "0 min";
             if (nbPausesReelles > 0) {
                 let mAvg = Math.round((totalPauseMs / nbPausesReelles) / 60000);
-                if(mAvg > 60) moyPause = `${Math.floor(mAvg/60)}h${(mAvg%60).toString().padStart(2,'0')}`;
-                else moyPause = `${mAvg} min`;
+                if(mAvg > 60) moyPause = `${Math.floor(mAvg/60)}h${(mAvg%60).toString().padStart(2,'0')}`; else moyPause = `${mAvg} min`;
             }
             dataToExport.push(["Durée moyenne de pause", moyPause, "", "", "", ""]);
             
-            // Restes de congés (En récupérant ce qui est à l'écran)
-            dataToExport.push([]);
-            dataToExport.push(["SOLDES RESTANTS A CE JOUR", "", "", "", "", ""]);
+            dataToExport.push([]); dataToExport.push(["SOLDES RESTANTS A CE JOUR", "", "", "", "", ""]);
             dataToExport.push(["CP Restants", document.getElementById('cpt-cp').textContent]);
             dataToExport.push(["Reliquat N-1", document.getElementById('cpt-reliquat').textContent]);
             dataToExport.push(["RTT Restants", document.getElementById('cpt-rtt').textContent]);
             dataToExport.push(["CET", document.getElementById('cpt-cet').textContent]);
 
-            // Génération fichier
-            const wb = XLSX.utils.book_new();
-            const ws = XLSX.utils.aoa_to_sheet(dataToExport);
-            
-            // Largeur colonnes
+            const wb = XLSX.utils.book_new(); const ws = XLSX.utils.aoa_to_sheet(dataToExport);
             ws['!cols'] = [{wch:12}, {wch:8}, {wch:30}, {wch:8}, {wch:15}, {wch:10}];
-            
-            XLSX.utils.book_append_sheet(wb, ws, "Export");
-            XLSX.writeFile(wb, `Export_SIRH_${startStr}_au_${endStr}.xlsx`);
+            XLSX.utils.book_append_sheet(wb, ws, "Export"); XLSX.writeFile(wb, `Export_SIRH_${startStr}_au_${endStr}.xlsx`);
             fermerModalExport();
         };
+
+        // --- GÉNÉRATION PDF ANALYTIQUE (CHART.JS) ---
+        window.genererExportPDF = async () => {
+            const startStr = document.getElementById('export_debut').value; const endStr = document.getElementById('export_fin').value;
+            if (!startStr || !endStr) return showToast("Dates invalides", true);
+            fermerModalExport(); showToast("Analyse et génération du PDF...");
+
+            const startD = new Date(startStr); startD.setHours(0,0,0,0); const endD = new Date(endStr); endD.setHours(23,59,59,999);
+            const diffDays = Math.round((endD - startD) / 86400000);
+            const groupMode = diffDays > 60 ? 'week' : 'day'; // Si > 2 mois, on groupe par semaine
+
+            const hoursPerDay = (userParams.base_horaire / 5);
+            document.getElementById('pdf-rappel-base').textContent = hoursPerDay;
+            document.getElementById('pdf-periode-texte').textContent = `Du ${startD.toLocaleDateString('fr-FR')} au ${endD.toLocaleDateString('fr-FR')} (${groupMode === 'week' ? 'Par semaine' : 'Par jour'})`;
+
+            // 1. Agréger les données brutes
+            let totalTravailléMs = 0; let totalEcartMs = 0; let totalPauseMs = 0; let nbPausesReelles = 0; let joursTravaillesReels = 0;
+            
+            // Stats Absences
+            let absStats = { 'CP':0, 'RTT':0, 'CET':0, 'Maladie':0, 'Formation':0 };
+            currentAbsences.forEach(a => {
+                const d = new Date(a.date_debut);
+                if (d >= startD && d <= endD) {
+                    let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1;
+                    if(absStats[a.type_absence] !== undefined) absStats[a.type_absence] += j;
+                }
+            });
+
+            // Données pour les graphiques
+            const chartLabels = [];
+            const dataWorked = []; const dataPause = [];
+            const dataNormale = []; const dataSup = []; const dataManque = [];
+            const dataExpected = []; const dataPauseExp = [];
+
+            // Groupement (Par jour ou semaine)
+            const mapGrouped = {};
+            const getWeekStr = (d) => { const first = new Date(d.getFullYear(), 0, 1); const days = Math.floor((d - first) / 86400000); return `S${Math.ceil((d.getDay() + 1 + days) / 7)} ${d.getFullYear()}`; };
+
+            for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().split('T')[0];
+                const key = groupMode === 'week' ? getWeekStr(d) : dateStr;
+                if(!mapGrouped[key]) mapGrouped[key] = { label: (groupMode==='week' ? key : d.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'})), workMs: 0, expectedMs: 0, pauseMs: 0 };
+                
+                const dayOfWeek = d.getDay(); const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                let expected = isWeekend ? 0 : hoursPerDay * 3600000;
+                
+                let absence = currentAbsences.find(a => { const aS = new Date(a.date_debut); aS.setHours(0,0,0,0); const aE = new Date(a.date_fin); aE.setHours(0,0,0,0); return d >= aS && d <= aE; });
+                if (absence) expected = (absence.moment === 'journee') ? 0 : (expected / 2);
+                mapGrouped[key].expectedMs += expected;
+
+                const pts = pointagesAnnee.filter(p => p.timestamp.startsWith(dateStr)).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+                if(pts.length > 0) {
+                    let lastArr = null; let pauseStart = null; let tMs = 0; let pMs = 0;
+                    pts.forEach(pt => {
+                        if(pt.type_action === 'arrivee') { lastArr = new Date(pt.timestamp); if(pauseStart) { const diff = new Date(pt.timestamp) - pauseStart; pMs += diff; totalPauseMs += diff; nbPausesReelles++; pauseStart = null; } }
+                        if(pt.type_action === 'pause') { pauseStart = new Date(pt.timestamp); if(lastArr) { tMs += (pauseStart - lastArr); lastArr = null; } }
+                        if(pt.type_action === 'depart') { const pEnd = new Date(pt.timestamp); if(lastArr) { tMs += (pEnd - lastArr); lastArr = null; } }
+                    });
+                    mapGrouped[key].workMs += tMs; mapGrouped[key].pauseMs += pMs;
+                    totalTravailléMs += tMs; totalEcartMs += (tMs - expected); joursTravaillesReels++;
+                } else {
+                    totalEcartMs += (0 - expected); // Jour non travaillé, on retire l'attendu s'il y en avait
+                }
+            }
+
+            // Remplissage des tableaux Chart.js
+            for (let key in mapGrouped) {
+                const g = mapGrouped[key];
+                const hw = g.workMs / 3600000; const he = g.expectedMs / 3600000; const hp = g.pauseMs / 3600000;
+                
+                chartLabels.push(g.label);
+                dataWorked.push(hw); dataPause.push(hp);
+                dataExpected.push(he); dataPauseExp.push(0.75); // Ligne d'obj pause (45 min)
+
+                // Logique Histogramme Empilé (Normale vs Sup vs Manquant)
+                if (hw > he) {
+                    dataNormale.push(he); dataSup.push(hw - he); dataManque.push(0);
+                } else {
+                    dataNormale.push(hw); dataSup.push(0); dataManque.push(he - hw);
+                }
+            }
+
+            // 2. MAJ du DOM (Cartes Stats)
+            const fmtH = (ms) => { let sign = ms < 0 ? '-' : ''; let a = Math.abs(ms); let h = Math.floor(a/3600000); let m = Math.round((a%3600000)/60000); return `${sign}${h}h${m.toString().padStart(2,'0')}`; };
+            
+            document.getElementById('pdf-stat-total').textContent = fmtH(totalTravailléMs);
+            document.getElementById('pdf-stat-moy-jour').textContent = joursTravaillesReels > 0 ? fmtH(totalTravailléMs / joursTravaillesReels) + ' / j (en moy.)' : '--';
+            
+            let ecartEl = document.getElementById('pdf-stat-ecart'); ecartEl.textContent = fmtH(totalEcartMs);
+            ecartEl.className = totalEcartMs >= 0 ? "text-2xl font-bold text-teal-600" : "text-2xl font-bold text-red-500";
+            document.getElementById('pdf-stat-moy-ecart').textContent = joursTravaillesReels > 0 ? fmtH(totalEcartMs / joursTravaillesReels) + ' / j (en moy.)' : '--';
+
+            document.getElementById('pdf-stat-pause-nb').textContent = nbPausesReelles;
+            let mAvg = nbPausesReelles > 0 ? Math.round((totalPauseMs / nbPausesReelles) / 60000) : 0;
+            document.getElementById('pdf-stat-pause-moy').textContent = mAvg > 60 ? `${Math.floor(mAvg/60)}h${(mAvg%60).toString().padStart(2,'0')} en moy.` : `${mAvg} min en moy.`;
+
+            let txtAbs = [];
+            for (let t in absStats) { if(absStats[t] > 0) txtAbs.push(`${t}: ${absStats[t]}j`); }
+            document.getElementById('pdf-stat-absences').innerHTML = txtAbs.length > 0 ? txtAbs.join('<br>') : '<span class="text-gray-400">Aucune absence</span>';
+
+            // 3. Dessiner les graphiques Chart.js (Sans animations pour capture instantanée)
+            pdfCharts.forEach(c => c.destroy()); pdfCharts = [];
+            
+            Chart.defaults.font.family = 'sans-serif';
+            const ctxEvol = document.getElementById('pdf-chart-evolution').getContext('2d');
+            pdfCharts.push(new Chart(ctxEvol, {
+                type: 'bar',
+                data: {
+                    labels: chartLabels,
+                    datasets: [
+                        { label: 'Heures travaillées', data: dataWorked, backgroundColor: '#4f46e5', order: 2, borderRadius: 4 },
+                        { label: 'Objectif Travail', data: dataExpected, type: 'line', borderColor: '#9ca3af', borderDash: [5, 5], borderWidth: 2, pointRadius: 0, fill: false, order: 1 },
+                        { label: 'Durée Pauses', data: dataPause, type: 'line', borderColor: '#f97316', backgroundColor: '#f97316', borderWidth: 2, order: 0 },
+                        { label: 'Réf. Pause (45m)', data: dataPauseExp, type: 'line', borderColor: '#fdba74', borderDash: [2, 2], borderWidth: 1, pointRadius: 0, fill: false, order: 3 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { beginAtZero: true, title: { display: true, text: 'Heures' } } } }
+            }));
+
+            const ctxRepart = document.getElementById('pdf-chart-repartition').getContext('2d');
+            pdfCharts.push(new Chart(ctxRepart, {
+                type: 'bar',
+                data: {
+                    labels: chartLabels,
+                    datasets: [
+                        { label: 'Heures Normales (Travaillé)', data: dataNormale, backgroundColor: '#14b8a6', stack: 'Stack 0' },
+                        { label: 'Heures Sup.', data: dataSup, backgroundColor: '#84cc16', stack: 'Stack 0' }, // Vert pomme pour le bonus
+                        { label: 'Heures Manquantes', data: dataManque, backgroundColor: '#fca5a5', stack: 'Stack 0' } // Rouge clair posé par dessus pour atteindre l'objectif
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Heures' } } } }
+            }));
+
+            // 4. Capture et export jsPDF
+            setTimeout(async () => {
+                try {
+                    const element = document.getElementById('pdf-export-container');
+                    const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdf = new jsPDF('p', 'mm', 'a4');
+                    const pdfW = pdf.internal.pageSize.getWidth();
+                    const pdfH = (canvas.height * pdfW) / canvas.width;
+                    
+                    pdf.addImage(imgData, 'PNG', 0, 10, pdfW, pdfH);
+                    pdf.save(`Rapport_SIRH_${startStr}_au_${endStr}.pdf`);
+                    showToast("PDF téléchargé avec succès !");
+                } catch(e) {
+                    showToast("Erreur lors de la création du PDF : " + e.message, true);
+                }
+            }, 300); // Léger délai pour s'assurer que Chart.js a bien fini de rendre l'image dans le DOM caché
+        };
+
+
+        // --- MODAL POINTAGE (MODIF/SUPPRESSION SANS PROMPT) ---
+        window.ouvrirModalPointage = (id, dateStr) => {
+            const d = new Date(dateStr);
+            const hhmm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+            document.getElementById('edit_pointage_id').value = id;
+            document.getElementById('edit_pointage_date').value = dateStr;
+            document.getElementById('edit_pointage_time').value = hhmm;
+            document.getElementById('modal-pointage-edit').classList.remove('hidden');
+        };
+        
+        window.fermerModalPointage = () => document.getElementById('modal-pointage-edit').classList.add('hidden');
+
+        window.sauvegarderModificationPointage = async () => {
+            const id = document.getElementById('edit_pointage_id').value;
+            const oldDateStr = document.getElementById('edit_pointage_date').value;
+            const newTime = document.getElementById('edit_pointage_time').value;
+            
+            if (!newTime) return showToast("Heure invalide", true);
+            const [h, m] = newTime.split(':');
+            const nd = new Date(oldDateStr); nd.setHours(h, m, 0);
+            
+            try {
+                await supaClient.from('pointages').update({ timestamp: nd.toISOString() }).eq('id', id); 
+                await chargerDonneesGlobales(); rafraichirVueJour(); if(calendar) calendar.refetchEvents();
+                fermerModalPointage(); showToast("Horaire modifié");
+            } catch(e) { showToast(e.message, true); }
+        };
+
+        window.confirmerSuppressionPointage = async () => {
+            const id = document.getElementById('edit_pointage_id').value;
+            try {
+                await supaClient.from('pointages').delete().eq('id', id); 
+                await chargerDonneesGlobales(); rafraichirVueJour(); if(calendar) calendar.refetchEvents();
+                fermerModalPointage(); showToast("Pointage supprimé");
+            } catch(e) { showToast(e.message, true); }
+        };
+
 
         // --- LOGIQUE INTERNE DE DEMARRAGE ---
         setInterval(() => {
@@ -565,7 +713,6 @@
             currentPointages = pointagesAnnee.filter(p => new Date(p.timestamp) >= debutJour);
             const conteneur = document.getElementById('historique-jour'); conteneur.innerHTML = '';
             
-            // MODIFICATION LOGIQUE BOUTON PAUSE/REPRISE
             const btnPause = document.getElementById('btn-action-pause');
             const txtPause1 = document.getElementById('txt-pause-1');
             const txtPause2 = document.getElementById('txt-pause-2');
@@ -573,16 +720,12 @@
             let lastAction = currentPointages.length > 0 ? currentPointages[currentPointages.length - 1].type_action : null;
             
             if (lastAction === 'pause') {
-                // Si on est en pause -> Bouton Vert "Reprise" (qui envoie un pointage "arrivee" derrière)
                 btnPause.className = 'btn-card bg-emerald-500 text-white p-3 md:p-4 rounded-xl text-center shadow-md flex flex-col justify-center items-center transition-colors';
-                txtPause1.textContent = 'Reprise';
-                txtPause2.textContent = 'Reprendre le travail';
+                txtPause1.textContent = 'Reprise'; txtPause2.textContent = 'Reprendre le travail';
                 btnPause.onclick = () => pointer('arrivee');
             } else {
-                // Sinon (travail ou pas commencé) -> Bouton Orange "Pause"
                 btnPause.className = 'btn-card bg-orange-500 text-white p-3 md:p-4 rounded-xl text-center shadow-md flex flex-col justify-center items-center transition-colors';
-                txtPause1.textContent = 'Pause';
-                txtPause2.textContent = 'Début de pause';
+                txtPause1.textContent = 'Pause'; txtPause2.textContent = 'Début de pause';
                 btnPause.onclick = () => pointer('pause');
             }
 
@@ -595,11 +738,12 @@
                     if(l === 'pause') { l="Début de pause"; c="text-orange-500"; ic='⏸️'; b="bg-orange-50"; }
                     if(l === 'depart') { l="Fin de poste"; c="text-slate-600"; ic='🔴'; b="bg-slate-50"; }
                     
+                    // ON UTILISE DESORMAIS LE MODAL POUR MODIFIER
                     conteneur.innerHTML += `<div class="flex justify-between items-center py-2.5 px-3 border-b border-gray-100 ${b} rounded-lg mb-2 text-xs md:text-sm">
                         <div class="font-medium ${c}"><span>${ic}</span> ${l}</div>
                         <div class="flex gap-3"><span class="font-mono mt-0.5">${heure}</span>
-                        <button onclick="modifierPointage('${p.id}', '${p.timestamp}')" class="text-blue-500 hover:text-blue-700">✏️</button>
-                        <button onclick="supprimerPointage('${p.id}')" class="text-red-400 hover:text-red-600">🗑️</button></div></div>`;
+                        <button onclick="ouvrirModalPointage('${p.id}', '${p.timestamp}')" class="text-blue-500 hover:text-blue-700 bg-blue-50 px-2 py-0.5 rounded shadow-sm">✏️ Éditer</button>
+                        </div></div>`;
                 });
             } else {
                 conteneur.innerHTML = '<div class="text-center text-gray-400 py-8 text-xs">Aucun pointage aujourd\'hui.</div>';
@@ -610,17 +754,6 @@
 
         window.pointer = async (type) => {
             try { await supaClient.from('pointages').insert([{ user_id: currentUser.id, type_action: type }]); await chargerDonneesGlobales(); rafraichirVueJour(); if(calendar) calendar.refetchEvents(); } catch(e) { showToast(e.message, true); }
-        };
-
-        window.modifierPointage = async (id, ancienneDateStr) => {
-            const h = prompt("Nouvelle heure (HH:MM) :", new Date(ancienneDateStr).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}));
-            if (!h || !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(h)) return showToast("Format invalide", true);
-            const nd = new Date(ancienneDateStr); nd.setHours(...h.split(':'), 0, 0);
-            await supaClient.from('pointages').update({ timestamp: nd.toISOString() }).eq('id', id); await chargerDonneesGlobales(); rafraichirVueJour(); if(calendar) calendar.refetchEvents();
-        };
-
-        window.supprimerPointage = async (id) => {
-            if(confirm("Supprimer ce pointage ?")) { await supaClient.from('pointages').delete().eq('id', id); await chargerDonneesGlobales(); rafraichirVueJour(); if(calendar) calendar.refetchEvents(); }
         };
 
         function calculerStatistiquesJour(pts) {

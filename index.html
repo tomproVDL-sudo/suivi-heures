@@ -490,29 +490,34 @@
         };
 
         async function chargerDonneesGlobales() {
+            // LECTURE HORS LIGNE
+            if (!navigator.onLine) {
+                const paramsCache = localStorage.getItem('sirh_cache_params');
+                if (paramsCache) userParams = { ...userParams, ...JSON.parse(paramsCache) };
+                
+                const pointagesCache = localStorage.getItem('sirh_cache_pointages');
+                if (pointagesCache) pointagesAnnee = JSON.parse(pointagesCache);
+                
+                showToast("Mode hors ligne : données locales chargées.", true);
+                return;
+            }
+
+            // LECTURE NORMALE (EN LIGNE)
             const { data: pData } = await supaClient.from('parametres').select('*').eq('user_id', currentUser.id).maybeSingle();
             if (pData) userParams = { ...userParams, ...pData };
 
             const currentYear = new Date().getFullYear();
-            if (!userParams.annee_maj) {
-                userParams.annee_maj = currentYear;
-                await supaClient.from('parametres').upsert({ user_id: currentUser.id, annee_maj: currentYear });
-            } else if (userParams.annee_maj < currentYear) {
-                const { data: absPrecedentes } = await supaClient.from('absences').select('*').eq('user_id', currentUser.id).eq('type_absence', 'CP').gte('date_debut', `${userParams.annee_maj}-01-01`).lte('date_debut', `${userParams.annee_maj}-12-31`);
-                let cpConsBeforeLimit = 0; let cpConsAfterLimit = 0;
-                const limiteDateStr = userParams.date_limite_reliquat; const limiteDate = limiteDateStr ? new Date(limiteDateStr + 'T23:59:59') : null;
-                (absPrecedentes || []).forEach(a => {
-                    let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1;
-                    if (limiteDate && new Date(a.date_debut) > limiteDate) cpConsAfterLimit += j; else cpConsBeforeLimit += j;
-                });
-                let ancienReliquat = userParams.reliquat_cp || 0;
-                let cpRestantsN = userParams.cp_initial - Math.max(0, cpConsBeforeLimit - ancienReliquat) - cpConsAfterLimit;
-                
-                userParams.reliquat_cp = Math.max(0, cpRestantsN); userParams.annee_maj = currentYear;
-                if (userParams.date_limite_reliquat) { let d = new Date(userParams.date_limite_reliquat); d.setFullYear(currentYear); userParams.date_limite_reliquat = `${currentYear}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
-                
-                await supaClient.from('parametres').upsert({ user_id: currentUser.id, annee_maj: currentYear, reliquat_cp: userParams.reliquat_cp, date_limite_reliquat: userParams.date_limite_reliquat });
+            // ... (Garde ta logique de reliquat et de annee_maj qui est ici normalement) ...
+
+            const debutAnnee = new Date(currentYear, 0, 1).toISOString();
+            const { data: ptData } = await supaClient.from('pointages').select('*').eq('user_id', currentUser.id).gte('timestamp', debutAnnee).order('timestamp', { ascending: true });
+            if (ptData) {
+                pointagesAnnee = ptData;
+                // SAUVEGARDE DANS LE CACHE
+                localStorage.setItem('sirh_cache_params', JSON.stringify(userParams));
+                localStorage.setItem('sirh_cache_pointages', JSON.stringify(pointagesAnnee));
             }
+        }
 
             const debutAnnee = new Date(currentYear, 0, 1).toISOString();
             const { data: ptData } = await supaClient.from('pointages').select('*').eq('user_id', currentUser.id).gte('timestamp', debutAnnee).order('timestamp', { ascending: true });
@@ -576,7 +581,32 @@
         }
 
         window.pointer = async (type) => {
-            try { await supaClient.from('pointages').insert([{ user_id: currentUser.id, type_action: type }]); await chargerDonneesGlobales(); rafraichirVueJour(); if(calendar) calendar.refetchEvents(); } catch(e) { showToast(e.message, true); }
+            // On fige l'heure exacte du clic sur l'appareil
+            const timestampActuel = new Date().toISOString();
+            const payload = { user_id: currentUser.id, type_action: type, timestamp: timestampActuel };
+            
+            // Mise à jour visuelle immédiate (même hors ligne)
+            pointagesAnnee.push({ id: 'temp-' + Date.now(), ...payload });
+            rafraichirVueJour();
+
+            // Si pas internet -> Sauvegarde locale
+            if (!navigator.onLine) {
+                let fileAttente = JSON.parse(localStorage.getItem('sirh_offline_queue')) || [];
+                fileAttente.push({ table: 'pointages', type: 'insert', data: payload });
+                localStorage.setItem('sirh_offline_queue', JSON.stringify(fileAttente));
+                showToast("Hors ligne : Pointage sauvegardé sur votre appareil.", true);
+                return;
+            }
+
+            // Si internet -> Envoi classique
+            try { 
+                await supaClient.from('pointages').insert([payload]); 
+                await chargerDonneesGlobales(); 
+                rafraichirVueJour(); 
+                if(calendar) calendar.refetchEvents(); 
+            } catch(e) { 
+                showToast(e.message, true); 
+            }
         };
 
         function calculerStatistiquesJour(pts) {
@@ -791,8 +821,23 @@
                 },
 
                 events: async function(info, success, fail) {
+                    // Si on est hors ligne, on charge les absences du cache
+                    if (!navigator.onLine) {
+                        const absCache = localStorage.getItem('sirh_cache_absences');
+                        if (absCache) {
+                            currentAbsences = JSON.parse(absCache);
+                            chargerSoldes(currentAbsences); calculerHeuresSupEt1607();
+                            // (laisser le code mapping "eventsList" générer l'affichage visuel ici)
+                        }
+                        return; // On arrête la requête Supabase
+                    }
+
+                    // Requête normale Supabase
                     const { data, error } = await supaClient.from('absences').select('*').eq('user_id', currentUser.id);
                     if (error) return fail(error);
+                    
+                    // On met à jour le cache
+                    localStorage.setItem('sirh_cache_absences', JSON.stringify(data));
                     
                     currentAbsences = data; chargerSoldes(data); calculerHeuresSupEt1607();
                     
@@ -1177,6 +1222,32 @@
             });
             if(tab === 'pointage') rafraichirVueJour(); else if(calendar) { calendar.render(); calendar.updateSize(); }
         };
+
+        // --- SYNCHRONISEUR AUTOMATIQUE ---
+        window.addEventListener('online', async () => {
+            let fileAttente = JSON.parse(localStorage.getItem('sirh_offline_queue')) || [];
+            
+            if (fileAttente.length > 0) {
+                showToast(`Connexion rétablie. Synchronisation de ${fileAttente.length} pointage(s)...`);
+                
+                for (let tache of fileAttente) {
+                    if (tache.type === 'insert') {
+                        await supaClient.from(tache.table).insert([tache.data]);
+                    }
+                }
+                
+                // On vide la file d'attente après succès
+                localStorage.removeItem('sirh_offline_queue');
+                
+                // On met à jour l'affichage avec les vraies données de la base
+                await chargerDonneesGlobales();
+                rafraichirVueJour();
+                showToast("Synchronisation terminée avec succès !");
+            } else {
+                showToast("Connexion rétablie.");
+            }
+        });
+        
     </script>
 </body>
 </html>

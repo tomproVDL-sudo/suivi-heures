@@ -869,7 +869,7 @@
             let totalTravailléMs = 0; let totalPauseMs = 0; let nbPausesReelles = 0; const hoursPerDay = (userParams.base_horaire / 5);
 
             for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toISOString().split('T')[0]; const dayOfWeek = d.getDay(); const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; const dayOfWeek = d.getDay(); const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
                 let strDebut = "--"; let strPauses = "--"; let strFin = "--"; let valTravail = "0h00"; let valEcart = "0h00";
                 let tMs = 0; let expected = isWeekend ? 0 : hoursPerDay * 3600000;
                 
@@ -953,7 +953,7 @@
             const getWeekStr = (d) => { const first = new Date(d.getFullYear(), 0, 1); const days = Math.floor((d - first) / 86400000); return `S${Math.ceil((d.getDay() + 1 + days) / 7)} ${d.getFullYear()}`; };
 
             for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toISOString().split('T')[0];
+                const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                 const key = groupMode === 'week' ? getWeekStr(d) : dateStr;
                 if(!mapGrouped[key]) mapGrouped[key] = { label: (groupMode==='week' ? key : d.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'})), workMs: 0, expectedMs: 0, pauseMs: 0 };
                 

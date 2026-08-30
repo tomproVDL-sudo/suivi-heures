@@ -819,29 +819,31 @@
                         if (dayFrame) { const oldBubble = dayFrame.querySelector('.fit-bubble-container'); if (oldBubble) oldBubble.remove(); dayFrame.appendChild(container); }
                     }
                 },
-
                 events: async function(info, success, fail) {
-                    // Si on est hors ligne, on charge les absences du cache
+                    let absData = [];
+
+                    // 1. Récupération des données (Hors ligne ou En ligne)
                     if (!navigator.onLine) {
                         const absCache = localStorage.getItem('sirh_cache_absences');
                         if (absCache) {
-                            currentAbsences = JSON.parse(absCache);
-                            chargerSoldes(currentAbsences); calculerHeuresSupEt1607();
-                            // (laisser le code mapping "eventsList" générer l'affichage visuel ici)
+                            absData = JSON.parse(absCache);
                         }
-                        return; // On arrête la requête Supabase
+                    } else {
+                        const { data, error } = await supaClient.from('absences').select('*').eq('user_id', currentUser.id);
+                        if (error) return fail(error);
+                        
+                        absData = data;
+                        // On met à jour le cache
+                        localStorage.setItem('sirh_cache_absences', JSON.stringify(absData));
                     }
 
-                    // Requête normale Supabase
-                    const { data, error } = await supaClient.from('absences').select('*').eq('user_id', currentUser.id);
-                    if (error) return fail(error);
+                    // 2. Mise à jour des variables globales et des compteurs
+                    currentAbsences = absData; 
+                    chargerSoldes(absData); 
+                    calculerHeuresSupEt1607();
                     
-                    // On met à jour le cache
-                    localStorage.setItem('sirh_cache_absences', JSON.stringify(data));
-                    
-                    currentAbsences = data; chargerSoldes(data); calculerHeuresSupEt1607();
-                    
-                    let eventsList = data.map(a => {
+                    // 3. Construction des événements (Absences)
+                    let eventsList = absData.map(a => {
                         let c = '#3b82f6'; 
                         if(a.type_absence === 'CP') c = '#14b8a6'; 
                         if(a.type_absence === 'Maladie') c = '#ef4444'; 
@@ -854,8 +856,14 @@
                         return { id: a.id, extendedProps: { type: a.type_absence, moment: a.moment }, title: titre, start: a.date_debut, end: `${endDateObj.getFullYear()}-${String(endDateObj.getMonth()+1).padStart(2,'0')}-${String(endDateObj.getDate()).padStart(2,'0')}`, backgroundColor: c, borderColor: c, allDay: true };
                     });
 
+                    // 4. Construction des événements (Pointages de travail)
                     const parJour = {};
-                    pointagesAnnee.forEach(p => { const pDateObj = new Date(p.timestamp); const d = `${pDateObj.getFullYear()}-${String(pDateObj.getMonth()+1).padStart(2,'0')}-${String(pDateObj.getDate()).padStart(2,'0')}`; if(!parJour[d]) parJour[d] = []; parJour[d].push(p); });
+                    pointagesAnnee.forEach(p => { 
+                        const pDateObj = new Date(p.timestamp); 
+                        const d = `${pDateObj.getFullYear()}-${String(pDateObj.getMonth()+1).padStart(2,'0')}-${String(pDateObj.getDate()).padStart(2,'0')}`; 
+                        if(!parJour[d]) parJour[d] = []; 
+                        parJour[d].push(p); 
+                    });
 
                     for (let jour in parJour) {
                         let lastArr = null; let blockStart = null;
@@ -869,6 +877,8 @@
                         });
                         if(lastArr) { eventsList.push({ title: 'Travail en cours', start: blockStart || lastArr, end: new Date(), backgroundColor: '#14b8a6', borderColor: '#0d9488', className: 'work-block', extendedProps: { isWork: true } }); }
                     }
+                    
+                    // 5. Envoi au calendrier (S'exécute avec ou sans réseau !)
                     success(eventsList);
                 },
                 

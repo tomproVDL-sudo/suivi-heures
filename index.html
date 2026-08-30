@@ -490,7 +490,7 @@
         };
 
         async function chargerDonneesGlobales() {
-            // LECTURE HORS LIGNE
+            // 1. LECTURE HORS LIGNE
             if (!navigator.onLine) {
                 const paramsCache = localStorage.getItem('sirh_cache_params');
                 if (paramsCache) userParams = { ...userParams, ...JSON.parse(paramsCache) };
@@ -502,26 +502,64 @@
                 return;
             }
 
-            // LECTURE NORMALE (EN LIGNE)
+            // 2. LECTURE NORMALE (EN LIGNE)
             const { data: pData } = await supaClient.from('parametres').select('*').eq('user_id', currentUser.id).maybeSingle();
             if (pData) userParams = { ...userParams, ...pData };
 
             const currentYear = new Date().getFullYear();
-            // ... (Garde ta logique de reliquat et de annee_maj qui est ici normalement) ...
 
+            // --- LOGIQUE DE MISE A JOUR ANNUELLE (RELIQUAT) ---
+            if (!userParams.annee_maj) {
+                userParams.annee_maj = currentYear;
+                await supaClient.from('parametres').upsert({ user_id: currentUser.id, annee_maj: currentYear });
+            } else if (userParams.annee_maj < currentYear) {
+                const { data: absPrecedentes } = await supaClient.from('absences')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .eq('type_absence', 'CP')
+                    .gte('date_debut', `${userParams.annee_maj}-01-01`)
+                    .lte('date_debut', `${userParams.annee_maj}-12-31`);
+                
+                let cpConsBeforeLimit = 0; 
+                let cpConsAfterLimit = 0;
+                const limiteDateStr = userParams.date_limite_reliquat; 
+                const limiteDate = limiteDateStr ? new Date(limiteDateStr + 'T23:59:59') : null;
+                
+                (absPrecedentes || []).forEach(a => {
+                    let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1;
+                    if (limiteDate && new Date(a.date_debut) > limiteDate) cpConsAfterLimit += j; 
+                    else cpConsBeforeLimit += j;
+                });
+                
+                let ancienReliquat = userParams.reliquat_cp || 0;
+                let cpRestantsN = userParams.cp_initial - Math.max(0, cpConsBeforeLimit - ancienReliquat) - cpConsAfterLimit;
+                
+                userParams.reliquat_cp = Math.max(0, cpRestantsN); 
+                userParams.annee_maj = currentYear;
+                if (userParams.date_limite_reliquat) { 
+                    let d = new Date(userParams.date_limite_reliquat); 
+                    d.setFullYear(currentYear); 
+                    userParams.date_limite_reliquat = `${currentYear}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; 
+                }
+                
+                await supaClient.from('parametres').upsert({ 
+                    user_id: currentUser.id, 
+                    annee_maj: currentYear, 
+                    reliquat_cp: userParams.reliquat_cp, 
+                    date_limite_reliquat: userParams.date_limite_reliquat 
+                });
+            }
+            // --- FIN LOGIQUE RELIQUAT ---
+
+            // 3. CHARGEMENT DES POINTAGES ET MISE EN CACHE
             const debutAnnee = new Date(currentYear, 0, 1).toISOString();
             const { data: ptData } = await supaClient.from('pointages').select('*').eq('user_id', currentUser.id).gte('timestamp', debutAnnee).order('timestamp', { ascending: true });
             if (ptData) {
                 pointagesAnnee = ptData;
-                // SAUVEGARDE DANS LE CACHE
+                // SAUVEGARDE DANS LE CACHE POUR LE MODE HORS LIGNE
                 localStorage.setItem('sirh_cache_params', JSON.stringify(userParams));
                 localStorage.setItem('sirh_cache_pointages', JSON.stringify(pointagesAnnee));
             }
-        }
-
-            const debutAnnee = new Date(currentYear, 0, 1).toISOString();
-            const { data: ptData } = await supaClient.from('pointages').select('*').eq('user_id', currentUser.id).gte('timestamp', debutAnnee).order('timestamp', { ascending: true });
-            if (ptData) pointagesAnnee = ptData;
         }
 
         function initialiserApp(user) {

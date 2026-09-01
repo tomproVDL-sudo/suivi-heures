@@ -123,14 +123,22 @@
                 <h2 class="text-2xl font-medium text-gray-800 text-center mb-6">Suivi d'activité</h2>
                 
                 <div class="grid grid-cols-3 gap-3 md:gap-4 mb-4">
-                    <div class="bg-teal-50 p-3 md:p-4 rounded-xl text-center transition-colors duration-300">
-                        <div class="text-xl md:text-2xl font-bold text-teal-600 transition-colors duration-300" id="stat-heures">0h00</div>
-                        <div class="text-[10px] md:text-xs text-gray-600 mt-1">Travaillé</div>
+                    <!-- Carte Travaillé avec progression dynamique -->
+                    <div class="bg-teal-50 rounded-xl text-center transition-colors duration-300 relative overflow-hidden flex flex-col justify-center p-3 md:p-4">
+                        <div id="progress-heures" class="absolute top-0 left-0 h-full bg-teal-100 transition-all duration-1000 ease-out" style="width: 0%;"></div>
+                        <div class="relative z-10">
+                            <div class="text-xl md:text-2xl font-bold text-teal-600 transition-colors duration-300" id="stat-heures">0h00</div>
+                            <div class="text-[10px] md:text-xs text-gray-600 mt-1">Travaillé</div>
+                        </div>
                     </div>
+                    
+                    <!-- Carte Pauses -->
                     <div class="bg-orange-50 p-3 md:p-4 rounded-xl text-center">
                         <div class="text-xl md:text-2xl font-bold text-orange-600" id="stat-pauses">0</div>
                         <div class="text-[10px] md:text-xs text-gray-600 mt-1">Pauses</div>
                     </div>
+                    
+                    <!-- Carte Statut -->
                     <div class="bg-blue-50 p-3 md:p-4 rounded-xl text-center">
                         <div class="text-xl md:text-2xl font-bold text-blue-600 truncate" id="stat-statut">--</div>
                         <div class="text-[10px] md:text-xs text-gray-600 mt-1">Statut</div>
@@ -657,9 +665,18 @@
             if (lastArrivee) { totalTravail += (new Date() - lastArrivee); }
 
             const spanHeures = document.getElementById('stat-heures');
+            const progressBg = document.getElementById('progress-heures');
+            
             if (totalTravail > 0) {
                 let h = Math.floor(totalTravail / 3600000); let m = Math.floor((totalTravail % 3600000) / 60000);
                 spanHeures.textContent = `${h}h${m.toString().padStart(2, '0')}`;
+                
+                // Calcul de la progression : Base hebdo / 5 jours (ex: 39h / 5 = 7.8h ou 7h48)
+                const msObjectif = (userParams.base_horaire / 5) * 3600000;
+                const pourcentage = (totalTravail / msObjectif) * 100;
+                // On bloque visuellement l'élargissement à 100% maximum
+                if (progressBg) progressBg.style.width = `${Math.min(pourcentage, 100)}%`;
+
                 const heuresDec = totalTravail / 3600000;
                 if (userParams.notifs_actives && heuresDec >= userParams.limite_heures_jour) {
                     spanHeures.classList.remove('text-teal-600'); spanHeures.classList.add('text-red-600');
@@ -670,7 +687,10 @@
                         localStorage.setItem('lastNotifDate', today);
                     }
                 } else { spanHeures.classList.remove('text-red-600'); spanHeures.classList.add('text-teal-600'); }
-            } else { spanHeures.textContent = '0h00'; }
+            } else { 
+                spanHeures.textContent = '0h00'; 
+                if (progressBg) progressBg.style.width = '0%';
+            }
             
             document.getElementById('stat-pauses').textContent = pauses;
             document.getElementById('stat-statut').textContent = (lastArrivee) ? 'En poste' : (totalTravail > 0 ? 'Terminé' : '--');

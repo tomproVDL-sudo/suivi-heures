@@ -655,9 +655,12 @@
             }
         };
 
-        function calculerStatistiquesJour(pts) {
+       function calculerStatistiquesJour(pts) {
             let totalTravail = 0; let lastArrivee = null; let pauses = 0;
+            let lastAction = null; // Permet de mémoriser l'état exact
+
             pts.forEach(pt => {
+                lastAction = pt.type_action;
                 if(pt.type_action === 'arrivee') { lastArrivee = new Date(pt.timestamp); }
                 if(pt.type_action === 'pause') { pauses++; if (lastArrivee) { totalTravail += (new Date(pt.timestamp) - lastArrivee); lastArrivee = null; } }
                 if(pt.type_action === 'depart') { if (lastArrivee) { totalTravail += (new Date(pt.timestamp) - lastArrivee); lastArrivee = null; } }
@@ -671,11 +674,34 @@
                 let h = Math.floor(totalTravail / 3600000); let m = Math.floor((totalTravail % 3600000) / 60000);
                 spanHeures.textContent = `${h}h${m.toString().padStart(2, '0')}`;
                 
-                // Calcul de la progression : Base hebdo / 5 jours (ex: 39h / 5 = 7.8h ou 7h48)
-                const msObjectif = (userParams.base_horaire / 5) * 3600000;
+                // --- LOGIQUE DEMI-JOURNÉE POUR LA JAUGE ---
+                let ratioJournee = 1;
+                const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
+                
+                // On fouille dans le planning pour voir si tu es absent aujourd'hui
+                let absenceAujourdhui = currentAbsences.find(a => {
+                    const aStart = new Date(a.date_debut); aStart.setHours(0,0,0,0); 
+                    const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0); 
+                    return todayMidnight >= aStart && todayMidnight <= aEnd;
+                });
+
+                if (absenceAujourdhui) {
+                    if (absenceAujourdhui.moment === 'matin' || absenceAujourdhui.moment === 'aprem') {
+                        ratioJournee = 0.5; // L'objectif est divisé par 2
+                    } else if (absenceAujourdhui.moment === 'journee') {
+                        ratioJournee = 0; 
+                    }
+                }
+
+                const baseMs = (userParams.base_horaire / 5) * 3600000;
+                let msObjectif = baseMs * ratioJournee;
+                
+                // Sécurité : si tu pointes un jour complet de repos, on remet l'objectif de base pour éviter un bug d'affichage (division par zéro)
+                if (msObjectif === 0) msObjectif = baseMs; 
+
                 const pourcentage = (totalTravail / msObjectif) * 100;
-                // On bloque visuellement l'élargissement à 100% maximum
                 if (progressBg) progressBg.style.width = `${Math.min(pourcentage, 100)}%`;
+                // -----------------------------------------
 
                 const heuresDec = totalTravail / 3600000;
                 if (userParams.notifs_actives && heuresDec >= userParams.limite_heures_jour) {
@@ -692,8 +718,14 @@
                 if (progressBg) progressBg.style.width = '0%';
             }
             
+            // --- LOGIQUE DE STATUT EXACT ---
+            let texteStatut = '--';
+            if (lastAction === 'arrivee') texteStatut = 'En poste';
+            else if (lastAction === 'pause') texteStatut = 'En pause';
+            else if (lastAction === 'depart') texteStatut = 'Terminé';
+            
             document.getElementById('stat-pauses').textContent = pauses;
-            document.getElementById('stat-statut').textContent = (lastArrivee) ? 'En poste' : (totalTravail > 0 ? 'Terminé' : '--');
+            document.getElementById('stat-statut').textContent = texteStatut;
         }
 
         function calculerHeuresSupEt1607() {

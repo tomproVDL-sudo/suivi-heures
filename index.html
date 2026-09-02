@@ -699,11 +699,8 @@
                 });
 
                 if (absenceAujourdhui) {
-                    if (absenceAujourdhui.moment === 'matin' || absenceAujourdhui.moment === 'aprem') {
-                        ratioJournee = 0.5; 
-                    } else if (absenceAujourdhui.moment === 'journee') {
-                        ratioJournee = 0; 
-                    }
+                    if (absenceAujourdhui.moment === 'matin' || absenceAujourdhui.moment === 'aprem') { ratioJournee = 0.5; } 
+                    else if (absenceAujourdhui.moment === 'journee') { ratioJournee = 0; }
                 }
 
                 const baseMs = (userParams.base_horaire / 5) * 3600000;
@@ -720,11 +717,7 @@
                     
                     if (localStorage.getItem('lastNotifDate') !== today) {
                         showToast(`⚠️ Alerte : Seuil des ${userParams.limite_heures_jour}h atteint !`, true);
-                        
-                        // 1. On mémorise immédiatement pour tuer la boucle temporelle
                         localStorage.setItem('lastNotifDate', today);
-                        
-                        // 2. On isole la notification dans un try/catch pour éviter le crash sur mobile
                         try {
                             if ("Notification" in window && Notification.permission === "granted") {
                                 if (navigator.serviceWorker && navigator.serviceWorker.controller) {
@@ -734,8 +727,7 @@
                                 }
                             }
                         } catch (e) {
-                            // Le téléphone refuse la notification, mais le code continue silencieusement.
-                            console.warn("Notification mobile refusée ou non supportée.");
+                            console.warn("Notification mobile refusée.");
                         }
                     }
                 } else { 
@@ -749,8 +741,7 @@
             // --- GESTION AFFICHAGE PAUSE EN DURÉE ---
             let textePause = '0 min';
             if (totalPauseMs > 0) {
-                let hPause = Math.floor(totalPauseMs / 3600000);
-                let mPause = Math.floor((totalPauseMs % 3600000) / 60000);
+                let hPause = Math.floor(totalPauseMs / 3600000); let mPause = Math.floor((totalPauseMs % 3600000) / 60000);
                 textePause = hPause > 0 ? `${hPause}h${mPause.toString().padStart(2, '0')}` : `${mPause} min`;
             }
             document.getElementById('stat-pauses').textContent = textePause;
@@ -762,6 +753,36 @@
             else if (lastAction === 'depart') texteStatut = 'Terminé';
             
             document.getElementById('stat-statut').textContent = texteStatut;
+
+            // --- SYNCHRONISATION EN DIRECT DE LA BULLE DU CALENDRIER ---
+            const todayCellFrame = document.querySelector('.fc-day-today .fc-daygrid-day-frame');
+            if (todayCellFrame) {
+                let container = todayCellFrame.querySelector('.fit-bubble-container');
+                if (totalTravail > 0) {
+                    if (!container) {
+                        container = document.createElement('div'); container.className = 'fit-bubble-container';
+                        const bubble = document.createElement('div'); bubble.className = 'fit-bubble';
+                        const textL = document.createElement('span'); textL.style.position = 'absolute'; textL.style.fontSize = '0.65rem'; textL.style.fontWeight = '700';
+                        container.appendChild(bubble); container.appendChild(textL);
+                        todayCellFrame.appendChild(container);
+                    }
+                    const hDec = totalTravail / 3600000; const reqHours = userParams.base_horaire / 5;
+                    let color = '#10b981'; let textColor = '#047857'; 
+                    if (hDec > 10) { color = '#ef4444'; textColor = '#b91c1c'; } else if (hDec < reqHours) { color = '#3b82f6'; textColor = '#1d4ed8'; } 
+                    
+                    let diameter = Math.min(50, Math.max(34, Math.round(hDec * 5)));
+                    let bubble = container.querySelector('.fit-bubble'); let textL = container.querySelector('span');
+                    
+                    if (bubble) { bubble.style.width = `${diameter}px`; bubble.style.height = `${diameter}px`; bubble.style.backgroundColor = color; bubble.style.opacity = '0.35'; }
+                    if (textL) {
+                        let h = Math.floor(hDec); let m = Math.floor((totalTravail % 3600000) / 60000);
+                        textL.textContent = m === 0 ? `${h}h` : `${h}h${m.toString().padStart(2, '0')}`;
+                        textL.style.color = textColor;
+                    }
+                } else if (container) {
+                    container.remove();
+                }
+            }
         }
         
         function calculerHeuresSupEt1607() {
@@ -1331,8 +1352,19 @@
             const nd = new Date(oldDateStr); nd.setHours(h, m, 0);
             try {
                 await supaClient.from('pointages').update({ timestamp: nd.toISOString() }).eq('id', id); 
-                await chargerDonneesGlobales(); rafraichirVueJour(); if(calendar) calendar.refetchEvents();
+                await chargerDonneesGlobales(); rafraichirVueJour(); 
+                if(calendar) { calendar.destroy(); initCalendar(); }
                 fermerModalPointage(); showToast("Horaire modifié");
+            } catch(e) { showToast(e.message, true); }
+        };
+
+        window.confirmerSuppressionPointage = async () => {
+            const id = document.getElementById('edit_pointage_id').value;
+            try {
+                await supaClient.from('pointages').delete().eq('id', id); 
+                await chargerDonneesGlobales(); rafraichirVueJour(); 
+                if(calendar) { calendar.destroy(); initCalendar(); }
+                fermerModalPointage(); showToast("Pointage supprimé");
             } catch(e) { showToast(e.message, true); }
         };
 
@@ -1390,7 +1422,7 @@
             // 1. On force l'actualisation des données depuis le serveur
             await chargerDonneesGlobales();
 
-            // 2. On change l'affichage des onglets
+            // 2. On change l'affichage
             ['pointage', 'planning'].forEach(t => { 
                 document.getElementById('view-' + t).classList.toggle('hidden', t !== tab); 
                 document.getElementById('view-' + t).classList.toggle('flex', t === tab); 
@@ -1398,13 +1430,13 @@
                 document.getElementById('btn-' + t).classList.toggle('text-teal-700', t === tab); 
             });
             
-            // 3. On reconstruit les interfaces
+            // 3. On met à jour la vue avec les nouvelles données
             if (tab === 'pointage') {
                 rafraichirVueJour(); 
-            } else if (tab === 'planning' && calendar) {
-                calculerHeuresSupEt1607(); // MAJ des encarts H. Sup en haut
-                calendar.destroy();        // Détruit le calendrier obsolète
-                initCalendar();            // Reconstruit le calendrier avec les bulles à jour
+            } else if (tab === 'planning') { 
+                calculerHeuresSupEt1607();
+                if (calendar) { calendar.destroy(); } // Détruit l'ancien calendrier figé
+                initCalendar(); // Reconstruit le calendrier avec les bulles à jour !
             }
         };
 

@@ -1390,7 +1390,7 @@
             // 1. On force l'actualisation des données depuis le serveur
             await chargerDonneesGlobales();
 
-            // 2. On change l'affichage
+            // 2. On change l'affichage des onglets
             ['pointage', 'planning'].forEach(t => { 
                 document.getElementById('view-' + t).classList.toggle('hidden', t !== tab); 
                 document.getElementById('view-' + t).classList.toggle('flex', t === tab); 
@@ -1398,13 +1398,13 @@
                 document.getElementById('btn-' + t).classList.toggle('text-teal-700', t === tab); 
             });
             
-            // 3. On met à jour la vue avec les nouvelles données
+            // 3. On reconstruit les interfaces
             if (tab === 'pointage') {
                 rafraichirVueJour(); 
-            } else if (calendar) { 
-                calendar.refetchEvents(); // Recharge événements et absences
-                calendar.render(); 
-                calendar.updateSize(); 
+            } else if (tab === 'planning' && calendar) {
+                calculerHeuresSupEt1607(); // MAJ des encarts H. Sup en haut
+                calendar.destroy();        // Détruit le calendrier obsolète
+                initCalendar();            // Reconstruit le calendrier avec les bulles à jour
             }
         };
 

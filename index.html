@@ -718,13 +718,27 @@
                     spanHeures.classList.remove('text-teal-600'); spanHeures.classList.add('text-red-600');
                     const today = new Date().toLocaleDateString();
                     
-                    // CORRECTION DU BUG DES NOTIFICATIONS MULTIPLES
                     if (localStorage.getItem('lastNotifDate') !== today) {
                         showToast(`⚠️ Alerte : Seuil des ${userParams.limite_heures_jour}h atteint !`, true);
-                        // ON UTILISE LA NOUVELLE FONCTION COMPATIBLE MOBILE
-                        envoyerNotification("Alerte Temps de Travail ⏱️", { body: `Limite journalière de ${userParams.limite_heures_jour}h atteinte.` });
+                        
+                        // 1. On mémorise immédiatement pour tuer la boucle temporelle
                         localStorage.setItem('lastNotifDate', today);
+                        
+                        // 2. On isole la notification dans un try/catch pour éviter le crash sur mobile
+                        try {
+                            if ("Notification" in window && Notification.permission === "granted") {
+                                if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                                    navigator.serviceWorker.ready.then(reg => reg.showNotification("Alerte Temps ⏱️", { body: `Limite de ${userParams.limite_heures_jour}h atteinte.` }));
+                                } else {
+                                    new Notification("Alerte Temps ⏱️", { body: `Limite de ${userParams.limite_heures_jour}h atteinte.` });
+                                }
+                            }
+                        } catch (e) {
+                            // Le téléphone refuse la notification, mais le code continue silencieusement.
+                            console.warn("Notification mobile refusée ou non supportée.");
+                        }
                     }
+                }
                 } else { spanHeures.classList.remove('text-red-600'); spanHeures.classList.add('text-teal-600'); }
             } else { 
                 spanHeures.textContent = '0h00'; 

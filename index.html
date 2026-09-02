@@ -655,17 +655,31 @@
             }
         };
 
-       function calculerStatistiquesJour(pts) {
-            let totalTravail = 0; let lastArrivee = null; let pauses = 0;
-            let lastAction = null; // Permet de mémoriser l'état exact
+        function calculerStatistiquesJour(pts) {
+            let totalTravail = 0; let lastArrivee = null; 
+            let totalPauseMs = 0; let lastPauseStart = null;
+            let lastAction = null; 
 
             pts.forEach(pt => {
                 lastAction = pt.type_action;
-                if(pt.type_action === 'arrivee') { lastArrivee = new Date(pt.timestamp); }
-                if(pt.type_action === 'pause') { pauses++; if (lastArrivee) { totalTravail += (new Date(pt.timestamp) - lastArrivee); lastArrivee = null; } }
-                if(pt.type_action === 'depart') { if (lastArrivee) { totalTravail += (new Date(pt.timestamp) - lastArrivee); lastArrivee = null; } }
+                
+                if(pt.type_action === 'arrivee') { 
+                    lastArrivee = new Date(pt.timestamp); 
+                    if (lastPauseStart) { totalPauseMs += (new Date(pt.timestamp) - lastPauseStart); lastPauseStart = null; }
+                }
+                if(pt.type_action === 'pause') { 
+                    lastPauseStart = new Date(pt.timestamp);
+                    if (lastArrivee) { totalTravail += (new Date(pt.timestamp) - lastArrivee); lastArrivee = null; } 
+                }
+                if(pt.type_action === 'depart') { 
+                    if (lastPauseStart) { totalPauseMs += (new Date(pt.timestamp) - lastPauseStart); lastPauseStart = null; }
+                    if (lastArrivee) { totalTravail += (new Date(pt.timestamp) - lastArrivee); lastArrivee = null; } 
+                }
             });
+            
+            // Ajout du temps en cours si l'action n'est pas terminée
             if (lastArrivee) { totalTravail += (new Date() - lastArrivee); }
+            if (lastPauseStart) { totalPauseMs += (new Date() - lastPauseStart); }
 
             const spanHeures = document.getElementById('stat-heures');
             const progressBg = document.getElementById('progress-heures');
@@ -678,7 +692,6 @@
                 let ratioJournee = 1;
                 const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
                 
-                // On fouille dans le planning pour voir si tu es absent aujourd'hui
                 let absenceAujourdhui = currentAbsences.find(a => {
                     const aStart = new Date(a.date_debut); aStart.setHours(0,0,0,0); 
                     const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0); 
@@ -687,7 +700,7 @@
 
                 if (absenceAujourdhui) {
                     if (absenceAujourdhui.moment === 'matin' || absenceAujourdhui.moment === 'aprem') {
-                        ratioJournee = 0.5; // L'objectif est divisé par 2
+                        ratioJournee = 0.5; 
                     } else if (absenceAujourdhui.moment === 'journee') {
                         ratioJournee = 0; 
                     }
@@ -695,21 +708,23 @@
 
                 const baseMs = (userParams.base_horaire / 5) * 3600000;
                 let msObjectif = baseMs * ratioJournee;
-                
-                // Sécurité : si tu pointes un jour complet de repos, on remet l'objectif de base pour éviter un bug d'affichage (division par zéro)
                 if (msObjectif === 0) msObjectif = baseMs; 
 
                 const pourcentage = (totalTravail / msObjectif) * 100;
                 if (progressBg) progressBg.style.width = `${Math.min(pourcentage, 100)}%`;
-                // -----------------------------------------
 
                 const heuresDec = totalTravail / 3600000;
                 if (userParams.notifs_actives && heuresDec >= userParams.limite_heures_jour) {
                     spanHeures.classList.remove('text-teal-600'); spanHeures.classList.add('text-red-600');
                     const today = new Date().toLocaleDateString();
+                    
+                    // CORRECTION DU BUG DES NOTIFICATIONS MULTIPLES
                     if (localStorage.getItem('lastNotifDate') !== today) {
                         showToast(`⚠️ Alerte : Seuil des ${userParams.limite_heures_jour}h atteint !`, true);
-                        if ("Notification" in window && Notification.permission === "granted") { new Notification("Alerte Temps de Travail ⏱️", { body: `Limite journalière de ${userParams.limite_heures_jour}h atteinte.` }); }
+                        if ("Notification" in window && Notification.permission === "granted") { 
+                            new Notification("Alerte Temps de Travail ⏱️", { body: `Limite journalière de ${userParams.limite_heures_jour}h atteinte.` }); 
+                        }
+                        // La date est maintenant sauvegardée peu importe si la notif OS fonctionne ou non
                         localStorage.setItem('lastNotifDate', today);
                     }
                 } else { spanHeures.classList.remove('text-red-600'); spanHeures.classList.add('text-teal-600'); }
@@ -718,16 +733,24 @@
                 if (progressBg) progressBg.style.width = '0%';
             }
             
+            // --- GESTION AFFICHAGE PAUSE EN DURÉE ---
+            let textePause = '0 min';
+            if (totalPauseMs > 0) {
+                let hPause = Math.floor(totalPauseMs / 3600000);
+                let mPause = Math.floor((totalPauseMs % 3600000) / 60000);
+                textePause = hPause > 0 ? `${hPause}h${mPause.toString().padStart(2, '0')}` : `${mPause} min`;
+            }
+            document.getElementById('stat-pauses').textContent = textePause;
+            
             // --- LOGIQUE DE STATUT EXACT ---
             let texteStatut = '--';
             if (lastAction === 'arrivee') texteStatut = 'En poste';
             else if (lastAction === 'pause') texteStatut = 'En pause';
             else if (lastAction === 'depart') texteStatut = 'Terminé';
             
-            document.getElementById('stat-pauses').textContent = pauses;
             document.getElementById('stat-statut').textContent = texteStatut;
         }
-
+        
         function calculerHeuresSupEt1607() {
             const objAnnuel = userParams.objectif_annuel || 1607;
             if(document.getElementById('lbl-objectif')) document.getElementById('lbl-objectif').textContent = objAnnuel;

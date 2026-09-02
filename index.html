@@ -272,7 +272,7 @@
                     <div class="mb-3"><label class="text-xs font-bold text-gray-500 block">Objectif annuel (Heures)</label><input type="number" id="input_objectif_annuel" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500"></div>
                     <div class="mb-3"><label class="text-xs font-bold text-gray-500 block">Base hebdomadaire</label><input type="number" id="input_base_horaire" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500"></div>
                     <div class="mb-3"><label class="text-xs font-bold text-gray-500 block">Alerte dépassement quotidien (Max 10h)</label><input type="number" step="0.5" max="10" id="input_limite_heures" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500"></div>
-                    <div class="flex items-center gap-2 mt-4"><input type="checkbox" id="input_notifs" class="w-5 h-5 text-teal-600 rounded cursor-pointer"><label class="text-sm font-bold text-gray-700 cursor-pointer" for="input_notifs">Activer les notifications</label></div>
+                    <div class="flex items-center gap-2 mt-4"><input type="checkbox" id="input_notifs" class="w-5 h-5 text-teal-600 rounded cursor-pointer" onchange="demanderPermissionNotif(this)"><label class="text-sm font-bold text-gray-700 cursor-pointer" for="input_notifs">Activer les notifications</label></div>
                 </div>
 
                 <div class="p-4 bg-gray-50 rounded-xl mb-2">
@@ -721,10 +721,8 @@
                     // CORRECTION DU BUG DES NOTIFICATIONS MULTIPLES
                     if (localStorage.getItem('lastNotifDate') !== today) {
                         showToast(`⚠️ Alerte : Seuil des ${userParams.limite_heures_jour}h atteint !`, true);
-                        if ("Notification" in window && Notification.permission === "granted") { 
-                            new Notification("Alerte Temps de Travail ⏱️", { body: `Limite journalière de ${userParams.limite_heures_jour}h atteinte.` }); 
-                        }
-                        // La date est maintenant sauvegardée peu importe si la notif OS fonctionne ou non
+                        // ON UTILISE LA NOUVELLE FONCTION COMPATIBLE MOBILE
+                        envoyerNotification("Alerte Temps de Travail ⏱️", { body: `Limite journalière de ${userParams.limite_heures_jour}h atteinte.` });
                         localStorage.setItem('lastNotifDate', today);
                     }
                 } else { spanHeures.classList.remove('text-red-600'); spanHeures.classList.add('text-teal-600'); }
@@ -884,6 +882,35 @@
             if(document.getElementById('cpt-don')) document.getElementById('cpt-don').textContent = (txtDon > 0 ? '+' : '') + txtDon + ' j';
         }
 
+        // Fonction universelle pour envoyer une notification (Mobile + Bureau)
+        function envoyerNotification(titre, options) {
+            if (!("Notification" in window) || Notification.permission !== "granted") return;
+            
+            // Tentative via Service Worker (Requis pour iOS/Android)
+            if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                navigator.serviceWorker.ready.then(registration => {
+                    registration.showNotification(titre, options);
+                });
+            } else {
+                // Fallback classique (Navigateurs bureau)
+                new Notification(titre, options);
+            }
+        }
+
+        // Demande l'autorisation au moment exact où l'utilisateur coche la case
+        window.demanderPermissionNotif = async (checkbox) => {
+            if (checkbox.checked && "Notification" in window && Notification.permission !== "granted") {
+                const permission = await Notification.requestPermission();
+                if (permission !== "granted") {
+                    checkbox.checked = false;
+                    showToast("Permission refusée par votre appareil.", true);
+                } else {
+                    envoyerNotification("Notifications activées ✅", { body: "Vous recevrez vos alertes ici." });
+                }
+            }
+        };
+
+        
         function initCalendar() {
             calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
                 initialView: 'dayGridMonth', locale: 'fr', firstDay: 1, slotMinTime: '06:00:00', slotMaxTime: '22:00:00',
@@ -1344,14 +1371,26 @@
             } catch(e) { showToast(e.message, true); }
         };
 
-        window.switchTab = (tab) => {
+        window.switchTab = async (tab) => {
+            // 1. On force l'actualisation des données depuis le serveur
+            await chargerDonneesGlobales();
+
+            // 2. On change l'affichage
             ['pointage', 'planning'].forEach(t => { 
                 document.getElementById('view-' + t).classList.toggle('hidden', t !== tab); 
                 document.getElementById('view-' + t).classList.toggle('flex', t === tab); 
                 document.getElementById('btn-' + t).classList.toggle('bg-teal-50', t === tab); 
                 document.getElementById('btn-' + t).classList.toggle('text-teal-700', t === tab); 
             });
-            if(tab === 'pointage') rafraichirVueJour(); else if(calendar) { calendar.render(); calendar.updateSize(); }
+            
+            // 3. On met à jour la vue avec les nouvelles données
+            if (tab === 'pointage') {
+                rafraichirVueJour(); 
+            } else if (calendar) { 
+                calendar.refetchEvents(); // Recharge événements et absences
+                calendar.render(); 
+                calendar.updateSize(); 
+            }
         };
 
         // --- SYNCHRONISEUR AUTOMATIQUE ---

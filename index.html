@@ -738,8 +738,9 @@
                             console.warn("Notification mobile refusée ou non supportée.");
                         }
                     }
+                } else { 
+                    spanHeures.classList.remove('text-red-600'); spanHeures.classList.add('text-teal-600'); 
                 }
-                } else { spanHeures.classList.remove('text-red-600'); spanHeures.classList.add('text-teal-600'); }
             } else { 
                 spanHeures.textContent = '0h00'; 
                 if (progressBg) progressBg.style.width = '0%';

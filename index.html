@@ -220,6 +220,39 @@
         </div>
     </div>
 
+    <!-- MODAL : DETAIL JOURNÉE (Planning) -->
+    <div id="modal-jour" class="hidden fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-slide-in flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-white z-10">
+                <h3 class="text-lg font-bold text-gray-800 capitalize" id="titre-modal-jour">Journée</h3>
+                <button onclick="fermerModalJour()" class="text-gray-400 hover:text-gray-700 font-bold text-2xl leading-none">&times;</button>
+            </div>
+            
+            <div class="p-4 overflow-y-auto flex-1 bg-gray-50 custom-scrollbar">
+                <div id="liste-pointages-jour" class="space-y-2 mb-6">
+                    <!-- Rempli dynamiquement en JS -->
+                </div>
+                
+                <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-4">
+                    <h4 class="text-xs font-bold text-gray-500 uppercase mb-3">➕ Ajouter un pointage manquant</h4>
+                    <div class="flex gap-2">
+                        <select id="new_pointage_type" class="flex-1 p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 font-medium">
+                            <option value="arrivee">🟢 Arrivée</option>
+                            <option value="pause">⏸️ Pause</option>
+                            <option value="depart">🔴 Départ</option>
+                        </select>
+                        <input type="time" id="new_pointage_time" class="p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 w-24">
+                        <button onclick="ajouterPointageManuel()" class="bg-teal-500 text-white font-bold px-4 py-2 rounded-lg hover:bg-teal-600 shadow-sm">+</button>
+                    </div>
+                </div>
+                
+                <button onclick="transferToAbsence()" class="w-full bg-slate-800 text-white font-bold py-3.5 rounded-xl hover:bg-slate-700 text-sm shadow-sm transition">🏖️ Déclarer une absence ce jour</button>
+            </div>
+        </div>
+    </div>
+    <input type="hidden" id="current_edit_date">
+
+    
     <!-- MODAL CONTEXTUEL : MODIFIER/SUPPRIMER POINTAGE -->
     <div id="modal-pointage-edit" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-slide-in text-center">
@@ -1024,7 +1057,7 @@
                 headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
                 navLinks: false, editable: false, dayMaxEvents: true, eventDisplay: 'block',
                 datesSet: function() { calendar.updateSize(); },
-                dateClick: function(info) { ouvrirModalAbsence(null, 'RTT', info.dateStr, info.dateStr, 'journee'); },
+                dateClick: function(info) { ouvrirModalJour(info.dateStr); },
                 eventDidMount: function(info) { if (info.view.type === 'dayGridMonth' && info.event.extendedProps.isWork) { info.el.style.display = 'none'; } },
 
                 dayCellDidMount: function(info) {
@@ -1504,6 +1537,7 @@
                 await supaClient.from('pointages').update({ timestamp: nd.toISOString() }).eq('id', id); 
                 await chargerDonneesGlobales(); 
                 actualiserToutesLesVues();
+                if (!document.getElementById('modal-jour').classList.contains('hidden')) { rafraichirListeModalJour(document.getElementById('current_edit_date').value); }
                 fermerModalPointage(); showToast("Horaire modifié");
             } catch(e) { showToast(e.message, true); }
         };
@@ -1514,11 +1548,89 @@
                 await supaClient.from('pointages').delete().eq('id', id); 
                 await chargerDonneesGlobales(); 
                 actualiserToutesLesVues();
+                if (!document.getElementById('modal-jour').classList.contains('hidden')) { rafraichirListeModalJour(document.getElementById('current_edit_date').value); }
                 fermerModalPointage(); showToast("Pointage supprimé");
             } catch(e) { showToast(e.message, true); }
         };
 
 
+        // --- GESTION DU DETAIL D'UNE JOURNÉE (DEPUIS LE PLANNING) ---
+        window.ouvrirModalJour = (dateStr) => {
+            document.getElementById('current_edit_date').value = dateStr;
+            const d = new Date(dateStr);
+            document.getElementById('titre-modal-jour').textContent = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+            
+            rafraichirListeModalJour(dateStr);
+            document.getElementById('modal-jour').classList.remove('hidden');
+        };
+
+        window.fermerModalJour = () => { 
+            document.getElementById('modal-jour').classList.add('hidden'); 
+            document.getElementById('new_pointage_time').value = '';
+        };
+
+        window.rafraichirListeModalJour = (dateStr) => {
+            const conteneur = document.getElementById('liste-pointages-jour'); 
+            conteneur.innerHTML = '';
+            
+            // On récupère tous les pointages qui tombent sur cette journée
+            const pts = pointagesAnnee.filter(p => p.timestamp.startsWith(dateStr)).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+            
+            if(pts.length > 0) {
+                pts.forEach(p => {
+                    const heure = new Date(p.timestamp).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
+                    let l = p.type_action; let ic = ''; let c = "text-gray-800"; let b = "bg-white";
+                    
+                    if(l === 'arrivee') { l="Prise de poste / Reprise"; c="text-teal-600"; ic='🟢'; }
+                    if(l === 'pause') { l="Début de pause"; c="text-orange-500"; ic='⏸️'; }
+                    if(l === 'depart') { l="Fin de poste"; c="text-slate-600"; ic='🔴'; }
+                    
+                    conteneur.innerHTML += `<div class="flex justify-between items-center py-2.5 px-3 border border-gray-200 ${b} rounded-lg shadow-sm text-sm">
+                        <div class="font-medium ${c}"><span>${ic}</span> ${l}</div>
+                        <div class="flex gap-3"><span class="font-mono mt-0.5 text-gray-700">${heure}</span>
+                        <button onclick="ouvrirModalPointage('${p.id}', '${p.timestamp}')" class="text-blue-600 hover:bg-blue-100 bg-blue-50 px-2.5 py-0.5 rounded shadow-sm transition">Éditer</button>
+                        </div></div>`;
+                });
+            } else {
+                conteneur.innerHTML = '<div class="text-center text-gray-400 py-6 text-sm italic bg-white rounded-xl border border-gray-100 shadow-sm">Aucun pointage ce jour.</div>';
+            }
+        };
+
+        window.ajouterPointageManuel = async () => {
+            const dateStr = document.getElementById('current_edit_date').value;
+            const timeStr = document.getElementById('new_pointage_time').value;
+            const type = document.getElementById('new_pointage_type').value;
+            
+            if (!timeStr) return showToast("Veuillez saisir une heure", true);
+            
+            // On crée la date avec le bon fuseau horaire
+            const [h, m] = timeStr.split(':');
+            const d = new Date(dateStr); d.setHours(h, m, 0);
+            
+            const payload = { user_id: currentUser.id, type_action: type, timestamp: d.toISOString() };
+            
+            try {
+                const { error } = await supaClient.from('pointages').insert([payload]);
+                if (error) throw error;
+                
+                showToast("Pointage ajouté avec succès !");
+                document.getElementById('new_pointage_time').value = '';
+                
+                await chargerDonneesGlobales();
+                actualiserToutesLesVues();
+                rafraichirListeModalJour(dateStr); 
+            } catch(e) {
+                showToast(e.message, true);
+            }
+        };
+
+        window.transferToAbsence = () => {
+            const dateStr = document.getElementById('current_edit_date').value;
+            fermerModalJour();
+            ouvrirModalAbsence(null, 'RTT', dateStr, dateStr, 'journee');
+        };
+
+        
         // --- PARAMÈTRES ---
         window.ouvrirModalParametres = async () => {
             document.getElementById('input_objectif_annuel').value = userParams.objectif_annuel || 1607;

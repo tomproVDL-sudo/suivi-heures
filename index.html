@@ -1254,7 +1254,8 @@
 
             let totalTravailléMs = 0; let totalEcartMs = 0; let totalPauseMs = 0; let nbPausesReelles = 0; let joursTravaillesReels = 0;
             
-            let absStats = { 'CP':0, 'RTT':0, 'CET':0, 'AEA':0, 'Formation':0, 'Maladie':0 };
+            // --- AJOUT DE "Férié" DANS LES STATISTIQUES GLOBALES ---
+            let absStats = { 'CP':0, 'RTT':0, 'CET':0, 'AEA':0, 'Formation':0, 'Maladie':0, 'Férié':0 };
             currentAbsences.forEach(a => {
                 const d = new Date(a.date_debut);
                 if (d >= startD && d <= endD) {
@@ -1268,8 +1269,8 @@
             const dataNormale = []; const dataSup = []; const dataManque = [];
             const dataExpected = []; const dataPauseExp = [];
             
-            // --- NOUVELLES DONNÉES ABSENCES ---
-            const dataAbsCP = []; const dataAbsRTT = []; const dataAbsCET = []; const dataAbsAEA = []; const dataAbsFormation = []; const dataAbsMaladie = [];
+            // --- NOUVELLES DONNÉES ABSENCES & FÉRIÉS POUR LE GRAPHIQUE ---
+            const dataAbsCP = []; const dataAbsRTT = []; const dataAbsCET = []; const dataAbsAEA = []; const dataAbsFormation = []; const dataAbsMaladie = []; const dataAbsFerie = [];
 
             const mapGrouped = {};
             const getWeekStr = (d) => { const first = new Date(d.getFullYear(), 0, 1); const days = Math.floor((d - first) / 86400000); return `S${Math.ceil((d.getDay() + 1 + days) / 7)} ${d.getFullYear()}`; };
@@ -1278,24 +1279,30 @@
                 const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                 const key = groupMode === 'week' ? getWeekStr(d) : dateStr;
                 
-                // --- ON AJOUTE LE COMPTEUR D'ABSENCES POUR LE GRAPHIQUE ---
                 if(!mapGrouped[key]) {
                     mapGrouped[key] = { 
                         label: (groupMode==='week' ? key : d.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'})), 
                         workMs: 0, expectedMs: 0, pauseMs: 0,
-                        abs: { 'CP':0, 'RTT':0, 'CET':0, 'AEA':0, 'Formation':0, 'Maladie':0 }
+                        abs: { 'CP':0, 'RTT':0, 'CET':0, 'AEA':0, 'Formation':0, 'Maladie':0, 'Férié':0 }
                     };
                 }
                 
                 const dayOfWeek = d.getDay(); 
-                const isWeekendOrFerie = (dayOfWeek === 0 || dayOfWeek === 6 || joursFeries[dateStr]);
+                const isFerie = joursFeries[dateStr];
+                const isWeekendOrFerie = (dayOfWeek === 0 || dayOfWeek === 6 || isFerie);
                 let expected = isWeekendOrFerie ? 0 : hoursPerDay * 3600000;
+                
+                // COMPTAGE DES JOURS FÉRIÉS (On ne compte que ceux qui tombent en semaine)
+                if (isFerie && dayOfWeek !== 0 && dayOfWeek !== 6) {
+                    mapGrouped[key].abs['Férié'] += 1;
+                    absStats['Férié'] += 1;
+                }
                 
                 let absence = currentAbsences.find(a => { const aS = new Date(a.date_debut); aS.setHours(0,0,0,0); const aE = new Date(a.date_fin); aE.setHours(0,0,0,0); return d >= aS && d <= aE; });
                 if (absence) {
                     expected = (absence.moment === 'journee') ? 0 : (expected / 2);
                     
-                    // On n'ajoute l'absence au graphique que si c'est un jour normalement travaillé
+                    // On n'ajoute l'absence au graphique que si c'est un jour normalement travaillé (pas un week-end ni un jour férié)
                     if (!isWeekendOrFerie && mapGrouped[key].abs[absence.type_absence] !== undefined) {
                         mapGrouped[key].abs[absence.type_absence] += (absence.moment === 'journee') ? 1 : 0.5;
                     }
@@ -1331,13 +1338,14 @@
                     dataNormale.push(hw); dataSup.push(0); dataManque.push(he - hw);
                 }
                 
-                // --- ON ENREGISTRE LES DONNÉES D'ABSENCES ---
+                // --- ON INJECTE LES DONNÉES DANS LES TABLEAUX DU GRAPHIQUE ---
                 dataAbsCP.push(g.abs['CP']);
                 dataAbsRTT.push(g.abs['RTT']);
                 dataAbsCET.push(g.abs['CET']);
                 dataAbsAEA.push(g.abs['AEA']);
                 dataAbsFormation.push(g.abs['Formation']);
                 dataAbsMaladie.push(g.abs['Maladie']);
+                dataAbsFerie.push(g.abs['Férié']);
             }
 
             const fmtH = (ms) => { let sign = ms < 0 ? '-' : ''; let a = Math.abs(ms); let h = Math.floor(a/3600000); let m = Math.round((a%3600000)/60000); return `${sign}${h}h${m.toString().padStart(2,'0')}`; };
@@ -1409,7 +1417,8 @@
                         { label: 'CET', data: dataAbsCET, backgroundColor: '#8b5cf6', stack: 'Abs' },
                         { label: 'AEA', data: dataAbsAEA, backgroundColor: '#06b6d4', stack: 'Abs' },
                         { label: 'Formation', data: dataAbsFormation, backgroundColor: '#84cc16', stack: 'Abs' },
-                        { label: 'Maladie', data: dataAbsMaladie, backgroundColor: '#ef4444', stack: 'Abs' }
+                        { label: 'Maladie', data: dataAbsMaladie, backgroundColor: '#ef4444', stack: 'Abs' },
+                        { label: 'Jours Fériés', data: dataAbsFerie, backgroundColor: '#94a3b8', stack: 'Abs' } // Gris Ardoise identique au calendrier
                     ]
                 },
                 options: { 

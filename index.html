@@ -387,6 +387,7 @@
         let pointagesAnnee = []; 
         let currentAbsences = [];
         let pdfCharts = [];
+        let joursFeries = {}; // Stockage des jours fériés (API Gouv)
         
         let userParams = { cp_initial: 25, rtt_initial: 15, base_horaire: 39, limite_heures_jour: 10, notifs_actives: false, objectif_annuel: 1607, reliquat_cp: 0, date_limite_reliquat: '', cet_initial: 0, recup_initial: 0, don_jours: 0, annee_maj: null };
 
@@ -514,6 +515,21 @@
         };
 
         async function chargerDonneesGlobales() {
+            // --- NOUVEAU : CHARGEMENT DES JOURS FÉRIÉS (API GOUV) ---
+            try {
+                const cacheFeries = localStorage.getItem('sirh_jours_feries');
+                if (cacheFeries) joursFeries = JSON.parse(cacheFeries);
+                
+                if (navigator.onLine) {
+                    fetch('https://calendrier.api.gouv.fr/jours-feries/metropole.json')
+                        .then(res => res.json())
+                        .then(data => { 
+                            joursFeries = data; 
+                            localStorage.setItem('sirh_jours_feries', JSON.stringify(joursFeries)); 
+                        }).catch(e => console.warn(e));
+                }
+            } catch(e) {}
+            
             // 1. LECTURE HORS LIGNE
             if (!navigator.onLine) {
                 const paramsCache = localStorage.getItem('sirh_cache_params');
@@ -707,19 +723,25 @@
                 
                 // --- LOGIQUE DEMI-JOURNÉE POUR LA JAUGE ---
                 let ratioJournee = 1;
-                const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
+                const todayStr = `${todayMidnight.getFullYear()}-${String(todayMidnight.getMonth()+1).padStart(2,'0')}-${String(todayMidnight.getDate()).padStart(2,'0')}`;
                 
-                let absenceAujourdhui = currentAbsences.find(a => {
-                    const aStart = new Date(a.date_debut); aStart.setHours(0,0,0,0); 
-                    const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0); 
-                    return todayMidnight >= aStart && todayMidnight <= aEnd;
-                });
-
-                if (absenceAujourdhui) {
-                    if (absenceAujourdhui.moment === 'matin' || absenceAujourdhui.moment === 'aprem') { ratioJournee = 0.5; } 
-                    else if (absenceAujourdhui.moment === 'journee') { ratioJournee = 0; }
+               // Si on est le week-end ou un Jour Férié, 0h attendues.
+                if (todayMidnight.getDay() === 0 || todayMidnight.getDay() === 6 || joursFeries[todayStr]) {
+                    ratioJournee = 0; 
+                
+                } else {
+                    let absenceAujourdhui = currentAbsences.find(a => {
+                        const aStart = new Date(a.date_debut); aStart.setHours(0,0,0,0); 
+                        const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0); 
+                        return todayMidnight >= aStart && todayMidnight <= aEnd;
+                    });
+                    if (absenceAujourdhui) {
+                        if (absenceAujourdhui.moment === 'matin' || absenceAujourdhui.moment === 'aprem') { ratioJournee = 0.5; } 
+                        else if (absenceAujourdhui.moment === 'journee') { ratioJournee = 0; }
+                    }
                 }
-
+                    
+                
                 const baseMs = (userParams.base_horaire / 5) * 3600000;
                 let msObjectif = baseMs * ratioJournee;
                 if (msObjectif === 0) msObjectif = baseMs; 
@@ -858,7 +880,10 @@
                 let d = new Date(startDate); d.setHours(0,0,0,0); let end = new Date(now); end.setHours(0,0,0,0);
                 while(d <= end) {
                     const dayOfWeek = d.getDay();
-                    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                    
+                    // On ne compte que s'il n'y a ni week-end, ni jour férié
+                    if (dayOfWeek !== 0 && dayOfWeek !== 6 && !joursFeries[dateStr]) {
                         let absence = currentAbsences.find(a => {
                             const aStart = new Date(a.date_debut); aStart.setHours(0,0,0,0); const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0);
                             return d >= aStart && d <= aEnd;
@@ -1094,6 +1119,21 @@
                         });
                         if(lastArr) { eventsList.push({ title: 'Travail en cours', start: blockStart || lastArr, end: new Date(), backgroundColor: '#14b8a6', borderColor: '#0d9488', className: 'work-block', extendedProps: { isWork: true } }); }
                     }
+
+                    // --- NOUVEAU : Ajout visuel des jours fériés ---
+                    for (let dStr in joursFeries) {
+                        eventsList.push({
+                            title: '🎉 ' + joursFeries[dStr], 
+                            start: dStr, 
+                            allDay: true,
+                            backgroundColor: '#f8fafc', // Gris très discret
+                            borderColor: '#e2e8f0', 
+                            textColor: '#64748b',
+                            extendedProps: { isFerie: true }
+                        });
+                    }
+
+
                     
                     // 5. Envoi au calendrier (S'exécute avec ou sans réseau !)
                     success(eventsList);
@@ -1141,7 +1181,9 @@
             let totalTravailléMs = 0; let totalPauseMs = 0; let nbPausesReelles = 0; const hoursPerDay = (userParams.base_horaire / 5);
 
             for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
-                const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; const dayOfWeek = d.getDay(); const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; const dayOfWeek = d.getDay(); 
+                const isWeekendOrFerie = (dayOfWeek === 0 || dayOfWeek === 6 || joursFeries[dateStr]);
+                let expected = isWeekendOrFerie ? 0 : hoursPerDay * 3600000;
                 let strDebut = "--"; let strPauses = "--"; let strFin = "--"; let valTravail = "0h00"; let valEcart = "0h00";
                 let tMs = 0; let expected = isWeekend ? 0 : hoursPerDay * 3600000;
                 
@@ -1229,7 +1271,9 @@
                 const key = groupMode === 'week' ? getWeekStr(d) : dateStr;
                 if(!mapGrouped[key]) mapGrouped[key] = { label: (groupMode==='week' ? key : d.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'})), workMs: 0, expectedMs: 0, pauseMs: 0 };
                 
-                const dayOfWeek = d.getDay(); const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                const dayOfWeek = d.getDay(); 
+                const isWeekendOrFerie = (dayOfWeek === 0 || dayOfWeek === 6 || joursFeries[dateStr]);
+                let expected = isWeekendOrFerie ? 0 : hoursPerDay * 3600000;
                 let expected = isWeekend ? 0 : hoursPerDay * 3600000;
                 
                 let absence = currentAbsences.find(a => { const aS = new Date(a.date_debut); aS.setHours(0,0,0,0); const aE = new Date(a.date_fin); aE.setHours(0,0,0,0); return d >= aS && d <= aE; });

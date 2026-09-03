@@ -958,18 +958,34 @@
         }
 
        function chargerSoldes(absences) {
-            let cpConsTotal = 0, rttCons = 0, cetCons = 0, aeaCons = 0, formationCons = 0, joursNF = 0;
+            let cpConsTotal = 0, rttCons = 0, cetCons = 0, aeaCons = 0, formationCons = 0, joursFractionnementPeriode = 0;
             const currentYear = new Date().getFullYear(); 
             const now = new Date();
             const limiteDate = userParams.date_limite_reliquat ? new Date(userParams.date_limite_reliquat + 'T23:59:59') : null;
 
             absences.forEach(a => {
-                if (new Date(a.date_debut).getFullYear() !== currentYear) return;
-                let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1;
+                const startAbs = new Date(a.date_debut);
+                const endAbs = new Date(a.date_fin);
+                if (startAbs.getFullYear() !== currentYear && endAbs.getFullYear() !== currentYear) return;
+                
+                let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((endAbs - startAbs) / 86400000) + 1;
                 
                 if(a.type_absence === 'CP') { 
                     cpConsTotal += j; 
-                    for(let d = new Date(a.date_debut); d <= new Date(a.date_fin); d.setDate(d.getDate() + 1)) { if([10, 11, 0, 1].includes(d.getMonth())) joursNF++; } 
+                    
+                    // --- COMPTAGE POUR LE FRACTIONNEMENT (Du 1er nov au 30 avril) ---
+                    // On parcourt chaque jour de l'absence pour voir s'il tombe dans la période de fractionnement
+                    let dCourante = new Date(startAbs);
+                    while(dCourante <= endAbs) {
+                        const m = dCourante.getMonth(); // 0 = Janvier, ..., 3 = Avril, 10 = Novembre, 11 = Décembre
+                        const poidsJour = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : 1.0;
+                        
+                        // Si on est en Janv-Avril (0,1,2,3) ou Nov-Déc (10,11)
+                        if (m <= 3 || m >= 10) {
+                            joursFractionnementPeriode += poidsJour;
+                        }
+                        dCourante.setDate(dCourante.getDate() + 1);
+                    }
                 }
                 if(a.type_absence === 'RTT') rttCons += j; 
                 if(a.type_absence === 'CET') cetCons += j;
@@ -1011,8 +1027,12 @@
             if(document.getElementById('cpt-cp')) document.getElementById('cpt-cp').textContent = cpRestantsN + ' j';
             if(document.getElementById('cpt-rtt')) document.getElementById('cpt-rtt').textContent = (userParams.rtt_initial - rttCons) + ' j';
             if(document.getElementById('cpt-cet')) document.getElementById('cpt-cet').textContent = (userParams.cet_initial - cetCons) + ' j';
-            if(document.getElementById('cpt-fractionnement')) document.getElementById('cpt-fractionnement').textContent = '+' + (joursNF >= 8 ? 2 : (joursNF >= 6 ? 1 : 0)) + ' j';
-            if(document.getElementById('alerte-rtt')) document.getElementById('alerte-rtt').classList.toggle('hidden', (userParams.rtt_initial - rttCons) > 0);
+            if(document.getElementById('cpt-fractionnement')) {
+                let jFrac = 0;
+                if (joursFractionnementPeriode >= 8) jFrac = 2;
+                else if (joursFractionnementPeriode >= 5) jFrac = 1;
+                document.getElementById('cpt-fractionnement').textContent = '+' + jFrac + ' j';
+            }            if(document.getElementById('alerte-rtt')) document.getElementById('alerte-rtt').classList.toggle('hidden', (userParams.rtt_initial - rttCons) > 0);
             
             if(document.getElementById('cpt-aea')) document.getElementById('cpt-aea').textContent = aeaCons + ' j';
             if(document.getElementById('cpt-formation')) document.getElementById('cpt-formation').textContent = formationCons + ' j';

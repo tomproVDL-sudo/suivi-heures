@@ -760,29 +760,41 @@
                 spanHeures.textContent = `${h}h${m.toString().padStart(2, '0')}`;
                 
                 // --- LOGIQUE DEMI-JOURNÉE POUR LA JAUGE ---
-                let ratioJournee = 1;
+               let ratioJournee = 1;
                 const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
                 const todayStr = `${todayMidnight.getFullYear()}-${String(todayMidnight.getMonth()+1).padStart(2,'0')}-${String(todayMidnight.getDate()).padStart(2,'0')}`;
-               // Si on est le week-end ou un Jour Férié, 0h attendues.
+                
+                let absenceAujourdhui = currentAbsences.find(a => {
+                    const aStart = new Date(a.date_debut); aStart.setHours(0,0,0,0); 
+                    const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0); 
+                    return todayMidnight >= aStart && todayMidnight <= aEnd;
+                });
+
                 if (todayMidnight.getDay() === 0 || todayMidnight.getDay() === 6 || joursFeries[todayStr]) {
                     ratioJournee = 0; 
-                
-                } else {
-                    let absenceAujourdhui = currentAbsences.find(a => {
-                        const aStart = new Date(a.date_debut); aStart.setHours(0,0,0,0); 
-                        const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0); 
-                        return todayMidnight >= aStart && todayMidnight <= aEnd;
-                    });
-                    if (absenceAujourdhui) {
+                } else if (absenceAujourdhui) {
+                    if (absenceAujourdhui.type_absence === 'Formation') {
+                        ratioJournee = (absenceAujourdhui.moment === 'matin' || absenceAujourdhui.moment === 'aprem') ? 0.5 : 1;
+                    } else {
                         if (absenceAujourdhui.moment === 'matin' || absenceAujourdhui.moment === 'aprem') { ratioJournee = 0.5; } 
                         else if (absenceAujourdhui.moment === 'journee') { ratioJournee = 0; }
                     }
                 }
-                    
-                
+
                 const baseMs = (userParams.base_horaire / 5) * 3600000;
                 let msObjectif = baseMs * ratioJournee;
                 if (msObjectif === 0) msObjectif = baseMs; 
+
+                // Si c'est un jour de formation et qu'aucun pointage n'a été fait, on ajoute le temps de formation au cumul du jour
+                let formationAujourdhui = currentAbsences.find(a => {
+                    const aStart = new Date(a.date_debut); aStart.setHours(0,0,0,0); 
+                    const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0); 
+                    return todayMidnight >= aStart && todayMidnight <= aEnd && a.type_absence === 'Formation';
+                });
+                if (formationAujourdhui && pts.length === 0) {
+                    let hForm = (formationAujourdhui.moment === 'matin' || formationAujourdhui.moment === 'aprem') ? (baseMs / 2) : baseMs;
+                    totalTravail += hForm;
+                }
 
                 const pourcentage = (totalTravail / msObjectif) * 100;
                 if (progressBg) progressBg.style.width = `${Math.min(pourcentage, 100)}%`;
@@ -886,7 +898,7 @@
             }
         }
         
-        function calculerHeuresSupEt1607() {
+       function calculerHeuresSupEt1607() {
             const objAnnuel = userParams.objectif_annuel || 1607;
             if(document.getElementById('lbl-objectif')) document.getElementById('lbl-objectif').textContent = objAnnuel;
             const now = new Date();
@@ -907,6 +919,22 @@
                     if (lastArr && jour === now.toISOString().split('T')[0]) totalMs += (now - lastArr);
                     map[jour] = totalMs / 3600000;
                 }
+
+                // --- AJOUT DE LA FORMATION COMME TEMPS TRAVAILLÉ EFFECTIF ---
+                const hoursPerDay = userParams.base_horaire / 5;
+                currentAbsences.forEach(a => {
+                    if (a.type_absence === 'Formation') {
+                        let dCur = new Date(a.date_debut); dCur.setHours(0,0,0,0);
+                        let dEnd = new Date(a.date_fin); dEnd.setHours(0,0,0,0);
+                        while(dCur <= dEnd) {
+                            const dateStr = `${dCur.getFullYear()}-${String(dCur.getMonth() + 1).padStart(2, '0')}-${String(dCur.getDate()).padStart(2, '0')}`;
+                            let hJour = (a.moment === 'matin' || a.moment === 'aprem') ? (hoursPerDay / 2) : hoursPerDay;
+                            map[dateStr] = (map[dateStr] || 0) + hJour;
+                            dCur.setDate(dCur.getDate() + 1);
+                        }
+                    }
+                });
+
                 return map;
             };
 
@@ -919,14 +947,24 @@
                 while(d <= end) {
                     const dayOfWeek = d.getDay();
                     const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                    const isFerie = joursFeries[dateStr];
                     
-                    // On ne compte que s'il n'y a ni week-end, ni jour férié
-                    if (dayOfWeek !== 0 && dayOfWeek !== 6 && !joursFeries[dateStr]) {
+                    if (dayOfWeek !== 0 && dayOfWeek !== 6 && !isFerie) {
                         let absence = currentAbsences.find(a => {
                             const aStart = new Date(a.date_debut); aStart.setHours(0,0,0,0); const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0);
                             return d >= aStart && d <= aEnd;
                         });
-                        if (!absence) expected += hoursPerDay; else if (absence.moment === 'matin' || absence.moment === 'aprem') expected += (hoursPerDay / 2);
+                        
+                        if (!absence) {
+                            expected += hoursPerDay;
+                        } else if (absence.type_absence === 'Formation') {
+                            // La formation compte dans l'attendu comme une journée de travail normale
+                            if (absence.moment === 'matin' || absence.moment === 'aprem') expected += (hoursPerDay / 2);
+                            else expected += hoursPerDay;
+                        } else {
+                            // Les autres absences (CP, RTT, Maladie...) réduisent l'attendu
+                            if (absence.moment === 'matin' || absence.moment === 'aprem') expected += (hoursPerDay / 2);
+                        }
                     }
                     d.setDate(d.getDate() + 1);
                 }

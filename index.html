@@ -283,7 +283,7 @@
                     <div class="flex items-center gap-2 mt-4"><input type="checkbox" id="input_notifs" class="w-5 h-5 text-teal-600 rounded cursor-pointer" onchange="demanderPermissionNotif(this)"><label class="text-sm font-bold text-gray-700 cursor-pointer" for="input_notifs">Activer les notifications</label></div>
                 </div>
 
-                <div class="p-4 bg-gray-50 rounded-xl mb-2">
+                <div class="p-4 bg-gray-50 rounded-xl mb-4">
                     <h4 class="font-bold text-gray-700 mb-3 text-sm">Soldes & Nouveaux compteurs</h4>
                     <div class="grid grid-cols-2 gap-3 mb-3">
                         <div><label class="text-xs font-bold text-gray-500 block">Congés Payés N</label><input type="number" step="0.5" id="input_cp" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500"></div>
@@ -298,6 +298,14 @@
                         <div><label class="text-xs font-bold text-gray-500 block">Heures à récup.</label><input type="number" step="0.5" id="input_recup" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500"></div>
                         <div><label class="text-xs font-bold text-gray-500 block">Don de jours (+/-)</label><input type="number" step="0.5" id="input_don" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-teal-500"></div>
                     </div>
+                </div>
+
+                <!-- NOUVEAU BLOC IMPORT -->
+                <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+                    <h4 class="font-bold text-indigo-800 mb-2 text-sm">Restaurer des horaires (Excel)</h4>
+                    <p class="text-[10px] text-indigo-600 mb-3 leading-tight">Le fichier doit contenir 3 colonnes : <b>Date</b> (JJ/MM/AAAA), <b>Heure</b> (HH:MM), et <b>Action</b> (arrivee, pause, ou depart).</p>
+                    <input type="file" id="input-import-excel" accept=".xlsx, .xls" class="hidden" onchange="importerDonneesExcel(event)">
+                    <button onclick="document.getElementById('input-import-excel').click()" class="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition shadow-sm text-xs">📁 Importer un fichier .xlsx</button>
                 </div>
             </div>
 
@@ -1472,7 +1480,78 @@
             // 3. On actualise l'intégralité de la page de manière sûre
             actualiserToutesLesVues();
         };
+        
+        window.importerDonneesExcel = async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            showToast("Lecture du fichier en cours...");
+            const reader = new FileReader();
+            
+            reader.onload = async (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const sheetName = workbook.SheetNames[0]; // On lit la première feuille
+                    const worksheet = workbook.Sheets[sheetName];
+                    
+                    // L'option raw:false permet de récupérer les dates sous forme de texte (ex: "25/08/2026")
+                    const json = XLSX.utils.sheet_to_json(worksheet, {raw: false}); 
 
+                    const payloads = [];
+                    
+                    for (let row of json) {
+                        if(!row.Date || !row.Heure || !row.Action) continue; // Ignore les lignes incomplètes
+                        
+                        const [d, m, y] = row.Date.split('/');
+                        const [hh, mm] = row.Heure.split(':');
+                        if(!d || !m || !y || !hh || !mm) continue;
+                        
+                        const dateObj = new Date(`${y}-${m}-${d}T${hh}:${mm}:00`);
+                        if(isNaN(dateObj)) continue;
+                        
+                        let actionFormatee = row.Action.toLowerCase().trim();
+                        if(actionFormatee.includes('arriv')) actionFormatee = 'arrivee';
+                        else if(actionFormatee.includes('dép') || actionFormatee.includes('dep')) actionFormatee = 'depart';
+                        else if(actionFormatee.includes('pause')) actionFormatee = 'pause';
+                        else continue;
+
+                        payloads.push({
+                            user_id: currentUser.id,
+                            type_action: actionFormatee,
+                            timestamp: dateObj.toISOString()
+                        });
+                    }
+
+                    if (payloads.length === 0) {
+                        throw new Error("Aucune donnée valide trouvée. Vérifiez les noms des colonnes.");
+                    }
+                    
+                    showToast(`Importation de ${payloads.length} pointages...`);
+                    
+                    // On envoie les données à Supabase par blocs de 100 pour éviter de surcharger la base
+                    const chunkSize = 100;
+                    for (let i = 0; i < payloads.length; i += chunkSize) {
+                        const chunk = payloads.slice(i, i + chunkSize);
+                        const { error } = await supaClient.from('pointages').insert(chunk);
+                        if (error) throw error;
+                    }
+                    
+                    await chargerDonneesGlobales();
+                    actualiserToutesLesVues();
+                    fermerModalParametres();
+                    showToast("Importation réussie avec succès !");
+                    
+                } catch (err) {
+                    showToast("Erreur d'import : " + err.message, true);
+                } finally {
+                    event.target.value = ''; // Réinitialise l'input pour pouvoir importer un autre fichier
+                }
+            };
+            
+            reader.readAsArrayBuffer(file);
+        };
+        
         // --- SYNCHRONISEUR AUTOMATIQUE ---
         window.addEventListener('online', async () => {
             let fileAttente = JSON.parse(localStorage.getItem('sirh_offline_queue')) || [];

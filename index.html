@@ -723,8 +723,8 @@
                 
                 // --- LOGIQUE DEMI-JOURNÉE POUR LA JAUGE ---
                 let ratioJournee = 1;
+                const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
                 const todayStr = `${todayMidnight.getFullYear()}-${String(todayMidnight.getMonth()+1).padStart(2,'0')}-${String(todayMidnight.getDate()).padStart(2,'0')}`;
-                
                // Si on est le week-end ou un Jour Férié, 0h attendues.
                 if (todayMidnight.getDay() === 0 || todayMidnight.getDay() === 6 || joursFeries[todayStr]) {
                     ratioJournee = 0; 
@@ -1185,7 +1185,7 @@
                 const isWeekendOrFerie = (dayOfWeek === 0 || dayOfWeek === 6 || joursFeries[dateStr]);
                 let expected = isWeekendOrFerie ? 0 : hoursPerDay * 3600000;
                 let strDebut = "--"; let strPauses = "--"; let strFin = "--"; let valTravail = "0h00"; let valEcart = "0h00";
-                let tMs = 0; let expected = isWeekend ? 0 : hoursPerDay * 3600000;
+                let tMs = 0;
                 
                 let absence = currentAbsences.find(a => {
                     const aStart = new Date(a.date_debut); aStart.setHours(0,0,0,0); const aEnd = new Date(a.date_fin); aEnd.setHours(0,0,0,0); return d >= aStart && d <= aEnd;
@@ -1274,7 +1274,6 @@
                 const dayOfWeek = d.getDay(); 
                 const isWeekendOrFerie = (dayOfWeek === 0 || dayOfWeek === 6 || joursFeries[dateStr]);
                 let expected = isWeekendOrFerie ? 0 : hoursPerDay * 3600000;
-                let expected = isWeekend ? 0 : hoursPerDay * 3600000;
                 
                 let absence = currentAbsences.find(a => { const aS = new Date(a.date_debut); aS.setHours(0,0,0,0); const aE = new Date(a.date_fin); aE.setHours(0,0,0,0); return d >= aS && d <= aE; });
                 if (absence) expected = (absence.moment === 'journee') ? 0 : (expected / 2);

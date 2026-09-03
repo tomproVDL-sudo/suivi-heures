@@ -362,14 +362,19 @@
             <span><strong>Pause de référence :</strong> 45 min le midi.</span>
         </div>
 
-        <div class="space-y-8">
+        <div class="space-y-6">
             <div>
                 <h3 class="text-md font-bold text-gray-700 mb-2">Évolution du temps de travail et des pauses</h3>
-                <div class="h-64 w-full bg-white relative"><canvas id="pdf-chart-evolution"></canvas></div>
+                <div class="h-56 w-full bg-white relative"><canvas id="pdf-chart-evolution"></canvas></div>
             </div>
             <div>
                 <h3 class="text-md font-bold text-gray-700 mb-2">Répartition (Heures Normales, Sup, Manquantes)</h3>
-                <div class="h-64 w-full bg-white relative"><canvas id="pdf-chart-repartition"></canvas></div>
+                <div class="h-56 w-full bg-white relative"><canvas id="pdf-chart-repartition"></canvas></div>
+            </div>
+            <!-- NOUVEAU GRAPHIQUE ABSENCES -->
+            <div>
+                <h3 class="text-md font-bold text-gray-700 mb-2">Répartition des Absences (en jours)</h3>
+                <div class="h-56 w-full bg-white relative"><canvas id="pdf-chart-absences"></canvas></div>
             </div>
         </div>
     </div>
@@ -1262,6 +1267,9 @@
             const dataWorked = []; const dataPause = [];
             const dataNormale = []; const dataSup = []; const dataManque = [];
             const dataExpected = []; const dataPauseExp = [];
+            
+            // --- NOUVELLES DONNÉES ABSENCES ---
+            const dataAbsCP = []; const dataAbsRTT = []; const dataAbsCET = []; const dataAbsAEA = []; const dataAbsFormation = []; const dataAbsMaladie = [];
 
             const mapGrouped = {};
             const getWeekStr = (d) => { const first = new Date(d.getFullYear(), 0, 1); const days = Math.floor((d - first) / 86400000); return `S${Math.ceil((d.getDay() + 1 + days) / 7)} ${d.getFullYear()}`; };
@@ -1269,14 +1277,29 @@
             for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
                 const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                 const key = groupMode === 'week' ? getWeekStr(d) : dateStr;
-                if(!mapGrouped[key]) mapGrouped[key] = { label: (groupMode==='week' ? key : d.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'})), workMs: 0, expectedMs: 0, pauseMs: 0 };
+                
+                // --- ON AJOUTE LE COMPTEUR D'ABSENCES POUR LE GRAPHIQUE ---
+                if(!mapGrouped[key]) {
+                    mapGrouped[key] = { 
+                        label: (groupMode==='week' ? key : d.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'})), 
+                        workMs: 0, expectedMs: 0, pauseMs: 0,
+                        abs: { 'CP':0, 'RTT':0, 'CET':0, 'AEA':0, 'Formation':0, 'Maladie':0 }
+                    };
+                }
                 
                 const dayOfWeek = d.getDay(); 
                 const isWeekendOrFerie = (dayOfWeek === 0 || dayOfWeek === 6 || joursFeries[dateStr]);
                 let expected = isWeekendOrFerie ? 0 : hoursPerDay * 3600000;
                 
                 let absence = currentAbsences.find(a => { const aS = new Date(a.date_debut); aS.setHours(0,0,0,0); const aE = new Date(a.date_fin); aE.setHours(0,0,0,0); return d >= aS && d <= aE; });
-                if (absence) expected = (absence.moment === 'journee') ? 0 : (expected / 2);
+                if (absence) {
+                    expected = (absence.moment === 'journee') ? 0 : (expected / 2);
+                    
+                    // On n'ajoute l'absence au graphique que si c'est un jour normalement travaillé
+                    if (!isWeekendOrFerie && mapGrouped[key].abs[absence.type_absence] !== undefined) {
+                        mapGrouped[key].abs[absence.type_absence] += (absence.moment === 'journee') ? 1 : 0.5;
+                    }
+                }
                 mapGrouped[key].expectedMs += expected;
 
                 const pts = pointagesAnnee.filter(p => p.timestamp.startsWith(dateStr)).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
@@ -1307,6 +1330,14 @@
                 } else {
                     dataNormale.push(hw); dataSup.push(0); dataManque.push(he - hw);
                 }
+                
+                // --- ON ENREGISTRE LES DONNÉES D'ABSENCES ---
+                dataAbsCP.push(g.abs['CP']);
+                dataAbsRTT.push(g.abs['RTT']);
+                dataAbsCET.push(g.abs['CET']);
+                dataAbsAEA.push(g.abs['AEA']);
+                dataAbsFormation.push(g.abs['Formation']);
+                dataAbsMaladie.push(g.abs['Maladie']);
             }
 
             const fmtH = (ms) => { let sign = ms < 0 ? '-' : ''; let a = Math.abs(ms); let h = Math.floor(a/3600000); let m = Math.round((a%3600000)/60000); return `${sign}${h}h${m.toString().padStart(2,'0')}`; };
@@ -1364,6 +1395,32 @@
                     ]
                 },
                 options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } }
+            }));
+
+            // --- NOUVEAU GRAPHIQUE DES ABSENCES ---
+            const ctxAbs = document.getElementById('pdf-chart-absences').getContext('2d');
+            pdfCharts.push(new Chart(ctxAbs, {
+                type: 'bar',
+                data: {
+                    labels: chartLabels,
+                    datasets: [
+                        { label: 'CP', data: dataAbsCP, backgroundColor: '#14b8a6', stack: 'Abs' },
+                        { label: 'RTT', data: dataAbsRTT, backgroundColor: '#3b82f6', stack: 'Abs' },
+                        { label: 'CET', data: dataAbsCET, backgroundColor: '#8b5cf6', stack: 'Abs' },
+                        { label: 'AEA', data: dataAbsAEA, backgroundColor: '#06b6d4', stack: 'Abs' },
+                        { label: 'Formation', data: dataAbsFormation, backgroundColor: '#84cc16', stack: 'Abs' },
+                        { label: 'Maladie', data: dataAbsMaladie, backgroundColor: '#ef4444', stack: 'Abs' }
+                    ]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    animation: false, 
+                    scales: { 
+                        x: { stacked: true }, 
+                        y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Jours' } } 
+                    }
+                }
             }));
 
             setTimeout(async () => {

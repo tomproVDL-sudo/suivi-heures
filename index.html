@@ -1491,26 +1491,59 @@
             reader.onload = async (e) => {
                 try {
                     const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, {type: 'array'});
-                    const sheetName = workbook.SheetNames[0]; // On lit la première feuille
+                    // L'option cellDates: true force la conversion des dates Excel brutes en vrai objet Date JavaScript
+                    const workbook = XLSX.read(data, {type: 'array', cellDates: true});
+                    const sheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[sheetName];
-                    
-                    // L'option raw:false permet de récupérer les dates sous forme de texte (ex: "25/08/2026")
-                    const json = XLSX.utils.sheet_to_json(worksheet, {raw: false}); 
+                    const json = XLSX.utils.sheet_to_json(worksheet); 
 
                     const payloads = [];
                     
                     for (let row of json) {
-                        if(!row.Date || !row.Heure || !row.Action) continue; // Ignore les lignes incomplètes
+                        if(!row.Date || !row.Heure || !row.Action) continue; 
                         
-                        const [d, m, y] = row.Date.split('/');
-                        const [hh, mm] = row.Heure.split(':');
-                        if(!d || !m || !y || !hh || !mm) continue;
+                        let y, m, d;
                         
+                        // --- 1. EXTRACTION INTELLIGENTE DE LA DATE ---
+                        if (row.Date instanceof Date) {
+                            y = row.Date.getUTCFullYear();
+                            m = String(row.Date.getUTCMonth() + 1).padStart(2, '0');
+                            d = String(row.Date.getUTCDate()).padStart(2, '0');
+                        } else if (typeof row.Date === 'string') {
+                            let parts = row.Date.includes('/') ? row.Date.split('/') : row.Date.split('-');
+                            if (parts.length === 3) {
+                                if (parts[0].length === 4) { y = parts[0]; m = parts[1]; d = parts[2]; } // YYYY-MM-DD
+                                else { d = parts[0]; m = parts[1]; y = parts[2]; } // DD/MM/YYYY ou MM-DD-YY
+                                if (y.length === 2) y = "20" + y; // 26 devient 2026
+                            }
+                        }
+
+                        let hh, mm;
+                        
+                        // --- 2. EXTRACTION INTELLIGENTE DE L'HEURE ---
+                        if (row.Heure instanceof Date) {
+                            hh = String(row.Heure.getUTCHours()).padStart(2, '0');
+                            mm = String(row.Heure.getUTCMinutes()).padStart(2, '0');
+                        } else if (typeof row.Heure === 'string') {
+                            let parts = row.Heure.split(':');
+                            if (parts.length >= 2) {
+                                hh = parts[0].padStart(2, '0');
+                                mm = parts[1].padStart(2, '0');
+                            }
+                        } else if (typeof row.Heure === 'number') {
+                            // Si Excel envoie un nombre décimal (ex: 0.3854 = 09:15)
+                            let totalMins = Math.round(row.Heure * 24 * 60);
+                            hh = String(Math.floor(totalMins / 60)).padStart(2, '0');
+                            mm = String(totalMins % 60).padStart(2, '0');
+                        }
+
+                        if(!y || !m || !d || !hh || !mm) continue;
+                        
+                        // --- 3. CREATION DU POINTAGE ---
                         const dateObj = new Date(`${y}-${m}-${d}T${hh}:${mm}:00`);
                         if(isNaN(dateObj)) continue;
                         
-                        let actionFormatee = row.Action.toLowerCase().trim();
+                        let actionFormatee = String(row.Action).toLowerCase().trim();
                         if(actionFormatee.includes('arriv')) actionFormatee = 'arrivee';
                         else if(actionFormatee.includes('dép') || actionFormatee.includes('dep')) actionFormatee = 'depart';
                         else if(actionFormatee.includes('pause')) actionFormatee = 'pause';
@@ -1524,12 +1557,12 @@
                     }
 
                     if (payloads.length === 0) {
-                        throw new Error("Aucune donnée valide trouvée. Vérifiez les noms des colonnes.");
+                        throw new Error("Aucune donnée valide. Vérifiez que les colonnes s'appellent bien Date, Heure et Action.");
                     }
                     
                     showToast(`Importation de ${payloads.length} pointages...`);
                     
-                    // On envoie les données à Supabase par blocs de 100 pour éviter de surcharger la base
+                    // On envoie par blocs de 100 pour ne pas saturer le serveur
                     const chunkSize = 100;
                     for (let i = 0; i < payloads.length; i += chunkSize) {
                         const chunk = payloads.slice(i, i + chunkSize);
@@ -1545,7 +1578,7 @@
                 } catch (err) {
                     showToast("Erreur d'import : " + err.message, true);
                 } finally {
-                    event.target.value = ''; // Réinitialise l'input pour pouvoir importer un autre fichier
+                    event.target.value = ''; 
                 }
             };
             

@@ -630,7 +630,7 @@
             // --- FIN LOGIQUE RELIQUAT ---
 
             // 3. CHARGEMENT DES POINTAGES ET MISE EN CACHE
-            const debutAnnee = new Date(currentYear, 0, 1).toISOString();
+            const debutAnnee = new Date(currentYear - 5, 0, 1).toISOString(); // Télécharge l'année en cours ET l'année précédente
             const { data: ptData } = await supaClient.from('pointages').select('*').eq('user_id', currentUser.id).gte('timestamp', debutAnnee).order('timestamp', { ascending: true });
             if (ptData) {
                 pointagesAnnee = ptData;

@@ -625,40 +625,45 @@
                 }
             }
 
-            // --- 3. CHARGEMENT INTELLIGENT DES POINTAGES (CACHE HISTORIQUE) ---
+           // --- 3. CHARGEMENT INTELLIGENT DES POINTAGES (CACHE HISTORIQUE) ---
             let historiqueCache = [];
-            const cacheYear = localStorage.getItem('sirh_historique_year');
+            // Utilisation d'une nouvelle clé (v2) pour forcer le navigateur à vider l'ancien historique tronqué
+            const cacheYear = localStorage.getItem('sirh_historique_year_v2'); 
             
             // Si on change d'année (ex: passage à 2027), on vide le cache pour qu'il archive l'année précédente
             if (cacheYear != currentYear) {
-                localStorage.removeItem('sirh_historique_pointages');
-                localStorage.setItem('sirh_historique_year', currentYear);
+                localStorage.removeItem('sirh_historique_pointages_v2');
+                localStorage.setItem('sirh_historique_year_v2', currentYear);
             } else {
-                historiqueCache = JSON.parse(localStorage.getItem('sirh_historique_pointages')) || [];
+                historiqueCache = JSON.parse(localStorage.getItem('sirh_historique_pointages_v2')) || [];
             }
 
             if (navigator.onLine) {
-                // Si le cache est vide, on télécharge N-5 à N-1 UNE SEULE FOIS (limite max 20 000 lignes)
+                // Si le cache est vide, on télécharge N-5 à N-1 ANNÉE PAR ANNÉE (pour contourner la limite de 1000 lignes de Supabase)
                 if (historiqueCache.length === 0) {
-                    const debutHisto = new Date(currentYear - 5, 0, 1).toISOString();
-                    const finHisto = new Date(currentYear, 0, 1).toISOString();
-                    const { data: hData } = await supaClient.from('pointages')
-                        .select('*').eq('user_id', currentUser.id)
-                        .gte('timestamp', debutHisto).lt('timestamp', finHisto)
-                        .order('timestamp', { ascending: true }).limit(20000);
+                    for (let y = currentYear - 5; y < currentYear; y++) {
+                        const debutY = new Date(y, 0, 1).toISOString();
+                        const finY = new Date(y + 1, 0, 1).toISOString();
                         
-                    if (hData) {
-                        historiqueCache = hData;
-                        localStorage.setItem('sirh_historique_pointages', JSON.stringify(historiqueCache));
+                        const { data: hData } = await supaClient.from('pointages')
+                            .select('*').eq('user_id', currentUser.id)
+                            .gte('timestamp', debutY).lt('timestamp', finY)
+                            .order('timestamp', { ascending: true })
+                            .limit(1000); // 1000 lignes suffisent largement pour une seule année
+                            
+                        if (hData && hData.length > 0) {
+                            historiqueCache = [...historiqueCache, ...hData];
+                        }
                     }
+                    localStorage.setItem('sirh_historique_pointages_v2', JSON.stringify(historiqueCache));
                 }
 
-                // On télécharge TOUJOURS l'année en cours (N) en direct (limite max 5000 lignes)
+                // On télécharge TOUJOURS l'année en cours (N) en direct
                 const debutAnnee = new Date(currentYear, 0, 1).toISOString();
                 const { data: ptData } = await supaClient.from('pointages')
                     .select('*').eq('user_id', currentUser.id)
                     .gte('timestamp', debutAnnee)
-                    .order('timestamp', { ascending: true }).limit(5000);
+                    .order('timestamp', { ascending: true }).limit(2000);
                     
                 if (ptData) {
                     localStorage.setItem('sirh_cache_pointages_n', JSON.stringify(ptData));

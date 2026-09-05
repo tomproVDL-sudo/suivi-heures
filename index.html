@@ -334,11 +334,19 @@
                 </div>
 
                 <!-- NOUVEAU BLOC IMPORT -->
-                <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
-                    <h4 class="font-bold text-indigo-800 mb-2 text-sm">Restaurer des horaires (Excel)</h4>
-                    <p class="text-[10px] text-indigo-600 mb-3 leading-tight">Le fichier doit contenir 3 colonnes : <b>Date</b> (JJ/MM/AAAA), <b>Heure</b> (HH:MM), et <b>Action</b> (arrivee, pause, ou depart).</p>
-                    <input type="file" id="input-import-excel" accept=".xlsx, .xls" class="hidden" onchange="importerDonneesExcel(event)">
-                    <button onclick="document.getElementById('input-import-excel').click()" class="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition shadow-sm text-xs">📁 Importer un fichier .xlsx</button>
+                <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-100 mb-4">
+                    <h4 class="font-bold text-indigo-800 mb-3 text-sm">Restaurer des historiques (Excel)</h4>
+                    
+                    <div class="flex flex-col gap-3">
+                        <div>
+                            <input type="file" id="input-import-excel" accept=".xlsx, .xls" class="hidden" onchange="importerDonneesExcel(event)">
+                            <button onclick="document.getElementById('input-import-excel').click()" class="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition shadow-sm text-xs">⏱️ Importer les Pointages</button>
+                        </div>
+                        <div>
+                            <input type="file" id="input-import-absences" accept=".xlsx, .xls" class="hidden" onchange="importerAbsencesExcel(event)">
+                            <button onclick="document.getElementById('input-import-absences').click()" class="w-full bg-blue-500 text-white font-bold py-2.5 rounded-lg hover:bg-blue-600 transition shadow-sm text-xs">🏖️ Importer les Absences / RTT</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -553,7 +561,7 @@
         };
 
         async function chargerDonneesGlobales() {
-            // --- NOUVEAU : CHARGEMENT DES JOURS FÉRIÉS (API GOUV) ---
+            // --- CHARGEMENT DES JOURS FÉRIÉS (API GOUV) ---
             try {
                 const cacheFeries = localStorage.getItem('sirh_jours_feries');
                 if (cacheFeries) joursFeries = JSON.parse(cacheFeries);
@@ -568,28 +576,24 @@
                 }
             } catch(e) {}
             
-            // 1. LECTURE HORS LIGNE
-            if (!navigator.onLine) {
+            // 1. LECTURE DES PARAMÈTRES (En ligne ou Hors ligne)
+            if (navigator.onLine) {
+                const { data: pData } = await supaClient.from('parametres').select('*').eq('user_id', currentUser.id).maybeSingle();
+                if (pData) {
+                    userParams = { ...userParams, ...pData };
+                    localStorage.setItem('sirh_cache_params', JSON.stringify(userParams));
+                }
+            } else {
                 const paramsCache = localStorage.getItem('sirh_cache_params');
                 if (paramsCache) userParams = { ...userParams, ...JSON.parse(paramsCache) };
-                
-                const pointagesCache = localStorage.getItem('sirh_cache_pointages');
-                if (pointagesCache) pointagesAnnee = JSON.parse(pointagesCache);
-                
-                showToast("Mode hors ligne : données locales chargées.", true);
-                return;
             }
-
-            // 2. LECTURE NORMALE (EN LIGNE)
-            const { data: pData } = await supaClient.from('parametres').select('*').eq('user_id', currentUser.id).maybeSingle();
-            if (pData) userParams = { ...userParams, ...pData };
 
             const currentYear = new Date().getFullYear();
 
-            // --- LOGIQUE DE MISE A JOUR ANNUELLE (RELIQUAT) ---
+            // --- 2. LOGIQUE DE MISE A JOUR ANNUELLE (RELIQUAT) ---
             if (!userParams.annee_maj) {
                 userParams.annee_maj = currentYear;
-                await supaClient.from('parametres').upsert({ user_id: currentUser.id, annee_maj: currentYear });
+                if (navigator.onLine) await supaClient.from('parametres').upsert({ user_id: currentUser.id, annee_maj: currentYear });
             } else if (userParams.annee_maj < currentYear) {
                 const { data: absPrecedentes } = await supaClient.from('absences')
                     .select('*')
@@ -598,46 +602,72 @@
                     .gte('date_debut', `${userParams.annee_maj}-01-01`)
                     .lte('date_debut', `${userParams.annee_maj}-12-31`);
                 
-                let cpConsBeforeLimit = 0; 
-                let cpConsAfterLimit = 0;
+                let cpConsBeforeLimit = 0; let cpConsAfterLimit = 0;
                 const limiteDateStr = userParams.date_limite_reliquat; 
                 const limiteDate = limiteDateStr ? new Date(limiteDateStr + 'T23:59:59') : null;
                 
                 (absPrecedentes || []).forEach(a => {
                     let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1;
-                    if (limiteDate && new Date(a.date_debut) > limiteDate) cpConsAfterLimit += j; 
-                    else cpConsBeforeLimit += j;
+                    if (limiteDate && new Date(a.date_debut) > limiteDate) cpConsAfterLimit += j; else cpConsBeforeLimit += j;
                 });
                 
                 let ancienReliquat = userParams.reliquat_cp || 0;
                 let cpRestantsN = userParams.cp_initial - Math.max(0, cpConsBeforeLimit - ancienReliquat) - cpConsAfterLimit;
                 
-                userParams.reliquat_cp = Math.max(0, cpRestantsN); 
-                userParams.annee_maj = currentYear;
+                userParams.reliquat_cp = Math.max(0, cpRestantsN); userParams.annee_maj = currentYear;
                 if (userParams.date_limite_reliquat) { 
-                    let d = new Date(userParams.date_limite_reliquat); 
-                    d.setFullYear(currentYear); 
+                    let d = new Date(userParams.date_limite_reliquat); d.setFullYear(currentYear); 
                     userParams.date_limite_reliquat = `${currentYear}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; 
                 }
                 
-                await supaClient.from('parametres').upsert({ 
-                    user_id: currentUser.id, 
-                    annee_maj: currentYear, 
-                    reliquat_cp: userParams.reliquat_cp, 
-                    date_limite_reliquat: userParams.date_limite_reliquat 
-                });
+                if (navigator.onLine) {
+                    await supaClient.from('parametres').upsert({ user_id: currentUser.id, annee_maj: currentYear, reliquat_cp: userParams.reliquat_cp, date_limite_reliquat: userParams.date_limite_reliquat });
+                }
             }
-            // --- FIN LOGIQUE RELIQUAT ---
 
-            // 3. CHARGEMENT DES POINTAGES ET MISE EN CACHE
+            // --- 3. CHARGEMENT INTELLIGENT DES POINTAGES (CACHE HISTORIQUE) ---
+            let historiqueCache = [];
+            const cacheYear = localStorage.getItem('sirh_historique_year');
+            
+            // Si on change d'année (ex: passage à 2027), on vide le cache pour qu'il archive l'année précédente
+            if (cacheYear != currentYear) {
+                localStorage.removeItem('sirh_historique_pointages');
+                localStorage.setItem('sirh_historique_year', currentYear);
+            } else {
+                historiqueCache = JSON.parse(localStorage.getItem('sirh_historique_pointages')) || [];
+            }
 
-            const debutAnnee = new Date(currentYear - 5, 0, 1).toISOString(); // Télécharge 5 ans d'historique
-            const { data: ptData } = await supaClient.from('pointages').select('*').eq('user_id', currentUser.id).gte('timestamp', debutAnnee).order('timestamp', { ascending: true }).limit(10000);
-            if (ptData) {
-                pointagesAnnee = ptData;
-                // SAUVEGARDE DANS LE CACHE POUR LE MODE HORS LIGNE
-                localStorage.setItem('sirh_cache_params', JSON.stringify(userParams));
-                localStorage.setItem('sirh_cache_pointages', JSON.stringify(pointagesAnnee));
+            if (navigator.onLine) {
+                // Si le cache est vide, on télécharge N-5 à N-1 UNE SEULE FOIS (limite max 20 000 lignes)
+                if (historiqueCache.length === 0) {
+                    const debutHisto = new Date(currentYear - 5, 0, 1).toISOString();
+                    const finHisto = new Date(currentYear, 0, 1).toISOString();
+                    const { data: hData } = await supaClient.from('pointages')
+                        .select('*').eq('user_id', currentUser.id)
+                        .gte('timestamp', debutHisto).lt('timestamp', finHisto)
+                        .order('timestamp', { ascending: true }).limit(20000);
+                        
+                    if (hData) {
+                        historiqueCache = hData;
+                        localStorage.setItem('sirh_historique_pointages', JSON.stringify(historiqueCache));
+                    }
+                }
+
+                // On télécharge TOUJOURS l'année en cours (N) en direct (limite max 5000 lignes)
+                const debutAnnee = new Date(currentYear, 0, 1).toISOString();
+                const { data: ptData } = await supaClient.from('pointages')
+                    .select('*').eq('user_id', currentUser.id)
+                    .gte('timestamp', debutAnnee)
+                    .order('timestamp', { ascending: true }).limit(5000);
+                    
+                if (ptData) {
+                    localStorage.setItem('sirh_cache_pointages_n', JSON.stringify(ptData));
+                    pointagesAnnee = [...historiqueCache, ...ptData]; // Fusion des anciennes données et des nouvelles
+                }
+            } else {
+                // MODE HORS LIGNE
+                const ptN = JSON.parse(localStorage.getItem('sirh_cache_pointages_n')) || [];
+                pointagesAnnee = [...historiqueCache, ...ptN];
             }
         }
 
@@ -1168,11 +1198,11 @@
                             absData = JSON.parse(absCache);
                         }
                     } else {
-                        const { data, error } = await supaClient.from('absences').select('*').eq('user_id', currentUser.id);
+                        // Ajout de la limite de 5000 pour éviter que Supabase ne coupe l'historique
+                        const { data, error } = await supaClient.from('absences').select('*').eq('user_id', currentUser.id).limit(5000);
                         if (error) return fail(error);
                         
                         absData = data;
-                        // On met à jour le cache
                         localStorage.setItem('sirh_cache_absences', JSON.stringify(absData));
                     }
 
@@ -1850,6 +1880,10 @@
                         if (error) throw error;
                     }
                     
+                    // On vide le cache historique pour forcer l'application à re-télécharger ces nouvelles données passées
+                    localStorage.removeItem('sirh_historique_pointages');
+                    localStorage.removeItem('sirh_historique_year');
+                    
                     await chargerDonneesGlobales();
                     actualiserToutesLesVues();
                     fermerModalParametres();
@@ -1864,6 +1898,84 @@
             
             reader.readAsArrayBuffer(file);
         };
+
+        window.importerAbsencesExcel = async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            showToast("Lecture du fichier des absences...");
+            const reader = new FileReader();
+            
+            reader.onload = async (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const sheetName = workbook.SheetNames[0];
+                    const json = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]); 
+
+                    const payloads = [];
+                    
+                    for (let row of json) {
+                        if(row.Date === undefined || !row.Type || !row.Moment) continue; 
+                        
+                        let y, m, d;
+                        
+                        // Calcul robuste de la date pour éviter le bug d'Excel
+                        if (typeof row.Date === 'number') {
+                            const utcMs = (Math.floor(row.Date) - 25569) * 86400000; 
+                            const dObj = new Date(utcMs);
+                            y = dObj.getUTCFullYear(); m = String(dObj.getUTCMonth() + 1).padStart(2, '0'); d = String(dObj.getUTCDate()).padStart(2, '0');
+                        } else if (typeof row.Date === 'string') {
+                            let parts = row.Date.includes('/') ? row.Date.split('/') : row.Date.split('-');
+                            if (parts.length === 3) {
+                                if (parts[0].length === 4) { y = parts[0]; m = parts[1]; d = parts[2]; } 
+                                else { d = parts[0]; m = parts[1]; y = parts[2]; } 
+                                if (y.length === 2) y = "20" + y; 
+                            }
+                        }
+
+                        if(!y || !m || !d) continue;
+                        const dateStr = `${y}-${m}-${d}`;
+
+                        payloads.push({
+                            user_id: currentUser.id,
+                            type_absence: row.Type,
+                            moment: row.Moment,
+                            date_debut: dateStr,
+                            date_fin: dateStr
+                        });
+                    }
+
+                    if (payloads.length === 0) throw new Error("Aucune absence valide trouvée.");
+                    
+                    showToast(`Importation de ${payloads.length} absences...`);
+                    
+                    const chunkSize = 100;
+                    for (let i = 0; i < payloads.length; i += chunkSize) {
+                        const chunk = payloads.slice(i, i + chunkSize);
+                        const { error } = await supaClient.from('absences').insert(chunk);
+                        if (error) throw error;
+                    }
+                    
+                    // On vide le cache historique pour forcer l'application à re-télécharger ces nouvelles données passées
+                    localStorage.removeItem('sirh_historique_pointages');
+                    localStorage.removeItem('sirh_historique_year');
+                    
+                    await chargerDonneesGlobales();
+                    actualiserToutesLesVues();
+                    fermerModalParametres();
+                    showToast("Absences importées avec succès !");
+                    
+                } catch (err) {
+                    showToast("Erreur d'import : " + err.message, true);
+                } finally {
+                    event.target.value = ''; 
+                }
+            };
+            
+            reader.readAsArrayBuffer(file);
+        };
+
         
         // --- SYNCHRONISEUR AUTOMATIQUE ---
         window.addEventListener('online', async () => {

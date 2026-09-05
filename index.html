@@ -641,7 +641,7 @@
             if (navigator.onLine) {
                 // Si le cache est vide, on télécharge N-5 à N-1 ANNÉE PAR ANNÉE (pour contourner la limite de 1000 lignes de Supabase)
                 if (historiqueCache.length === 0) {
-                    for (let y = currentYear - 5; y < currentYear; y++) {
+                    for (let y = currentYear - 10; y < currentYear; y++) {
                         const debutY = new Date(y, 0, 1).toISOString();
                         const finY = new Date(y + 1, 0, 1).toISOString();
                         

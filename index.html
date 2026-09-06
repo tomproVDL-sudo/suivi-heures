@@ -1843,21 +1843,10 @@
             if (!elStart.value) elStart.value = `${currentYear}-01`;
             if (!elEnd.value) elEnd.value = `${currentYear}-12`;
 
-            const startD = new Date(elStart.value + '-01');
+            const startD = new Date(elStart.value + '-01'); startD.setHours(0,0,0,0);
             const endD = new Date(elEnd.value + '-01');
-            endD.setMonth(endD.getMonth() + 1); 
-            endD.setDate(0); // Dernier jour du mois de fin
+            endD.setMonth(endD.getMonth() + 1); endD.setDate(0); endD.setHours(23,59,59,999);
 
-            // --- CORRECTION : Récupération de l'historique COMPLET des absences ---
-            let toutesLesAbsences = [];
-            try { 
-                toutesLesAbsences = JSON.parse(localStorage.getItem('sirh_cache_absences')) || []; 
-            } catch(e) {}
-            // Sécurités en cas de cache vide
-            if (toutesLesAbsences.length === 0 && typeof absData !== 'undefined') toutesLesAbsences = absData;
-            if (toutesLesAbsences.length === 0 && typeof currentAbsences !== 'undefined') toutesLesAbsences = currentAbsences;
-
-            // Génération des étiquettes (ex: Jan 2024, Fév 2024...)
             const labels = []; const statsKeys = [];
             let curr = new Date(startD); curr.setDate(1);
             while(curr <= endD) {
@@ -1868,7 +1857,6 @@
                 curr.setMonth(curr.getMonth() + 1);
             }
 
-            // Initialisation du dictionnaire de statistiques
             let stats = {};
             statsKeys.forEach(k => {
                 stats[k] = {
@@ -1879,7 +1867,15 @@
                 };
             });
 
-            // Boucle jour par jour sur toute la période choisie
+            // --- OPTIMISATION 1 : Regrouper les pointages par jour (Évite des millions de boucles) ---
+            const pointagesParJour = {};
+            pointagesAnnee.forEach(p => {
+                const dStr = p.timestamp.split('T')[0];
+                if (!pointagesParJour[dStr]) pointagesParJour[dStr] = [];
+                pointagesParJour[dStr].push(p);
+            });
+
+            // Boucle ultra-rapide sur les jours de la période
             for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
                 const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                 const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -1887,23 +1883,13 @@
                 
                 const dayOfWeek = d.getDay();
                 const isFerie = joursFeries[dateStr];
-                const isWeekendOrFerie = (dayOfWeek === 0 || dayOfWeek === 6 || isFerie);
 
+                // Fériés
                 if (isFerie && dayOfWeek !== 0 && dayOfWeek !== 6) stats[key].abs['Férié'] += 1;
 
-                // On cherche l'absence dans l'historique brut complet (toutesLesAbsences)
-                let absence = toutesLesAbsences.find(a => {
-                    const aS = new Date(a.date_debut); aS.setHours(0,0,0,0); const aE = new Date(a.date_fin); aE.setHours(0,0,0,0); 
-                    return d >= aS && d <= aE; 
-                });
-                
-                if (absence && !isWeekendOrFerie && stats[key].abs[absence.type_absence] !== undefined) {
-                    stats[key].abs[absence.type_absence] += (absence.moment === 'journee') ? 1 : 0.5;
-                }
-
-                // Comptage des Horaires et Pointages
-                const pts = pointagesAnnee.filter(p => p.timestamp.startsWith(dateStr)).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
-                if (pts.length > 0) {
+                // Pointages (Accès direct en O(1) grâce au dictionnaire)
+                if (pointagesParJour[dateStr]) {
+                    const pts = pointagesParJour[dateStr].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
                     let premierArrivee = null; let dernierDepart = null;
                     let premierPauseDebut = null; let dernierPauseFin = null;
                     let lastArr = null; let pauseStart = null;
@@ -1915,12 +1901,7 @@
                         if (pt.type_action === 'arrivee') {
                             lastArr = t;
                             if (premierArrivee === null) premierArrivee = decTime;
-                            if (pauseStart) {
-                                dernierPauseFin = decTime; 
-                                stats[key].pauseMs += (t - pauseStart);
-                                stats[key].nbPauses++;
-                                pauseStart = null;
-                            }
+                            if (pauseStart) { dernierPauseFin = decTime; stats[key].pauseMs += (t - pauseStart); stats[key].nbPauses++; pauseStart = null; }
                         }
                         if (pt.type_action === 'pause') {
                             pauseStart = t;
@@ -1939,6 +1920,37 @@
                     if (dernierPauseFin !== null) { stats[key].sommePauseFin += dernierPauseFin; stats[key].nbPauseFins++; }
                 }
             }
+
+            // --- OPTIMISATION 2 : Boucler directement sur les absences (Au lieu de fouiller jour par jour) ---
+            let toutesLesAbsences = currentAbsences || [];
+            if (toutesLesAbsences.length === 0) {
+                try { toutesLesAbsences = JSON.parse(localStorage.getItem('sirh_cache_absences')) || []; } catch(e){}
+            }
+
+            toutesLesAbsences.forEach(a => {
+                const aS = new Date(a.date_debut); aS.setHours(0,0,0,0);
+                const aE = new Date(a.date_fin); aE.setHours(23,59,59,999);
+                
+                // Si l'absence est hors période sélectionnée, on l'ignore instantanément
+                if (aE < startD || aS > endD) return;
+                
+                let curD = new Date(Math.max(aS, startD));
+                let endLim = new Date(Math.min(aE, endD));
+                
+                while(curD <= endLim) {
+                    const dateStr = `${curD.getFullYear()}-${String(curD.getMonth() + 1).padStart(2, '0')}-${String(curD.getDate()).padStart(2, '0')}`;
+                    const key = `${curD.getFullYear()}-${String(curD.getMonth() + 1).padStart(2, '0')}`;
+                    
+                    if (stats[key] && stats[key].abs[a.type_absence] !== undefined) {
+                        const dayOfWeek = curD.getDay();
+                        const isFerie = joursFeries[dateStr];
+                        if (dayOfWeek !== 0 && dayOfWeek !== 6 && !isFerie) {
+                            stats[key].abs[a.type_absence] += (a.moment === 'journee') ? 1 : 0.5;
+                        }
+                    }
+                    curD.setDate(curD.getDate() + 1);
+                }
+            });
 
             // Transformation en tableaux pour Chart.js
             const dataHeures = statsKeys.map(k => stats[k].travailMs / 3600000);

@@ -102,6 +102,9 @@
                 <button onclick="switchTab('planning')" id="btn-planning" class="flex items-center gap-3 p-2.5 md:p-3 rounded-xl text-gray-600 hover:bg-gray-100 font-medium transition text-sm md:text-base">
                     <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg> Planning
                 </button>
+                <button onclick="switchTab('statistiques')" id="btn-statistiques" class="flex items-center gap-3 p-2.5 md:p-3 rounded-xl text-gray-600 hover:bg-gray-100 font-medium transition text-sm md:text-base">
+                    <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg> Statistiques
+                </button>
                 <button onclick="logout()" class="flex items-center gap-3 p-2.5 md:p-3 rounded-xl text-red-600 hover:bg-red-50 font-medium transition text-sm md:text-base mt-2 md:mt-4">
                     <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg> Déconnexion
                 </button>
@@ -197,6 +200,32 @@
 
                 <div id="calendar" class="flex-1 min-h-[600px] md:min-h-[450px] shadow-lg rounded-xl border border-gray-200 p-2 bg-white"></div>
             </div>
+
+            <!-- VUE STATISTIQUES -->
+            <div id="view-statistiques" class="hidden flex-1 flex-col h-full overflow-y-auto custom-scrollbar">
+                <h2 class="text-2xl font-medium text-gray-800 mb-6">Mon Tableau de Bord (Année en cours)</h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <!-- Graphique : Volume horaire par mois -->
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                        <h3 class="text-sm font-bold text-gray-700 mb-2">Volume horaire par mois</h3>
+                        <div class="h-64 relative"><canvas id="chart-heures-mois"></canvas></div>
+                    </div>
+                    
+                    <!-- Graphique : Durée moyenne des pauses -->
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                        <h3 class="text-sm font-bold text-gray-700 mb-2">Durée moyenne des pauses (en min)</h3>
+                        <div class="h-64 relative"><canvas id="chart-pauses"></canvas></div>
+                    </div>
+
+                    <!-- Graphique : Heures d'arrivée et départ -->
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
+                        <h3 class="text-sm font-bold text-gray-700 mb-2">Heure moyenne de prise et de fin de poste</h3>
+                        <div class="h-64 relative"><canvas id="chart-horaires"></canvas></div>
+                    </div>
+                </div>
+            </div>
+            
         </div>
     </div>
 
@@ -433,6 +462,7 @@
         let pointagesAnnee = []; 
         let currentAbsences = [];
         let pdfCharts = [];
+        let dashCharts = {};
         let joursFeries = {}; // Stockage des jours fériés (API Gouv)
         
         let userParams = { cp_initial: 25, rtt_initial: 15, base_horaire: 39, limite_heures_jour: 10, notifs_actives: false, objectif_annuel: 1607, reliquat_cp: 0, date_limite_reliquat: '', cet_initial: 0, recup_initial: 0, don_jours: 0, annee_maj: null };
@@ -1788,21 +1818,138 @@
                 initCalendar();
             }
         };
+        
+        window.genererTableauDeBord = () => {
+            const currentYear = new Date().getFullYear();
+            const moisLabels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+            
+            // Préparation des compteurs pour chaque mois
+            let statsMois = Array(12).fill(null).map(() => ({
+                travailMs: 0, pauseMs: 0, nbPauses: 0,
+                sommeArrivee: 0, nbArrivees: 0, sommeDepart: 0, nbDeparts: 0
+            }));
 
+            // Grouper les pointages de l'année par jour
+            const parJour = {};
+            pointagesAnnee.forEach(p => {
+                const dObj = new Date(p.timestamp);
+                if (dObj.getFullYear() === currentYear) {
+                    const dStr = p.timestamp.split('T')[0];
+                    if (!parJour[dStr]) parJour[dStr] = [];
+                    parJour[dStr].push(p);
+                }
+            });
+
+            // Analyser chaque journée
+            for (let jour in parJour) {
+                const moisIdx = new Date(jour).getMonth();
+                const events = parJour[jour].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                
+                let lastArr = null; let pauseStart = null;
+                let premierArrivee = null; let dernierDepart = null;
+
+                events.forEach(pt => {
+                    const t = new Date(pt.timestamp);
+                    const decTime = t.getHours() + (t.getMinutes() / 60);
+
+                    if (pt.type_action === 'arrivee') {
+                        lastArr = t;
+                        if (premierArrivee === null) premierArrivee = decTime;
+                        if (pauseStart) {
+                            statsMois[moisIdx].pauseMs += (t - pauseStart);
+                            statsMois[moisIdx].nbPauses++;
+                            pauseStart = null;
+                        }
+                    }
+                    if (pt.type_action === 'pause') {
+                        pauseStart = t;
+                        if (lastArr) { statsMois[moisIdx].travailMs += (t - lastArr); lastArr = null; }
+                    }
+                    if (pt.type_action === 'depart') {
+                        dernierDepart = decTime;
+                        if (lastArr) { statsMois[moisIdx].travailMs += (t - lastArr); lastArr = null; }
+                    }
+                });
+
+                if (premierArrivee !== null) { statsMois[moisIdx].sommeArrivee += premierArrivee; statsMois[moisIdx].nbArrivees++; }
+                if (dernierDepart !== null) { statsMois[moisIdx].sommeDepart += dernierDepart; statsMois[moisIdx].nbDeparts++; }
+            }
+
+            // Calcul des moyennes
+            const dataHeures = statsMois.map(s => s.travailMs / 3600000);
+            const dataPauses = statsMois.map(s => s.nbPauses > 0 ? (s.pauseMs / s.nbPauses) / 60000 : 0);
+            const dataArrivees = statsMois.map(s => s.nbArrivees > 0 ? s.sommeArrivee / s.nbArrivees : null);
+            const dataDeparts = statsMois.map(s => s.nbDeparts > 0 ? s.sommeDepart / s.nbDeparts : null);
+
+            // Nettoyage des anciens graphiques
+            if(dashCharts.heures) dashCharts.heures.destroy();
+            if(dashCharts.pauses) dashCharts.pauses.destroy();
+            if(dashCharts.horaires) dashCharts.horaires.destroy();
+
+            Chart.defaults.font.family = 'sans-serif';
+
+            // 1. Graphique Heures par mois
+            dashCharts.heures = new Chart(document.getElementById('chart-heures-mois').getContext('2d'), {
+                type: 'bar',
+                data: { labels: moisLabels, datasets: [{ label: 'Heures Travaillées', data: dataHeures, backgroundColor: '#14b8a6', borderRadius: 4 }] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // 2. Graphique Durée des Pauses
+            dashCharts.pauses = new Chart(document.getElementById('chart-pauses').getContext('2d'), {
+                type: 'line',
+                data: { labels: moisLabels, datasets: [{ label: 'Minutes de pause', data: dataPauses, borderColor: '#f97316', backgroundColor: '#fdba74', fill: true, tension: 0.3 }] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // 3. Graphique Arrivées / Départs (Avec formatage d'heures)
+            dashCharts.horaires = new Chart(document.getElementById('chart-horaires').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: moisLabels,
+                    datasets: [
+                        { label: 'Heure moyenne d\'arrivée', data: dataArrivees, borderColor: '#3b82f6', backgroundColor: '#3b82f6', tension: 0.2 },
+                        { label: 'Heure moyenne de départ', data: dataDeparts, borderColor: '#8b5cf6', backgroundColor: '#8b5cf6', tension: 0.2 }
+                    ]
+                },
+                options: { 
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            ticks: {
+                                callback: function(value) {
+                                    let h = Math.floor(value); let m = Math.round((value - h) * 60);
+                                    return h + 'h' + m.toString().padStart(2, '0');
+                                }
+                            }
+                        }
+                    },
+                    plugins: { tooltip: { callbacks: { label: function(context) {
+                        let value = context.parsed.y; let h = Math.floor(value); let m = Math.round((value - h) * 60);
+                        return context.dataset.label + ': ' + h + 'h' + m.toString().padStart(2, '0');
+                    }}}}
+                }
+            });
+        };
         
         window.switchTab = async (tab) => {
-            // 1. On force l'actualisation depuis le serveur
             await chargerDonneesGlobales();
 
-            // 2. On change l'affichage des onglets
-            ['pointage', 'planning'].forEach(t => { 
-                document.getElementById('view-' + t).classList.toggle('hidden', t !== tab); 
-                document.getElementById('view-' + t).classList.toggle('flex', t === tab); 
-                document.getElementById('btn-' + t).classList.toggle('bg-teal-50', t === tab); 
-                document.getElementById('btn-' + t).classList.toggle('text-teal-700', t === tab); 
+            ['pointage', 'planning', 'statistiques'].forEach(t => { 
+                const vue = document.getElementById('view-' + t);
+                const btn = document.getElementById('btn-' + t);
+                
+                if (vue) {
+                    vue.classList.toggle('hidden', t !== tab); 
+                    vue.classList.toggle('flex', t === tab); 
+                }
+                if (btn) {
+                    btn.classList.toggle('bg-teal-50', t === tab); 
+                    btn.classList.toggle('text-teal-700', t === tab); 
+                    btn.classList.toggle('text-gray-600', t !== tab); 
+                }
             });
             
-            // 3. On actualise l'intégralité de la page de manière sûre
             actualiserToutesLesVues();
         };
         

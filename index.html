@@ -1848,6 +1848,15 @@
             endD.setMonth(endD.getMonth() + 1); 
             endD.setDate(0); // Dernier jour du mois de fin
 
+            // --- CORRECTION : Récupération de l'historique COMPLET des absences ---
+            let toutesLesAbsences = [];
+            try { 
+                toutesLesAbsences = JSON.parse(localStorage.getItem('sirh_cache_absences')) || []; 
+            } catch(e) {}
+            // Sécurités en cas de cache vide
+            if (toutesLesAbsences.length === 0 && typeof absData !== 'undefined') toutesLesAbsences = absData;
+            if (toutesLesAbsences.length === 0 && typeof currentAbsences !== 'undefined') toutesLesAbsences = currentAbsences;
+
             // Génération des étiquettes (ex: Jan 2024, Fév 2024...)
             const labels = []; const statsKeys = [];
             let curr = new Date(startD); curr.setDate(1);
@@ -1870,7 +1879,7 @@
                 };
             });
 
-            // Boucle jour par jour sur toute la période choisie (Hyper précis)
+            // Boucle jour par jour sur toute la période choisie
             for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
                 const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                 const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -1880,14 +1889,14 @@
                 const isFerie = joursFeries[dateStr];
                 const isWeekendOrFerie = (dayOfWeek === 0 || dayOfWeek === 6 || isFerie);
 
-                // Comptage des jours fériés en semaine
                 if (isFerie && dayOfWeek !== 0 && dayOfWeek !== 6) stats[key].abs['Férié'] += 1;
 
-                // Comptage des Absences
-                let absence = currentAbsences.find(a => {
+                // On cherche l'absence dans l'historique brut complet (toutesLesAbsences)
+                let absence = toutesLesAbsences.find(a => {
                     const aS = new Date(a.date_debut); aS.setHours(0,0,0,0); const aE = new Date(a.date_fin); aE.setHours(0,0,0,0); 
                     return d >= aS && d <= aE; 
                 });
+                
                 if (absence && !isWeekendOrFerie && stats[key].abs[absence.type_absence] !== undefined) {
                     stats[key].abs[absence.type_absence] += (absence.moment === 'journee') ? 1 : 0.5;
                 }
@@ -1907,7 +1916,6 @@
                             lastArr = t;
                             if (premierArrivee === null) premierArrivee = decTime;
                             if (pauseStart) {
-                                // C'est une reprise après une pause, donc la pause se termine
                                 dernierPauseFin = decTime; 
                                 stats[key].pauseMs += (t - pauseStart);
                                 stats[key].nbPauses++;

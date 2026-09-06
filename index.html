@@ -192,7 +192,11 @@
                 <div class="grid grid-cols-3 gap-2 mb-4 bg-teal-50/60 p-3 rounded-xl border border-teal-200 text-center shadow-sm">
                     <div><span class="text-[10px] text-teal-700 font-bold uppercase block">H. Sup Semaine</span><span class="font-bold text-teal-800 text-base" id="hs-semaine">--</span></div>
                     <div><span class="text-[10px] text-teal-700 font-bold uppercase block">H. Sup Mois</span><span class="font-bold text-teal-800 text-base" id="hs-mois">--</span></div>
-                    <div><span class="text-[10px] text-teal-700 font-bold uppercase block">H. Sup Année</span><span class="font-bold text-teal-800 text-base" id="hs-annee">--</span></div>
+                    <div>
+                        <span class="text-[10px] text-teal-700 font-bold uppercase block">H. Sup Année</span>
+                        <span class="font-bold text-teal-800 text-base" id="hs-annee">--</span>
+                        <div id="hs-annee-equiv" class="text-[9px] text-teal-600 font-bold mt-0.5"></div>
+                    </div>                
                 </div>
 
                 <!-- GRILLE DES COMPTEURS DYNAMIQUE -->
@@ -429,6 +433,8 @@
                 <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Écart (Sup / Manquant)</div>
                 <div class="text-2xl font-bold text-teal-600" id="pdf-stat-ecart">--</div>
                 <div class="text-xs text-gray-500 mt-1" id="pdf-stat-moy-ecart">-- / jour</div>
+                <!-- NOUVELLE LIGNE POUR L'ÉQUIVALENCE -->
+                <div id="pdf-stat-ecart-equiv" class="text-xs font-bold mt-1 text-teal-700"></div>
             </div>
             <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
                 <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Pauses (Total)</div>
@@ -1063,8 +1069,25 @@
 
             document.getElementById('hs-semaine').textContent = formatterDelta(getTempsReelTotal(startWeek), getTempsAttendu(startWeek));
             document.getElementById('hs-mois').textContent = formatterDelta(getTempsReelTotal(startMonth), getTempsAttendu(startMonth));
-            document.getElementById('hs-annee').textContent = formatterDelta(getTempsReelTotal(startYear), getTempsAttendu(startYear));
-
+            
+            let reelAnnee = getTempsReelTotal(startYear);
+            let attAnnee = getTempsAttendu(startYear);
+            document.getElementById('hs-annee').textContent = formatterDelta(reelAnnee, attAnnee);
+            
+            let equivAnneeEl = document.getElementById('hs-annee-equiv');
+            if (equivAnneeEl) {
+                let ecartH = Math.abs(reelAnnee - attAnnee);
+                let equivJours = ecartH / (userParams.base_horaire / 5);
+                let equivSemaines = equivJours / 5;
+                let equivMois = equivSemaines / (52/12); // Moyenne de 4.33 semaines par mois
+                
+                if (equivMois >= 1) equivAnneeEl.textContent = `~ ${equivMois.toFixed(1)} mois (${equivJours.toFixed(0)} j)`;
+                else if (equivSemaines >= 1) equivAnneeEl.textContent = `~ ${equivSemaines.toFixed(1)} sem`;
+                else if (equivJours >= 1) equivAnneeEl.textContent = `~ ${equivJours.toFixed(1)} j`;
+                else equivAnneeEl.textContent = "";
+                
+                equivAnneeEl.className = (reelAnnee - attAnnee) >= 0 ? "text-[9px] text-teal-600 font-bold mt-0.5" : "text-[9px] text-red-500 font-bold mt-0.5";
+            }
             let cumulAnnee = 0; let dateAtteinte = null; let d = new Date(startYear);
             while(d <= now) {
                 const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -1538,6 +1561,28 @@
             ecartEl.className = totalEcartMs >= 0 ? "text-2xl font-bold text-teal-600" : "text-2xl font-bold text-red-500";
             document.getElementById('pdf-stat-moy-ecart').textContent = joursTravaillesReels > 0 ? fmtH(totalEcartMs / joursTravaillesReels) + ' / j' : '--';
 
+            // NOUVEAU : Calcul et affichage de l'équivalence sur le PDF
+            let encartEquiv = document.getElementById('pdf-stat-ecart-equiv');
+            if (encartEquiv) {
+                let ecartH = Math.abs(totalEcartMs) / 3600000;
+                let equivJours = ecartH / hoursPerDay;
+                let equivSemaines = equivJours / 5;
+                let equivMois = equivSemaines / (52/12);
+                
+                if (equivMois >= 1) {
+                    encartEquiv.textContent = `Soit ~ ${equivMois.toFixed(1)} mois (${equivSemaines.toFixed(1)} sem)`;
+                } else if (equivSemaines >= 1) {
+                    encartEquiv.textContent = `Soit ~ ${equivSemaines.toFixed(1)} semaines`;
+                } else if (equivJours >= 1) {
+                    encartEquiv.textContent = `Soit ~ ${equivJours.toFixed(1)} jours`;
+                } else {
+                    encartEquiv.textContent = "";
+                }
+                encartEquiv.className = totalEcartMs >= 0 ? "text-xs font-bold mt-1 text-teal-700" : "text-xs font-bold mt-1 text-red-500";
+            }
+
+
+            
             document.getElementById('pdf-stat-pause-nb').textContent = nbPausesReelles;
             let mAvg = nbPausesReelles > 0 ? Math.round((totalPauseMs / nbPausesReelles) / 60000) : 0;
             document.getElementById('pdf-stat-pause-moy').textContent = mAvg > 60 ? `${Math.floor(mAvg/60)}h${(mAvg%60).toString().padStart(2,'0')}` : `${mAvg} min`;

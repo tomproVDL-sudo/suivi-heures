@@ -1824,10 +1824,13 @@
         window.actualiserToutesLesVues = () => {
             rafraichirVueJour();
             calculerHeuresSupEt1607();
-            genererTableauDeBord();
+            
+            // OPTIMISATION : On ne calcule les graphiques que si l'onglet Statistiques est visible !
+            if (!document.getElementById('view-statistiques').classList.contains('hidden')) {
+                genererTableauDeBord();
+            }
             
             // On détruit et reconstruit le calendrier UNIQUEMENT s'il est affiché à l'écran.
-            // S'il est caché, FullCalendar n'arrive pas à calculer ses bulles.
             if (!document.getElementById('view-planning').classList.contains('hidden')) {
                 if (calendar) { calendar.destroy(); }
                 initCalendar();

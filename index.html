@@ -629,13 +629,13 @@
             let historiqueCache = [];
             
             // On passe à "v4" pour forcer un nettoyage complet et corriger la coquille
-            const cacheYear = localStorage.getItem('sirh_historique_year_v4'); 
+            const cacheYear = localStorage.getItem('sirh_historique_year_v5'); 
             
             if (cacheYear != currentYear) {
-                localStorage.removeItem('sirh_historique_pointages_v4');
-                localStorage.setItem('sirh_historique_year_v4', currentYear); // Correction appliquée ici
+                localStorage.removeItem('sirh_historique_pointages_v5');
+                localStorage.setItem('sirh_historique_year_v5', currentYear); // Correction appliquée ici
             } else {
-                historiqueCache = JSON.parse(localStorage.getItem('sirh_historique_pointages_v4')) || [];
+                historiqueCache = JSON.parse(localStorage.getItem('sirh_historique_pointages_v5')) || [];
             }
 
             if (navigator.onLine) {
@@ -655,7 +655,7 @@
                             historiqueCache = [...historiqueCache, ...hData];
                         }
                     }
-                    localStorage.setItem('sirh_historique_pointages_v4', JSON.stringify(historiqueCache));
+                    localStorage.setItem('sirh_historique_pointages_v5', JSON.stringify(historiqueCache));
                 }
 
                 // On télécharge TOUJOURS l'année en cours (N) en direct

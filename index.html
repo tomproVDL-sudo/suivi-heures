@@ -629,13 +629,13 @@
             let historiqueCache = [];
             
             // On passe à "v4" pour forcer un nettoyage complet et corriger la coquille
-            const cacheYear = localStorage.getItem('sirh_historique_year_v5'); 
+            const cacheYear = localStorage.getItem('sirh_historique_year_v6'); 
             
             if (cacheYear != currentYear) {
-                localStorage.removeItem('sirh_historique_pointages_v5');
-                localStorage.setItem('sirh_historique_year_v5', currentYear); // Correction appliquée ici
+                localStorage.removeItem('sirh_historique_pointages_v6');
+                localStorage.setItem('sirh_historique_year_v6', currentYear); // Correction appliquée ici
             } else {
-                historiqueCache = JSON.parse(localStorage.getItem('sirh_historique_pointages_v5')) || [];
+                historiqueCache = JSON.parse(localStorage.getItem('sirh_historique_pointages_v6')) || [];
             }
 
             if (navigator.onLine) {
@@ -934,7 +934,7 @@
             }
         }
         
-       function calculerHeuresSupEt1607() {
+        function calculerHeuresSupEt1607() {
             const objAnnuel = userParams.objectif_annuel || 1607;
             if(document.getElementById('lbl-objectif')) document.getElementById('lbl-objectif').textContent = objAnnuel;
             const now = new Date();
@@ -956,15 +956,18 @@
                     map[jour] = totalMs / 3600000;
                 }
 
-                // --- AJOUT DE LA FORMATION COMME TEMPS TRAVAILLÉ EFFECTIF ---
-                const hoursPerDay = userParams.base_horaire / 5;
+                // --- AJOUT DE LA FORMATION (AVEC BASE DYNAMIQUE) ---
                 currentAbsences.forEach(a => {
                     if (a.type_absence === 'Formation') {
                         let dCur = new Date(a.date_debut); dCur.setHours(0,0,0,0);
                         let dEnd = new Date(a.date_fin); dEnd.setHours(0,0,0,0);
                         while(dCur <= dEnd) {
+                            // Si avant 2022 -> 35h, sinon paramètre actuel (39h)
+                            let currentBase = dCur.getFullYear() < 2022 ? 35 : userParams.base_horaire;
+                            let currentHoursPerDay = currentBase / 5;
+                            
                             const dateStr = `${dCur.getFullYear()}-${String(dCur.getMonth() + 1).padStart(2, '0')}-${String(dCur.getDate()).padStart(2, '0')}`;
-                            let hJour = (a.moment === 'matin' || a.moment === 'aprem') ? (hoursPerDay / 2) : hoursPerDay;
+                            let hJour = (a.moment === 'matin' || a.moment === 'aprem') ? (currentHoursPerDay / 2) : currentHoursPerDay;
                             map[dateStr] = (map[dateStr] || 0) + hJour;
                             dCur.setDate(dCur.getDate() + 1);
                         }
@@ -978,9 +981,13 @@
             const getTempsReelTotal = (startDate) => { let total = 0; for(let jour in mapReelJour) { if(new Date(jour) >= startDate) total += mapReelJour[jour]; } return total; };
 
             const getTempsAttendu = (startDate) => {
-                let expected = 0; const hoursPerDay = userParams.base_horaire / 5;
+                let expected = 0; 
                 let d = new Date(startDate); d.setHours(0,0,0,0); let end = new Date(now); end.setHours(0,0,0,0);
                 while(d <= end) {
+                    // Si avant 2022 -> 35h, sinon paramètre actuel (39h)
+                    let currentBase = d.getFullYear() < 2022 ? 35 : userParams.base_horaire;
+                    let currentHoursPerDay = currentBase / 5;
+                    
                     const dayOfWeek = d.getDay();
                     const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                     const isFerie = joursFeries[dateStr];
@@ -992,14 +999,12 @@
                         });
                         
                         if (!absence) {
-                            expected += hoursPerDay;
+                            expected += currentHoursPerDay;
                         } else if (absence.type_absence === 'Formation') {
-                            // La formation compte dans l'attendu comme une journée de travail normale
-                            if (absence.moment === 'matin' || absence.moment === 'aprem') expected += (hoursPerDay / 2);
-                            else expected += hoursPerDay;
+                            if (absence.moment === 'matin' || absence.moment === 'aprem') expected += (currentHoursPerDay / 2);
+                            else expected += currentHoursPerDay;
                         } else {
-                            // Les autres absences (CP, RTT, Maladie...) réduisent l'attendu
-                            if (absence.moment === 'matin' || absence.moment === 'aprem') expected += (hoursPerDay / 2);
+                            if (absence.moment === 'matin' || absence.moment === 'aprem') expected += (currentHoursPerDay / 2);
                         }
                     }
                     d.setDate(d.getDate() + 1);
@@ -1030,7 +1035,7 @@
                 else { info1607.textContent = `Reste ~${(objAnnuel - cumulAnnee).toFixed(0)}h`; }
             }
         }
-
+        
        function chargerSoldes(absences) {
             let cpConsTotal = 0, rttCons = 0, cetCons = 0, aeaCons = 0, formationCons = 0, joursFractionnementPeriode = 0;
             const currentYear = new Date().getFullYear(); 
@@ -1403,6 +1408,10 @@
             const getWeekStr = (d) => { const first = new Date(d.getFullYear(), 0, 1); const days = Math.floor((d - first) / 86400000); return `S${Math.ceil((d.getDay() + 1 + days) / 7)} ${d.getFullYear()}`; };
 
             for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
+                // LOGIQUE DYNAMIQUE PDF : 35h avant 2022
+                let currentBase = d.getFullYear() < 2022 ? 35 : userParams.base_horaire;
+                let currentHoursPerDay = currentBase / 5;
+                
                 const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                 const key = groupMode === 'week' ? getWeekStr(d) : dateStr;
                 
@@ -1417,7 +1426,8 @@
                 const dayOfWeek = d.getDay(); 
                 const isFerie = joursFeries[dateStr];
                 const isWeekendOrFerie = (dayOfWeek === 0 || dayOfWeek === 6 || isFerie);
-                let expected = isWeekendOrFerie ? 0 : hoursPerDay * 3600000;
+                // Utilisation de currentHoursPerDay au lieu de hoursPerDay statique
+                let expected = isWeekendOrFerie ? 0 : currentHoursPerDay * 3600000;
                 
                 // COMPTAGE DES JOURS FÉRIÉS (On ne compte que ceux qui tombent en semaine)
                 if (isFerie && dayOfWeek !== 0 && dayOfWeek !== 6) {

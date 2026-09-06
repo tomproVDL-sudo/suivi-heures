@@ -201,14 +201,22 @@
                 <div id="calendar" class="flex-1 min-h-[600px] md:min-h-[450px] shadow-lg rounded-xl border border-gray-200 p-2 bg-white"></div>
             </div>
 
-            <!-- VUE STATISTIQUES -->
+           <!-- VUE STATISTIQUES -->
             <div id="view-statistiques" class="hidden flex-1 flex-col h-full overflow-y-auto custom-scrollbar">
-                <h2 class="text-2xl font-medium text-gray-800 mb-6">Mon Tableau de Bord (Année en cours)</h2>
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <h2 class="text-2xl font-medium text-gray-800">Mon Tableau de Bord</h2>
+                    <div class="flex items-center gap-2 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
+                        <input type="month" id="stat-start" class="p-2 border-none text-sm text-gray-700 focus:ring-0 cursor-pointer font-medium">
+                        <span class="text-gray-400">à</span>
+                        <input type="month" id="stat-end" class="p-2 border-none text-sm text-gray-700 focus:ring-0 cursor-pointer font-medium">
+                        <button onclick="genererTableauDeBord()" class="bg-indigo-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-indigo-700 shadow-sm text-sm transition">Filtrer</button>
+                    </div>
+                </div>
                 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <!-- Graphique : Volume horaire par mois -->
                     <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                        <h3 class="text-sm font-bold text-gray-700 mb-2">Volume horaire par mois</h3>
+                        <h3 class="text-sm font-bold text-gray-700 mb-2">Volume horaire travaillé</h3>
                         <div class="h-64 relative"><canvas id="chart-heures-mois"></canvas></div>
                     </div>
                     
@@ -218,10 +226,16 @@
                         <div class="h-64 relative"><canvas id="chart-pauses"></canvas></div>
                     </div>
 
-                    <!-- Graphique : Heures d'arrivée et départ -->
+                    <!-- Graphique : Heures d'arrivée, pauses et départ -->
                     <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
-                        <h3 class="text-sm font-bold text-gray-700 mb-2">Heure moyenne de prise et de fin de poste</h3>
-                        <div class="h-64 relative"><canvas id="chart-horaires"></canvas></div>
+                        <h3 class="text-sm font-bold text-gray-700 mb-2">Rythme journalier (Heures moyennes)</h3>
+                        <div class="h-72 relative"><canvas id="chart-horaires"></canvas></div>
+                    </div>
+
+                    <!-- Graphique : Absences posées -->
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
+                        <h3 class="text-sm font-bold text-gray-700 mb-2">Répartition des Absences & Jours fériés (en jours)</h3>
+                        <div class="h-72 relative"><canvas id="chart-absences-stat"></canvas></div>
                     </div>
                 </div>
             </div>
@@ -1822,113 +1836,169 @@
         
         window.genererTableauDeBord = () => {
             const currentYear = new Date().getFullYear();
-            const moisLabels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+            let elStart = document.getElementById('stat-start');
+            let elEnd = document.getElementById('stat-end');
             
-            // Préparation des compteurs pour chaque mois
-            let statsMois = Array(12).fill(null).map(() => ({
-                travailMs: 0, pauseMs: 0, nbPauses: 0,
-                sommeArrivee: 0, nbArrivees: 0, sommeDepart: 0, nbDeparts: 0
-            }));
+            // Initialisation par défaut : Janvier à Décembre de l'année en cours
+            if (!elStart.value) elStart.value = `${currentYear}-01`;
+            if (!elEnd.value) elEnd.value = `${currentYear}-12`;
 
-            // Grouper les pointages de l'année par jour
-            const parJour = {};
-            pointagesAnnee.forEach(p => {
-                const dObj = new Date(p.timestamp);
-                if (dObj.getFullYear() === currentYear) {
-                    const dStr = p.timestamp.split('T')[0];
-                    if (!parJour[dStr]) parJour[dStr] = [];
-                    parJour[dStr].push(p);
-                }
-            });
+            const startD = new Date(elStart.value + '-01');
+            const endD = new Date(elEnd.value + '-01');
+            endD.setMonth(endD.getMonth() + 1); 
+            endD.setDate(0); // Dernier jour du mois de fin
 
-            // Analyser chaque journée
-            for (let jour in parJour) {
-                const moisIdx = new Date(jour).getMonth();
-                const events = parJour[jour].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-                
-                let lastArr = null; let pauseStart = null;
-                let premierArrivee = null; let dernierDepart = null;
-
-                events.forEach(pt => {
-                    const t = new Date(pt.timestamp);
-                    const decTime = t.getHours() + (t.getMinutes() / 60);
-
-                    if (pt.type_action === 'arrivee') {
-                        lastArr = t;
-                        if (premierArrivee === null) premierArrivee = decTime;
-                        if (pauseStart) {
-                            statsMois[moisIdx].pauseMs += (t - pauseStart);
-                            statsMois[moisIdx].nbPauses++;
-                            pauseStart = null;
-                        }
-                    }
-                    if (pt.type_action === 'pause') {
-                        pauseStart = t;
-                        if (lastArr) { statsMois[moisIdx].travailMs += (t - lastArr); lastArr = null; }
-                    }
-                    if (pt.type_action === 'depart') {
-                        dernierDepart = decTime;
-                        if (lastArr) { statsMois[moisIdx].travailMs += (t - lastArr); lastArr = null; }
-                    }
-                });
-
-                if (premierArrivee !== null) { statsMois[moisIdx].sommeArrivee += premierArrivee; statsMois[moisIdx].nbArrivees++; }
-                if (dernierDepart !== null) { statsMois[moisIdx].sommeDepart += dernierDepart; statsMois[moisIdx].nbDeparts++; }
+            // Génération des étiquettes (ex: Jan 2024, Fév 2024...)
+            const labels = []; const statsKeys = [];
+            let curr = new Date(startD); curr.setDate(1);
+            while(curr <= endD) {
+                const y = curr.getFullYear(); const m = String(curr.getMonth() + 1).padStart(2, '0');
+                const key = `${y}-${m}`;
+                statsKeys.push(key);
+                labels.push(curr.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }));
+                curr.setMonth(curr.getMonth() + 1);
             }
 
-            // Calcul des moyennes
-            const dataHeures = statsMois.map(s => s.travailMs / 3600000);
-            const dataPauses = statsMois.map(s => s.nbPauses > 0 ? (s.pauseMs / s.nbPauses) / 60000 : 0);
-            const dataArrivees = statsMois.map(s => s.nbArrivees > 0 ? s.sommeArrivee / s.nbArrivees : null);
-            const dataDeparts = statsMois.map(s => s.nbDeparts > 0 ? s.sommeDepart / s.nbDeparts : null);
+            // Initialisation du dictionnaire de statistiques
+            let stats = {};
+            statsKeys.forEach(k => {
+                stats[k] = {
+                    travailMs: 0, pauseMs: 0, nbPauses: 0,
+                    sommeArrivee: 0, nbArrivees: 0, sommeDepart: 0, nbDeparts: 0,
+                    sommePauseDebut: 0, nbPauseDebuts: 0, sommePauseFin: 0, nbPauseFins: 0,
+                    abs: { 'CP': 0, 'RTT': 0, 'CET': 0, 'AEA': 0, 'Formation': 0, 'Maladie': 0, 'Férié': 0 }
+                };
+            });
+
+            // Boucle jour par jour sur toute la période choisie (Hyper précis)
+            for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
+                const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                if (!stats[key]) continue;
+                
+                const dayOfWeek = d.getDay();
+                const isFerie = joursFeries[dateStr];
+                const isWeekendOrFerie = (dayOfWeek === 0 || dayOfWeek === 6 || isFerie);
+
+                // Comptage des jours fériés en semaine
+                if (isFerie && dayOfWeek !== 0 && dayOfWeek !== 6) stats[key].abs['Férié'] += 1;
+
+                // Comptage des Absences
+                let absence = currentAbsences.find(a => {
+                    const aS = new Date(a.date_debut); aS.setHours(0,0,0,0); const aE = new Date(a.date_fin); aE.setHours(0,0,0,0); 
+                    return d >= aS && d <= aE; 
+                });
+                if (absence && !isWeekendOrFerie && stats[key].abs[absence.type_absence] !== undefined) {
+                    stats[key].abs[absence.type_absence] += (absence.moment === 'journee') ? 1 : 0.5;
+                }
+
+                // Comptage des Horaires et Pointages
+                const pts = pointagesAnnee.filter(p => p.timestamp.startsWith(dateStr)).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+                if (pts.length > 0) {
+                    let premierArrivee = null; let dernierDepart = null;
+                    let premierPauseDebut = null; let dernierPauseFin = null;
+                    let lastArr = null; let pauseStart = null;
+
+                    pts.forEach(pt => {
+                        const t = new Date(pt.timestamp);
+                        const decTime = t.getHours() + (t.getMinutes() / 60);
+
+                        if (pt.type_action === 'arrivee') {
+                            lastArr = t;
+                            if (premierArrivee === null) premierArrivee = decTime;
+                            if (pauseStart) {
+                                // C'est une reprise après une pause, donc la pause se termine
+                                dernierPauseFin = decTime; 
+                                stats[key].pauseMs += (t - pauseStart);
+                                stats[key].nbPauses++;
+                                pauseStart = null;
+                            }
+                        }
+                        if (pt.type_action === 'pause') {
+                            pauseStart = t;
+                            if (premierPauseDebut === null) premierPauseDebut = decTime;
+                            if (lastArr) { stats[key].travailMs += (t - lastArr); lastArr = null; }
+                        }
+                        if (pt.type_action === 'depart') {
+                            dernierDepart = decTime;
+                            if (lastArr) { stats[key].travailMs += (t - lastArr); lastArr = null; }
+                        }
+                    });
+
+                    if (premierArrivee !== null) { stats[key].sommeArrivee += premierArrivee; stats[key].nbArrivees++; }
+                    if (dernierDepart !== null) { stats[key].sommeDepart += dernierDepart; stats[key].nbDeparts++; }
+                    if (premierPauseDebut !== null) { stats[key].sommePauseDebut += premierPauseDebut; stats[key].nbPauseDebuts++; }
+                    if (dernierPauseFin !== null) { stats[key].sommePauseFin += dernierPauseFin; stats[key].nbPauseFins++; }
+                }
+            }
+
+            // Transformation en tableaux pour Chart.js
+            const dataHeures = statsKeys.map(k => stats[k].travailMs / 3600000);
+            const dataPauses = statsKeys.map(k => stats[k].nbPauses > 0 ? (stats[k].pauseMs / stats[k].nbPauses) / 60000 : 0);
+            const dataArr = statsKeys.map(k => stats[k].nbArrivees > 0 ? stats[k].sommeArrivee / stats[k].nbArrivees : null);
+            const dataDep = statsKeys.map(k => stats[k].nbDeparts > 0 ? stats[k].sommeDepart / stats[k].nbDeparts : null);
+            const dataPauseD = statsKeys.map(k => stats[k].nbPauseDebuts > 0 ? stats[k].sommePauseDebut / stats[k].nbPauseDebuts : null);
+            const dataPauseF = statsKeys.map(k => stats[k].nbPauseFins > 0 ? stats[k].sommePauseFin / stats[k].nbPauseFins : null);
 
             // Nettoyage des anciens graphiques
             if(dashCharts.heures) dashCharts.heures.destroy();
             if(dashCharts.pauses) dashCharts.pauses.destroy();
             if(dashCharts.horaires) dashCharts.horaires.destroy();
+            if(dashCharts.absences) dashCharts.absences.destroy();
 
             Chart.defaults.font.family = 'sans-serif';
 
-            // 1. Graphique Heures par mois
+            // 1. Graphique Heures
             dashCharts.heures = new Chart(document.getElementById('chart-heures-mois').getContext('2d'), {
                 type: 'bar',
-                data: { labels: moisLabels, datasets: [{ label: 'Heures Travaillées', data: dataHeures, backgroundColor: '#14b8a6', borderRadius: 4 }] },
+                data: { labels: labels, datasets: [{ label: 'Heures Travaillées', data: dataHeures, backgroundColor: '#4f46e5', borderRadius: 4 }] },
                 options: { responsive: true, maintainAspectRatio: false }
             });
 
-            // 2. Graphique Durée des Pauses
+            // 2. Graphique Durée Pauses
             dashCharts.pauses = new Chart(document.getElementById('chart-pauses').getContext('2d'), {
                 type: 'line',
-                data: { labels: moisLabels, datasets: [{ label: 'Minutes de pause', data: dataPauses, borderColor: '#f97316', backgroundColor: '#fdba74', fill: true, tension: 0.3 }] },
+                data: { labels: labels, datasets: [{ label: 'Minutes de pause', data: dataPauses, borderColor: '#f97316', backgroundColor: '#fdba74', fill: true, tension: 0.3 }] },
                 options: { responsive: true, maintainAspectRatio: false }
             });
 
-            // 3. Graphique Arrivées / Départs (Avec formatage d'heures)
+            // 3. Graphique Horaires (Rythme)
             dashCharts.horaires = new Chart(document.getElementById('chart-horaires').getContext('2d'), {
                 type: 'line',
                 data: {
-                    labels: moisLabels,
+                    labels: labels,
                     datasets: [
-                        { label: 'Heure moyenne d\'arrivée', data: dataArrivees, borderColor: '#3b82f6', backgroundColor: '#3b82f6', tension: 0.2 },
-                        { label: 'Heure moyenne de départ', data: dataDeparts, borderColor: '#8b5cf6', backgroundColor: '#8b5cf6', tension: 0.2 }
+                        { label: 'Heure moyenne d\'arrivée', data: dataArr, borderColor: '#14b8a6', backgroundColor: '#14b8a6', tension: 0.2 },
+                        { label: 'Début moyen des pauses', data: dataPauseD, borderColor: '#f59e0b', backgroundColor: '#f59e0b', borderDash: [5, 5], tension: 0.2 },
+                        { label: 'Fin moyenne des pauses', data: dataPauseF, borderColor: '#ea580c', backgroundColor: '#ea580c', borderDash: [5, 5], tension: 0.2 },
+                        { label: 'Heure moyenne de départ', data: dataDep, borderColor: '#6366f1', backgroundColor: '#6366f1', tension: 0.2 }
                     ]
                 },
                 options: { 
                     responsive: true, maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            ticks: {
-                                callback: function(value) {
-                                    let h = Math.floor(value); let m = Math.round((value - h) * 60);
-                                    return h + 'h' + m.toString().padStart(2, '0');
-                                }
-                            }
-                        }
-                    },
-                    plugins: { tooltip: { callbacks: { label: function(context) {
-                        let value = context.parsed.y; let h = Math.floor(value); let m = Math.round((value - h) * 60);
-                        return context.dataset.label + ': ' + h + 'h' + m.toString().padStart(2, '0');
-                    }}}}
+                    scales: { y: { ticks: { callback: function(val) { let h = Math.floor(val); let m = Math.round((val - h) * 60); return h + 'h' + m.toString().padStart(2, '0'); } } } },
+                    plugins: { tooltip: { callbacks: { label: function(ctx) { let v = ctx.parsed.y; let h = Math.floor(v); let m = Math.round((v - h) * 60); return ctx.dataset.label + ': ' + h + 'h' + m.toString().padStart(2, '0'); } } } }
+                }
+            });
+
+            // 4. Graphique Absences (Empilé)
+            dashCharts.absences = new Chart(document.getElementById('chart-absences-stat').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'CP', data: statsKeys.map(k => stats[k].abs['CP']), backgroundColor: '#14b8a6', stack: 'Abs' },
+                        { label: 'RTT', data: statsKeys.map(k => stats[k].abs['RTT']), backgroundColor: '#3b82f6', stack: 'Abs' },
+                        { label: 'CET', data: statsKeys.map(k => stats[k].abs['CET']), backgroundColor: '#8b5cf6', stack: 'Abs' },
+                        { label: 'AEA', data: statsKeys.map(k => stats[k].abs['AEA']), backgroundColor: '#06b6d4', stack: 'Abs' },
+                        { label: 'Formation', data: statsKeys.map(k => stats[k].abs['Formation']), backgroundColor: '#84cc16', stack: 'Abs' },
+                        { label: 'Maladie', data: statsKeys.map(k => stats[k].abs['Maladie']), backgroundColor: '#ef4444', stack: 'Abs' },
+                        { label: 'Jours Fériés', data: statsKeys.map(k => stats[k].abs['Férié']), backgroundColor: '#94a3b8', stack: 'Abs' }
+                    ]
+                },
+                options: { 
+                    responsive: true, maintainAspectRatio: false, 
+                    scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: 'Jours' } } } 
                 }
             });
         };

@@ -1473,11 +1473,28 @@
             
             // --- AJOUT DE "Férié" DANS LES STATISTIQUES GLOBALES ---
             let absStats = { 'CP':0, 'RTT':0, 'CET':0, 'AEA':0, 'Formation':0, 'Maladie':0, 'Férié':0 };
+            let nbPontsPDF = 0; // Compteur local pour le PDF
+
             currentAbsences.forEach(a => {
                 const d = new Date(a.date_debut);
                 if (d >= startD && d <= endD) {
                     let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1;
                     if(absStats[a.type_absence] !== undefined) absStats[a.type_absence] += j;
+
+                    // --- DÉTECTION DU PONT DE 1 JOUR ---
+                    if (a.date_debut === a.date_fin && a.moment === 'journee' && a.type_absence !== 'Maladie' && a.type_absence !== 'Formation') {
+                        const day = d.getDay();
+                        if (day === 1 || day === 5) {
+                            const getStr = (dateObj) => `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+                            let dAdjacent = new Date(d);
+                            if (day === 1) dAdjacent.setDate(d.getDate() + 1);
+                            if (day === 5) dAdjacent.setDate(d.getDate() - 1);
+                            
+                            if (joursFeries[getStr(dAdjacent)]) {
+                                nbPontsPDF++;
+                            }
+                        }
+                    }
                 }
             });
 
@@ -1607,8 +1624,14 @@
 
             let txtAbs = [];
             for (let t in absStats) { if(absStats[t] > 0) txtAbs.push(`${t}: ${absStats[t]}j`); }
+            
+            // On ajoute la mention des ponts s'il y en a eu sur la période
+            if (nbPontsPDF > 0) {
+                txtAbs.push(`<span class="text-emerald-600 font-bold mt-1 block border-t border-gray-200 pt-1">Ponts (1j) : ${nbPontsPDF}</span>`);
+            }
+            
             document.getElementById('pdf-stat-absences').innerHTML = txtAbs.length > 0 ? txtAbs.join('<br>') : '<span class="text-gray-400">Aucune absence</span>';
-
+            
             pdfCharts.forEach(c => c.destroy()); pdfCharts = [];
             
             Chart.defaults.font.family = 'sans-serif';

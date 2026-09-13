@@ -498,10 +498,10 @@
             'recup': { bg: 'bg-amber-50', border: 'border-amber-200', title: 'H. à récupérer', innerHtml: '<div class="text-[10px] text-amber-600 font-bold uppercase mb-1">H. à récupérer</div><div class="text-lg font-bold text-amber-800" id="cpt-recup">-- h</div>' },
             'aea': { bg: 'bg-cyan-50', border: 'border-cyan-200', title: 'CExeptionnel posé', innerHtml: '<div class="text-[10px] text-cyan-600 font-bold uppercase mb-1">CExceptionnel posé</div><div class="text-lg font-bold text-cyan-800" id="cpt-aea">0 j</div>' },
             'formation': { bg: 'bg-lime-50', border: 'border-lime-200', title: 'Formation', innerHtml: '<div class="text-[10px] text-lime-700 font-bold uppercase mb-1">Formation</div><div class="text-lg font-bold text-lime-900" id="cpt-formation">0 j</div>' },
-            'don': { bg: 'bg-rose-50', border: 'border-rose-200', title: 'Don de jours', innerHtml: '<div class="text-[10px] text-rose-600 font-bold uppercase mb-1">Don de jours</div><div class="text-lg font-bold text-rose-800" id="cpt-don">0 j</div>' }
+            'don': { bg: 'bg-rose-50', border: 'border-rose-200', title: 'Don de jours', innerHtml: '<div class="text-[10px] text-rose-600 font-bold uppercase mb-1">Don de jours</div><div class="text-lg font-bold text-rose-800" id="cpt-don">0 j</div>' },'ponts': { bg: 'bg-emerald-50', border: 'border-emerald-200', title: 'Ponts (1j)', innerHtml: '<div class="text-[10px] text-emerald-600 font-bold uppercase mb-1">Ponts de 1 jour</div><div class="text-lg font-bold text-emerald-800" id="cpt-ponts">0</div>' }
         };
 
-        let defaultOrder = ['1607', 'reliquat', 'cp', 'rtt', 'cet', 'fractionnement', 'recup', 'aea', 'formation', 'don'];
+        let defaultOrder = ['1607', 'reliquat', 'cp', 'rtt', 'cet', 'fractionnement', 'ponts', 'recup', 'aea', 'formation', 'don'];
         let gridOrder = JSON.parse(localStorage.getItem('sirh_order')) || defaultOrder;
         let hiddenCounters = JSON.parse(localStorage.getItem('sirh_hidden')) || ['recup', 'aea', 'formation', 'don'];
         let sortableInstance = null;
@@ -1105,6 +1105,7 @@
         
        function chargerSoldes(absences) {
             let cpConsTotal = 0, rttCons = 0, cetCons = 0, aeaCons = 0, formationCons = 0, joursFractionnementPeriode = 0;
+            let nbPonts1Jour = 0; // NOUVELLE VARIABLE POUR LES PONTS
             const currentYear = new Date().getFullYear(); 
             const now = new Date();
             const limiteDate = userParams.date_limite_reliquat ? new Date(userParams.date_limite_reliquat + 'T23:59:59') : null;
@@ -1115,7 +1116,23 @@
                 if (startAbs.getFullYear() !== currentYear && endAbs.getFullYear() !== currentYear) return;
                 
                 let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((endAbs - startAbs) / 86400000) + 1;
-                
+
+                // --- DÉTECTION INTELLIGENTE : PONT DE 1 JOUR ---
+                // Condition : Dure 1 jour, journée entière, pas de la maladie ou formation
+                if (a.date_debut === a.date_fin && a.moment === 'journee' && a.type_absence !== 'Maladie' && a.type_absence !== 'Formation') {
+                    const day = startAbs.getDay();
+                    // Si c'est un Lundi (1) ou un Vendredi (5)
+                    if (day === 1 || day === 5) {
+                        const getStr = (dateObj) => `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+                        let dAdjacent = new Date(startAbs);
+                        if (day === 1) dAdjacent.setDate(startAbs.getDate() + 1); // Si Lundi, on regarde si Mardi est férié
+                        if (day === 5) dAdjacent.setDate(startAbs.getDate() - 1); // Si Vendredi, on regarde si Jeudi est férié
+                        
+                        if (joursFeries[getStr(dAdjacent)]) {
+                            nbPonts1Jour++; // C'est un pont de 1 jour confirmé !
+                        }
+                    }
+                }
                 if(a.type_absence === 'CP') { 
                     cpConsTotal += j; 
                     
@@ -1186,7 +1203,8 @@
             
             let txtDon = (userParams.don_jours || 0);
             if(document.getElementById('cpt-don')) document.getElementById('cpt-don').textContent = (txtDon > 0 ? '+' : '') + txtDon + ' j';
-        }
+            if(document.getElementById('cpt-ponts')) document.getElementById('cpt-ponts').textContent = nbPonts1Jour; 
+       }
 
         // Fonction universelle pour envoyer une notification (Mobile + Bureau)
         function envoyerNotification(titre, options) {

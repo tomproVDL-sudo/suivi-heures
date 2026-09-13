@@ -1473,28 +1473,50 @@
             
             // --- AJOUT DE "Férié" DANS LES STATISTIQUES GLOBALES ---
             let absStats = { 'CP':0, 'RTT':0, 'CET':0, 'AEA':0, 'Formation':0, 'Maladie':0, 'Férié':0 };
-            let nbPontsPDF = 0; // Compteur local pour le PDF
+            let nbPontsPoses = 0;
+            let nbPontsPossibles = 0;
 
+            // On balaie chaque jour de la période du PDF pour identifier les ponts possibles
+            for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
+                const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                const day = d.getDay();
+                
+                // Si c'est un Lundi (1) ou un Vendredi (5)
+                if (day === 1 || day === 5) {
+                    const getStr = (dateObj) => `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+                    let dAdjacent = new Date(d);
+                    if (day === 1) dAdjacent.setDate(d.getDate() + 1);
+                    if (day === 5) dAdjacent.setDate(d.getDate() - 1);
+                    
+                    // S'il y a un jour férié juste à côté, c'est un "pont possible"
+                    if (joursFeries[getStr(dAdjacent)]) {
+                        const dayOfWeek = d.getDay();
+                        const isFerie = joursFeries[dateStr];
+                        // S'il n'est pas lui-même férié ou le week-end
+                        if (dayOfWeek !== 0 && dayOfWeek !== 6 && !isFerie) {
+                            nbPontsPossibles++;
+                            
+                            // Est-ce que l'utilisateur a posé un congé ce jour-là ?
+                            let estPose = currentAbsences.some(a => {
+                                const aS = new Date(a.date_debut); aS.setHours(0,0,0,0);
+                                const aE = new Date(a.date_fin); aE.setHours(23,59,59,999);
+                                return d >= aS && d <= aE && a.moment === 'journee' && a.type_absence !== 'Maladie' && a.type_absence !== 'Formation';
+                            });
+                            
+                            if (estPose) {
+                                nbPontsPoses++;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Calcul classique des autres absences sur la période
             currentAbsences.forEach(a => {
                 const d = new Date(a.date_debut);
                 if (d >= startD && d <= endD) {
                     let j = (a.moment === 'matin' || a.moment === 'aprem') ? 0.5 : Math.round((new Date(a.date_fin) - new Date(a.date_debut)) / 86400000) + 1;
                     if(absStats[a.type_absence] !== undefined) absStats[a.type_absence] += j;
-
-                    // --- DÉTECTION DU PONT DE 1 JOUR ---
-                    if (a.date_debut === a.date_fin && a.moment === 'journee' && a.type_absence !== 'Maladie' && a.type_absence !== 'Formation') {
-                        const day = d.getDay();
-                        if (day === 1 || day === 5) {
-                            const getStr = (dateObj) => `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-                            let dAdjacent = new Date(d);
-                            if (day === 1) dAdjacent.setDate(d.getDate() + 1);
-                            if (day === 5) dAdjacent.setDate(d.getDate() - 1);
-                            
-                            if (joursFeries[getStr(dAdjacent)]) {
-                                nbPontsPDF++;
-                            }
-                        }
-                    }
                 }
             });
 
@@ -1625,9 +1647,9 @@
             let txtAbs = [];
             for (let t in absStats) { if(absStats[t] > 0) txtAbs.push(`${t}: ${absStats[t]}j`); }
             
-            // On ajoute la mention des ponts s'il y en a eu sur la période
-            if (nbPontsPDF > 0) {
-                txtAbs.push(`<span class="text-emerald-600 font-bold mt-1 block border-t border-gray-200 pt-1">Ponts (1j) : ${nbPontsPDF}</span>`);
+            // Affichage du ratio des ponts (ex: 3 sur 15)
+            if (nbPontsPossibles > 0) {
+                txtAbs.push(`<span class="text-emerald-600 font-bold mt-1 block border-t border-gray-200 pt-1">Ponts (1j) : ${nbPontsPoses} sur ${nbPontsPossibles} poss.</span>`);
             }
             
             document.getElementById('pdf-stat-absences').innerHTML = txtAbs.length > 0 ? txtAbs.join('<br>') : '<span class="text-gray-400">Aucune absence</span>';

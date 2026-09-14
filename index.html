@@ -2150,17 +2150,17 @@
                 }
             });
 
-        // --- 5. GRAPHIQUE DE DISTRIBUTION (TRANCHES DE 20 MIN) ---
+        // --- 5. GRAPHIQUE DE DISTRIBUTION (TRANCHES DE 10 MIN) ---
             const typeDistEl = document.getElementById('select-type-distribution');
             const modeDist = typeDistEl ? typeDistEl.value : 'arrivee';
 
             let labelsTranches = [];
             let countsTranches = [];
-            let dailyWorkMins = []; // Utilisé pour stocker les durées totales par jour
+            let dailyWorkMins = []; 
             
             if (modeDist !== 'duree_travail') {
-                // Initialisation pour les tranches horaires (par 20 min) de 06:00 à 22:00
-                countsTranches = Array(48).fill(0);
+                // CORRECTION : On initialise 96 tranches (16 heures * 6 tranches de 10 min)
+                countsTranches = Array(96).fill(0);
                 for (let h = 6; h < 22; h++) {
                     for (let m = 0; m < 60; m += 10) {
                         let hStr = String(h).padStart(2, '0');
@@ -2172,7 +2172,6 @@
                 }
             }
 
-            // Extraction des valeurs de la période filtrée
             for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
                 const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                 if (pointagesParJour[dateStr]) {
@@ -2181,7 +2180,7 @@
                     let firstArr = null; let lastDep = null;
                     let pStarts = []; let pEnds = [];
                     let lastArrTemp = null; let pauseStartTemp = null;
-                    let totalWorkMs = 0; // Temps de travail du jour
+                    let totalWorkMs = 0; 
 
                     pts.forEach(pt => {
                         const t = new Date(pt.timestamp);
@@ -2200,12 +2199,8 @@
                     });
 
                     if (modeDist === 'duree_travail') {
-                        // On enregistre la durée totale de la journée (en minutes)
-                        if (totalWorkMs > 0) {
-                            dailyWorkMins.push(Math.floor(totalWorkMs / 60000));
-                        }
+                        if (totalWorkMs > 0) dailyWorkMins.push(Math.floor(totalWorkMs / 60000));
                     } else {
-                        // On classe les heures dans les tranches de 20 minutes
                         let targetDates = [];
                         if (modeDist === 'arrivee' && firstArr) targetDates.push(firstArr);
                         if (modeDist === 'depart' && lastDep) targetDates.push(lastDep);
@@ -2214,20 +2209,19 @@
 
                         targetDates.forEach(dt => {
                             let totalMins = dt.getHours() * 60 + dt.getMinutes();
-                            let trancheIdx = Math.floor((totalMins - 360) / 10); // 360 min = 06:00
+                            // CORRECTION : On divise par 10 (et plus par 20)
+                            let trancheIdx = Math.floor((totalMins - 360) / 10); 
                             if (trancheIdx >= 0 && trancheIdx < countsTranches.length) countsTranches[trancheIdx]++;
                         });
                     }
                 }
             }
 
-            // Génération dynamique des tranches de 10 min si on est en mode "Durée du travail"
             if (modeDist === 'duree_travail') {
                 if (dailyWorkMins.length > 0) {
                     let minVal = Math.min(...dailyWorkMins);
                     let maxVal = Math.max(...dailyWorkMins);
                     
-                    // On arrondit à la dizaine inférieure et supérieure (ex: 423 min -> 420, 517 min -> 520)
                     let minBucket = Math.floor(minVal / 10) * 10;
                     let maxBucket = (Math.floor(maxVal / 10) + 1) * 10;
                     
@@ -2237,21 +2231,18 @@
                         let h2 = Math.floor(mEnd / 60); let m2 = String(mEnd % 60).padStart(2, '0');
                         
                         labelsTranches.push(`${h1}h${m1}-${h2}h${m2}`);
-                        
-                        // Compte combien de journées tombent dans cette tranche de 10 minutes
                         let count = dailyWorkMins.filter(val => val >= m && val < mEnd).length;
                         countsTranches.push(count);
                     }
                 }
             }
 
-            // Couleurs personnalisées selon l'indicateur
             const colorsDist = {
                 'arrivee': '#14b8a6',
                 'depart': '#ef4444',
                 'pause_debut': '#f59e0b',
                 'pause_fin': '#ea580c',
-                'duree_travail': '#8b5cf6' // Violet pour la durée de travail
+                'duree_travail': '#8b5cf6' 
             };
 
             dashCharts.distribution = new Chart(document.getElementById('chart-distribution').getContext('2d'), {

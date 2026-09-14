@@ -236,6 +236,20 @@
                         <div class="h-72 relative"><canvas id="chart-horaires"></canvas></div>
                     </div>
 
+                    <!-- Graphique : Distribution horaire par tranches de 20 min -->
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-3 gap-2">
+                            <h3 class="text-sm font-bold text-gray-700">Répartition des horaires (Tranches de 20 min)</h3>
+                            <select id="select-type-distribution" onchange="genererTableauDeBord()" class="p-2 border border-gray-200 rounded-lg text-xs font-medium bg-gray-50 focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+                                <option value="arrivee">🟢 Heure d'arrivée</option>
+                                <option value="depart">🔴 Heure de départ</option>
+                                <option value="pause_debut">⏸️ Début des pauses</option>
+                                <option value="pause_fin">▶️ Fin des pauses</option>
+                            </select>
+                        </div>
+                        <div class="h-72 relative"><canvas id="chart-distribution"></canvas></div>
+                    </div>
+
                     <!-- Graphique : Absences posées -->
                     <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
                         <h3 class="text-sm font-bold text-gray-700 mb-2">Répartition des Absences & Jours fériés (en jours)</h3>
@@ -2029,6 +2043,7 @@
                     if (dernierDepart !== null) { stats[key].sommeDepart += dernierDepart; stats[key].nbDeparts++; }
                     if (premierPauseDebut !== null) { stats[key].sommePauseDebut += premierPauseDebut; stats[key].nbPauseDebuts++; }
                     if (dernierPauseFin !== null) { stats[key].sommePauseFin += dernierPauseFin; stats[key].nbPauseFins++; }
+                    
                 }
             }
 
@@ -2076,6 +2091,7 @@
             if(dashCharts.pauses) dashCharts.pauses.destroy();
             if(dashCharts.horaires) dashCharts.horaires.destroy();
             if(dashCharts.absences) dashCharts.absences.destroy();
+            if(dashCharts.distribution) dashCharts.distribution.destroy();
 
             Chart.defaults.font.family = 'sans-serif';
 
@@ -2132,6 +2148,100 @@
                     scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: 'Jours' } } } 
                 }
             });
+
+// --- 5. GRAPHIQUE DE DISTRIBUTION (TRANCHES DE 20 MIN) ---
+            const typeDistEl = document.getElementById('select-type-distribution');
+            const modeDist = typeDistEl ? typeDistEl.value : 'arrivee';
+
+            // Création des tranches de 20 min de 06:00 à 22:00 (soit 48 tranches)
+            let labelsTranches = [];
+            let countsTranches = Array(48).fill(0);
+            
+            for (let h = 6; h < 22; h++) {
+                for (let m = 0; m < 60; m += 20) {
+                    let hStr = String(h).padStart(2, '0');
+                    let mStr = String(m).padStart(2, '0');
+                    let mEnd = m + 20;
+                    let hEnd = h;
+                    if (mEnd >= 60) { mEnd = 0; hEnd++; }
+                    let hEndStr = String(hEnd).padStart(2, '0');
+                    let mEndStr = String(mEnd).padStart(2, '0');
+                    labelsTranches.push(`${hStr}h${mStr}-${hEndStr}h${mEndStr}`);
+                }
+            }
+
+            // Extraction des valeurs de la période filtrée
+            for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
+                const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                if (pointagesParJour[dateStr]) {
+                    const pts = pointagesParJour[dateStr].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+                    
+                    let firstArr = null; let lastDep = null;
+                    let pStarts = []; let pEnds = [];
+                    let lastArrTemp = null; let pauseStartTemp = null;
+
+                    pts.forEach(pt => {
+                        const t = new Date(pt.timestamp);
+                        if (pt.type_action === 'arrivee') {
+                            lastArrTemp = t;
+                            if (!firstArr) firstArr = t;
+                            if (pauseStartTemp) { pEnds.push(t); pauseStartTemp = null; }
+                        } else if (pt.type_action === 'pause') {
+                            pauseStartTemp = t;
+                            pStarts.push(t);
+                            if (lastArrTemp) lastArrTemp = null;
+                        } else if (pt.type_action === 'depart') {
+                            lastDep = t;
+                            if (pauseStartTemp) { pEnds.push(t); pauseStartTemp = null; }
+                            if (lastArrTemp) lastArrTemp = null;
+                        }
+                    });
+
+                    let targetDates = [];
+                    if (modeDist === 'arrivee' && firstArr) targetDates.push(firstArr);
+                    if (modeDist === 'depart' && lastDep) targetDates.push(lastDep);
+                    if (modeDist === 'pause_debut') targetDates = pStarts;
+                    if (modeDist === 'pause_fin') targetDates = pEnds;
+
+                    targetDates.forEach(dt => {
+                        let totalMins = dt.getHours() * 60 + dt.getMinutes();
+                        let trancheIdx = Math.floor((totalMins - 360) / 20); // 360 min = 06:00
+                        if (trancheIdx >= 0 && trancheIdx < countsTranches.length) {
+                            countsTranches[trancheIdx]++;
+                        }
+                    });
+                }
+            }
+
+            // Couleurs selon le type choisi
+            const colorsDist = {
+                'arrivee': '#14b8a6',
+                'depart': '#6366f1',
+                'pause_debut': '#f59e0b',
+                'pause_fin': '#ea580c'
+            };
+
+            dashCharts.distribution = new Chart(document.getElementById('chart-distribution').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: labelsTranches,
+                    datasets: [{
+                        label: 'Nombre d\'occurrences',
+                        data: countsTranches,
+                        backgroundColor: colorsDist[modeDist] || '#4f46e5',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { maxRotation: 45, minRotation: 45, font: { size: 10 } } },
+                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                    }
+                }
+            });
+            
         };
         
         window.switchTab = async (tab) => {

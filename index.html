@@ -245,6 +245,7 @@
                                 <option value="depart">🔴 Heure de départ</option>
                                 <option value="pause_debut">⏸️ Début des pauses</option>
                                 <option value="pause_fin">▶️ Fin des pauses</option>
+                                <option value="duree_travail">⏱️ Durée de la journée (par 10 min)</option>
                             </select>
                         </div>
                         <div class="h-72 relative"><canvas id="chart-distribution"></canvas></div>
@@ -2149,24 +2150,25 @@
                 }
             });
 
-// --- 5. GRAPHIQUE DE DISTRIBUTION (TRANCHES DE 20 MIN) ---
+        // --- 5. GRAPHIQUE DE DISTRIBUTION (TRANCHES DE 20 MIN) ---
             const typeDistEl = document.getElementById('select-type-distribution');
             const modeDist = typeDistEl ? typeDistEl.value : 'arrivee';
 
-            // Création des tranches de 20 min de 06:00 à 22:00 (soit 48 tranches)
             let labelsTranches = [];
-            let countsTranches = Array(48).fill(0);
+            let countsTranches = [];
+            let dailyWorkMins = []; // Utilisé pour stocker les durées totales par jour
             
-            for (let h = 6; h < 22; h++) {
-                for (let m = 0; m < 60; m += 20) {
-                    let hStr = String(h).padStart(2, '0');
-                    let mStr = String(m).padStart(2, '0');
-                    let mEnd = m + 20;
-                    let hEnd = h;
-                    if (mEnd >= 60) { mEnd = 0; hEnd++; }
-                    let hEndStr = String(hEnd).padStart(2, '0');
-                    let mEndStr = String(mEnd).padStart(2, '0');
-                    labelsTranches.push(`${hStr}h${mStr}-${hEndStr}h${mEndStr}`);
+            if (modeDist !== 'duree_travail') {
+                // Initialisation pour les tranches horaires (par 20 min) de 06:00 à 22:00
+                countsTranches = Array(48).fill(0);
+                for (let h = 6; h < 22; h++) {
+                    for (let m = 0; m < 60; m += 20) {
+                        let hStr = String(h).padStart(2, '0');
+                        let mStr = String(m).padStart(2, '0');
+                        let mEnd = m + 20; let hEnd = h;
+                        if (mEnd >= 60) { mEnd = 0; hEnd++; }
+                        labelsTranches.push(`${hStr}h${mStr}-${String(hEnd).padStart(2, '0')}h${String(mEnd).padStart(2, '0')}`);
+                    }
                 }
             }
 
@@ -2179,6 +2181,7 @@
                     let firstArr = null; let lastDep = null;
                     let pStarts = []; let pEnds = [];
                     let lastArrTemp = null; let pauseStartTemp = null;
+                    let totalWorkMs = 0; // Temps de travail du jour
 
                     pts.forEach(pt => {
                         const t = new Date(pt.timestamp);
@@ -2187,38 +2190,68 @@
                             if (!firstArr) firstArr = t;
                             if (pauseStartTemp) { pEnds.push(t); pauseStartTemp = null; }
                         } else if (pt.type_action === 'pause') {
-                            pauseStartTemp = t;
-                            pStarts.push(t);
-                            if (lastArrTemp) lastArrTemp = null;
+                            pauseStartTemp = t; pStarts.push(t);
+                            if (lastArrTemp) { totalWorkMs += (t - lastArrTemp); lastArrTemp = null; }
                         } else if (pt.type_action === 'depart') {
                             lastDep = t;
                             if (pauseStartTemp) { pEnds.push(t); pauseStartTemp = null; }
-                            if (lastArrTemp) lastArrTemp = null;
+                            if (lastArrTemp) { totalWorkMs += (t - lastArrTemp); lastArrTemp = null; }
                         }
                     });
 
-                    let targetDates = [];
-                    if (modeDist === 'arrivee' && firstArr) targetDates.push(firstArr);
-                    if (modeDist === 'depart' && lastDep) targetDates.push(lastDep);
-                    if (modeDist === 'pause_debut') targetDates = pStarts;
-                    if (modeDist === 'pause_fin') targetDates = pEnds;
-
-                    targetDates.forEach(dt => {
-                        let totalMins = dt.getHours() * 60 + dt.getMinutes();
-                        let trancheIdx = Math.floor((totalMins - 360) / 20); // 360 min = 06:00
-                        if (trancheIdx >= 0 && trancheIdx < countsTranches.length) {
-                            countsTranches[trancheIdx]++;
+                    if (modeDist === 'duree_travail') {
+                        // On enregistre la durée totale de la journée (en minutes)
+                        if (totalWorkMs > 0) {
+                            dailyWorkMins.push(Math.floor(totalWorkMs / 60000));
                         }
-                    });
+                    } else {
+                        // On classe les heures dans les tranches de 20 minutes
+                        let targetDates = [];
+                        if (modeDist === 'arrivee' && firstArr) targetDates.push(firstArr);
+                        if (modeDist === 'depart' && lastDep) targetDates.push(lastDep);
+                        if (modeDist === 'pause_debut') targetDates = pStarts;
+                        if (modeDist === 'pause_fin') targetDates = pEnds;
+
+                        targetDates.forEach(dt => {
+                            let totalMins = dt.getHours() * 60 + dt.getMinutes();
+                            let trancheIdx = Math.floor((totalMins - 360) / 20); // 360 min = 06:00
+                            if (trancheIdx >= 0 && trancheIdx < countsTranches.length) countsTranches[trancheIdx]++;
+                        });
+                    }
                 }
             }
 
-            // Couleurs selon le type choisi
+            // Génération dynamique des tranches de 10 min si on est en mode "Durée du travail"
+            if (modeDist === 'duree_travail') {
+                if (dailyWorkMins.length > 0) {
+                    let minVal = Math.min(...dailyWorkMins);
+                    let maxVal = Math.max(...dailyWorkMins);
+                    
+                    // On arrondit à la dizaine inférieure et supérieure (ex: 423 min -> 420, 517 min -> 520)
+                    let minBucket = Math.floor(minVal / 10) * 10;
+                    let maxBucket = (Math.floor(maxVal / 10) + 1) * 10;
+                    
+                    for(let m = minBucket; m < maxBucket; m += 10) {
+                        let h1 = Math.floor(m / 60); let m1 = String(m % 60).padStart(2, '0');
+                        let mEnd = m + 10;
+                        let h2 = Math.floor(mEnd / 60); let m2 = String(mEnd % 60).padStart(2, '0');
+                        
+                        labelsTranches.push(`${h1}h${m1}-${h2}h${m2}`);
+                        
+                        // Compte combien de journées tombent dans cette tranche de 10 minutes
+                        let count = dailyWorkMins.filter(val => val >= m && val < mEnd).length;
+                        countsTranches.push(count);
+                    }
+                }
+            }
+
+            // Couleurs personnalisées selon l'indicateur
             const colorsDist = {
                 'arrivee': '#14b8a6',
-                'depart': '#6366f1',
+                'depart': '#ef4444',
                 'pause_debut': '#f59e0b',
-                'pause_fin': '#ea580c'
+                'pause_fin': '#ea580c',
+                'duree_travail': '#8b5cf6' // Violet pour la durée de travail
             };
 
             dashCharts.distribution = new Chart(document.getElementById('chart-distribution').getContext('2d'), {
@@ -2226,7 +2259,7 @@
                 data: {
                     labels: labelsTranches,
                     datasets: [{
-                        label: 'Nombre d\'occurrences',
+                        label: modeDist === 'duree_travail' ? 'Nombre de jours' : 'Nombre d\'occurrences',
                         data: countsTranches,
                         backgroundColor: colorsDist[modeDist] || '#4f46e5',
                         borderRadius: 4

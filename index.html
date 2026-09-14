@@ -239,7 +239,7 @@
                     <!-- Graphique : Distribution horaire par tranches de 20 min -->
                     <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
                         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-3 gap-2">
-                            <h3 class="text-sm font-bold text-gray-700">Répartition des horaires (Tranches de 20 min)</h3>
+                            <h3 class="text-sm font-bold text-gray-700">Répartition des horaires (Tranches de 10 min)</h3>
                             <select id="select-type-distribution" onchange="genererTableauDeBord()" class="p-2 border border-gray-200 rounded-lg text-xs font-medium bg-gray-50 focus:ring-2 focus:ring-indigo-500 cursor-pointer">
                                 <option value="arrivee">🟢 Heure d'arrivée</option>
                                 <option value="depart">🔴 Heure de départ</option>
@@ -2162,10 +2162,10 @@
                 // Initialisation pour les tranches horaires (par 20 min) de 06:00 à 22:00
                 countsTranches = Array(48).fill(0);
                 for (let h = 6; h < 22; h++) {
-                    for (let m = 0; m < 60; m += 20) {
+                    for (let m = 0; m < 60; m += 10) {
                         let hStr = String(h).padStart(2, '0');
                         let mStr = String(m).padStart(2, '0');
-                        let mEnd = m + 20; let hEnd = h;
+                        let mEnd = m + 10; let hEnd = h;
                         if (mEnd >= 60) { mEnd = 0; hEnd++; }
                         labelsTranches.push(`${hStr}h${mStr}-${String(hEnd).padStart(2, '0')}h${String(mEnd).padStart(2, '0')}`);
                     }
@@ -2214,7 +2214,7 @@
 
                         targetDates.forEach(dt => {
                             let totalMins = dt.getHours() * 60 + dt.getMinutes();
-                            let trancheIdx = Math.floor((totalMins - 360) / 20); // 360 min = 06:00
+                            let trancheIdx = Math.floor((totalMins - 360) / 10); // 360 min = 06:00
                             if (trancheIdx >= 0 && trancheIdx < countsTranches.length) countsTranches[trancheIdx]++;
                         });
                     }

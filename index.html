@@ -38,6 +38,7 @@
         
         .fc-daygrid-day-frame { position: relative !important; }
         .fc-daygrid-day-bg, .fc-daygrid-day-events, .fc-daygrid-day-top { position: relative; z-index: 1; }
+        .fc-daygrid-row-events { bottom: 0 !important; }
         .fit-bubble-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; justify-content: center; align-items: center; pointer-events: none; z-index: 0; }
         .fit-bubble { border-radius: 50%; transition: all 0.2s; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
 
@@ -1263,8 +1264,26 @@
                 navLinks: false, editable: false, dayMaxEvents: true, eventDisplay: 'block',
                 datesSet: function() { calendar.updateSize(); },
                 dateClick: function(info) { ouvrirModalJour(info.dateStr); },
-                eventDidMount: function(info) { if (info.view.type === 'dayGridMonth' && info.event.extendedProps.isWork) { info.el.style.display = 'none'; } },
-
+                eventDidMount: function(info) { 
+                    if (info.view.type === 'dayGridMonth') {
+                        if (info.event.extendedProps.isWork) { 
+                            info.el.style.display = 'none'; 
+                        } else {
+                            // Pousse les rectangles (Absences, RTT, Fériés) vers le bas de la case
+                            const harness = info.el.closest('.fc-daygrid-event-harness');
+                            if (harness) {
+                                // On attend que FullCalendar ait positionné l'élément pour inverser l'ancrage
+                                setTimeout(() => {
+                                    const currentTop = harness.style.top;
+                                    if (currentTop && currentTop !== 'auto') {
+                                        harness.style.top = 'auto';
+                                        harness.style.bottom = `calc(2px + ${currentTop})`; 
+                                    }
+                                }, 0);
+                            }
+                        }
+                    }
+                },
                 dayCellDidMount: function(info) {
                     if (!calendar || calendar.view.type !== 'dayGridMonth') return;
                     const dateStr = `${info.date.getFullYear()}-${String(info.date.getMonth() + 1).padStart(2, '0')}-${String(info.date.getDate()).padStart(2, '0')}`;

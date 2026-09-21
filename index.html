@@ -37,12 +37,6 @@
             .fc .fc-toolbar-title { font-size: 1.35rem !important; }
         }
         /* Force le conteneur des événements à s'étirer jusqu'en bas de la case */
-        .fc-daygrid-row-events {
-            top: 0 !important;
-            bottom: 0 !important;
-            height: 100% !important;
-            pointer-events: none; /* Laisse le clic passer à travers le conteneur vide */
-        }
         .fc-daygrid-event-harness {
             pointer-events: auto; /* Réactive le clic sur les blocs d'absence */
         }
@@ -1298,8 +1292,11 @@
                 dayCellDidMount: function(info) {
                     if (!calendar || calendar.view.type !== 'dayGridMonth') return;
                     const dateStr = `${info.date.getFullYear()}-${String(info.date.getMonth() + 1).padStart(2, '0')}-${String(info.date.getDate()).padStart(2, '0')}`;
+                    const dayFrame = info.el.querySelector('.fc-daygrid-day-frame');
+                    if (!dayFrame) return;
+
+                    // 1. CALCUL DU TEMPS DE TRAVAIL (La bulle au centre)
                     let msJour = 0; let lastArr = null;
-                    
                     pointagesAnnee.filter(p => {
                         const dObj = new Date(p.timestamp); return `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, '0')}-${String(dObj.getDate()).padStart(2, '0')}` === dateStr;
                     }).forEach(pt => {
@@ -1330,8 +1327,71 @@
                         textL.style.position = 'absolute'; textL.style.fontSize = '0.65rem'; textL.style.fontWeight = '700'; textL.style.color = textColor;
                         container.appendChild(textL);
                         
-                        const dayFrame = info.el.querySelector('.fc-daygrid-day-frame');
-                        if (dayFrame) { const oldBubble = dayFrame.querySelector('.fit-bubble-container'); if (oldBubble) oldBubble.remove(); dayFrame.appendChild(container); }
+                        const oldBubble = dayFrame.querySelector('.fit-bubble-container'); if (oldBubble) oldBubble.remove(); 
+                        dayFrame.appendChild(container);
+                    }
+
+                    // 2. GESTION DES ABSENCES ET FÉRIÉS (Ancrage parfait en bas)
+                    let absence = currentAbsences.find(a => {
+                        const aS = new Date(a.date_debut); aS.setHours(0,0,0,0);
+                        const aE = new Date(a.date_fin); aE.setHours(23,59,59,999);
+                        const d = new Date(dateStr); d.setHours(12,0,0,0);
+                        return d >= aS && d <= aE;
+                    });
+
+                    const isFerie = joursFeries[dateStr];
+
+                    if (absence || isFerie) {
+                        // Création d'un conteneur 100% indépendant, fixé au bas de la case
+                        const absContainer = document.createElement('div');
+                        absContainer.style.position = 'absolute';
+                        absContainer.style.bottom = '4px';
+                        absContainer.style.left = '4px';
+                        absContainer.style.right = '4px';
+                        absContainer.style.display = 'flex';
+                        absContainer.style.flexDirection = 'column';
+                        absContainer.style.gap = '2px';
+                        absContainer.style.zIndex = '10';
+                        
+                        if (isFerie) {
+                            const fDiv = document.createElement('div');
+                            fDiv.textContent = '🎉 ' + joursFeries[dateStr];
+                            fDiv.className = 'text-[9px] font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1 py-0.5 truncate text-center';
+                            absContainer.appendChild(fDiv);
+                        }
+
+                        if (absence) {
+                            let c = 'bg-blue-500'; 
+                            if(absence.type_absence === 'CP') c = 'bg-teal-500'; 
+                            if(absence.type_absence === 'Maladie') c = 'bg-red-500'; 
+                            if(absence.type_absence === 'CET') c = 'bg-purple-500';
+                            if(absence.type_absence === 'AEA') c = 'bg-cyan-500';
+                            if(absence.type_absence === 'Formation') c = 'bg-lime-500';
+
+                            let titre = absence.type_absence; 
+                            if(absence.moment === 'matin') titre += " (Matin)"; 
+                            if(absence.moment === 'aprem') titre += " (Aprem)";
+
+                            const aDiv = document.createElement('div');
+                            aDiv.textContent = titre;
+                            aDiv.className = `text-[9px] font-bold text-white ${c} rounded px-1 py-0.5 truncate text-center cursor-pointer shadow-sm hover:opacity-80 transition`;
+                            
+                            // Clic manuel pour ouvrir l'édition
+                            aDiv.onclick = (e) => {
+                                e.stopPropagation(); 
+                                ouvrirModalAbsence(absence.id, absence.type_absence, absence.date_debut, absence.date_fin, absence.moment || 'journee');
+                            };
+                            absContainer.appendChild(aDiv);
+                        }
+                        dayFrame.appendChild(absContainer);
+                    }
+                },
+                
+                eventDidMount: function(info) { 
+                    // On cache totalement les blocs automatiques de FullCalendar en vue mois, 
+                    // puisqu'on vient de les redessiner parfaitement nous-mêmes ci-dessus.
+                    if (info.view.type === 'dayGridMonth') {
+                        info.el.style.display = 'none'; 
                     }
                 },
                 events: async function(info, success, fail) {

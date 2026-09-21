@@ -19,6 +19,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
     <style>
+        
         .fc { font-family: inherit; font-size: 0.85rem; }
         .fc-button-primary { background-color: #14b8a6 !important; border-color: #14b8a6 !important; font-size: 0.75rem !important; }
         .fc-button-primary:hover { background-color: #0d9488 !important; border-color: #0d9488 !important; }
@@ -35,7 +36,16 @@
             .fc-toolbar-chunk:nth-child(2) { order: 3; width: 100%; text-align: center; margin-top: 12px; }
             .fc .fc-toolbar-title { font-size: 1.35rem !important; }
         }
-        
+        /* Force le conteneur des événements à s'étirer jusqu'en bas de la case */
+        .fc-daygrid-row-events {
+            top: 0 !important;
+            bottom: 0 !important;
+            height: 100% !important;
+            pointer-events: none; /* Laisse le clic passer à travers le conteneur vide */
+        }
+        .fc-daygrid-event-harness {
+            pointer-events: auto; /* Réactive le clic sur les blocs d'absence */
+        }
         .fc-daygrid-day-frame { position: relative !important; }
         .fc-daygrid-day-bg, .fc-daygrid-day-events, .fc-daygrid-day-top { position: relative; z-index: 1; }
         .fc-daygrid-row-events { bottom: 0 !important; }
@@ -1269,17 +1279,18 @@
                         if (info.event.extendedProps.isWork) { 
                             info.el.style.display = 'none'; 
                         } else {
-                            // Pousse les rectangles (Absences, RTT, Fériés) vers le bas de la case
                             const harness = info.el.closest('.fc-daygrid-event-harness');
                             if (harness) {
-                                // On attend que FullCalendar ait positionné l'élément pour inverser l'ancrage
+                                // On utilise un léger délai pour que FC finisse ses calculs
                                 setTimeout(() => {
-                                    const currentTop = harness.style.top;
-                                    if (currentTop && currentTop !== 'auto') {
-                                        harness.style.top = 'auto';
-                                        harness.style.bottom = `calc(2px + ${currentTop})`; 
-                                    }
-                                }, 0);
+                                    // On récupère la position haute prévue par FullCalendar (ex: "0px", "26px")
+                                    let currentTop = harness.style.top;
+                                    if (!currentTop || currentTop === 'auto') currentTop = '0px';
+                                    
+                                    // On inverse vers le bas et on garde l'empilement intact
+                                    harness.style.top = 'auto';
+                                    harness.style.bottom = `calc(4px + ${currentTop})`;
+                                }, 30);
                             }
                         }
                     }

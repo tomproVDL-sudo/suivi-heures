@@ -991,9 +991,16 @@
                             todayCellFrame.appendChild(container);
                         }
                         const hDec = totalTravail / 3600000; const reqHours = userParams.base_horaire / 5;
-                        let color = '#10b981'; let textColor = '#047857'; 
-                        if (hDec > 10) { color = '#ef4444'; textColor = '#b91c1c'; } else if (hDec < reqHours) { color = '#3b82f6'; textColor = '#1d4ed8'; } 
+                        let color = '#10b981'; let textColor = '#047857'; // Vert par défaut (entre reqHours et 8h48)
                         
+                        if (hDec > 10) { 
+                            color = '#ef4444'; textColor = '#b91c1c'; // Rouge (+ de 10h)
+                        } else if (hDec > 8.8) { 
+                            color = '#f97316'; textColor = '#c2410c'; // Orange (entre 8h48 et 10h)
+                        } else if (hDec < reqHours) { 
+                            color = '#3b82f6'; textColor = '#1d4ed8'; // Bleu (- que l'objectif)
+                        }
+                                                
                         let diameter = Math.min(50, Math.max(34, Math.round(hDec * 5)));
                         let bubble = container.querySelector('.fit-bubble'); let textL = container.querySelector('span');
                         
@@ -1309,9 +1316,15 @@
                     
                     if(msJour > 0) {
                         const hDec = msJour / 3600000; const reqHours = userParams.base_horaire / 5;
-                        let color = '#10b981'; let textColor = '#047857'; 
-                        if (hDec > 10) { color = '#ef4444'; textColor = '#b91c1c'; } 
-                        else if (hDec < reqHours) { color = '#3b82f6'; textColor = '#1d4ed8'; } 
+                        let color = '#10b981'; let textColor = '#047857'; // Vert par défaut
+                        
+                        if (hDec > 10) { 
+                            color = '#ef4444'; textColor = '#b91c1c'; // Rouge (+ de 10h)
+                        } else if (hDec > 8.8) { 
+                            color = '#f97316'; textColor = '#c2410c'; // Orange (entre 8h48 et 10h)
+                        } else if (hDec < reqHours) { 
+                            color = '#3b82f6'; textColor = '#1d4ed8'; // Bleu (- que l'objectif)
+                        }
                         
                         let diameter = Math.min(50, Math.max(34, Math.round(hDec * 5)));
                         const container = document.createElement('div'); container.className = 'fit-bubble-container';

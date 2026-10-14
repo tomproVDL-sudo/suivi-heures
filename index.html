@@ -991,16 +991,19 @@
                             todayCellFrame.appendChild(container);
                         }
                         const hDec = totalTravail / 3600000; const reqHours = userParams.base_horaire / 5;
-                        let color = '#10b981'; let textColor = '#047857'; // Vert par défaut (entre reqHours et 8h48)
+                       
+                        const totalMinutes = Math.round(totalTravail / 60000);
+                        const reqMinutes = Math.round((userParams.base_horaire / 5) * 60);
                         
-                        if (hDec > 10) { 
-                            color = '#ef4444'; textColor = '#b91c1c'; // Rouge (+ de 10h)
-                        } else if (hDec > 8.8) { 
-                            color = '#f97316'; textColor = '#c2410c'; // Orange (entre 8h48 et 10h)
-                        } else if (hDec < reqHours) { 
-                            color = '#3b82f6'; textColor = '#1d4ed8'; // Bleu (- que l'objectif)
-                        }
-                                                
+                        let color = '#10b981'; let textColor = '#047857'; // Vert (entre l'objectif et 8h48)
+                        
+                        if (totalMinutes > 600) { 
+                            color = '#ef4444'; textColor = '#b91c1c'; // Rouge (> 10h00)
+                        } else if (totalMinutes >= 528) { 
+                            color = '#f97316'; textColor = '#c2410c'; // Orange (entre 8h48 et 10h00)
+                        } else if (totalMinutes < reqMinutes) { 
+                            color = '#3b82f6'; textColor = '#1d4ed8'; // Bleu (< Objectif)
+                        }                    
                         let diameter = Math.min(50, Math.max(34, Math.round(hDec * 5)));
                         let bubble = container.querySelector('.fit-bubble'); let textL = container.querySelector('span');
                         
@@ -1297,12 +1300,13 @@
                     }
                 },
                 dayCellDidMount: function(info) {
-                    if (!calendar || calendar.view.type !== 'dayGridMonth') return;
+                    // Correction : on utilise info.view.type directement sans tester calendar
+                    if (!info.view || info.view.type !== 'dayGridMonth') return;
                     const dateStr = `${info.date.getFullYear()}-${String(info.date.getMonth() + 1).padStart(2, '0')}-${String(info.date.getDate()).padStart(2, '0')}`;
                     const dayFrame = info.el.querySelector('.fc-daygrid-day-frame');
                     if (!dayFrame) return;
-
-                    // 1. CALCUL DU TEMPS DE TRAVAIL (La bulle au centre)
+                
+                    // 1. CALCUL DU TEMPS DE TRAVAIL
                     let msJour = 0; let lastArr = null;
                     pointagesAnnee.filter(p => {
                         const dObj = new Date(p.timestamp); return `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, '0')}-${String(dObj.getDate()).padStart(2, '0')}` === dateStr;
@@ -1315,17 +1319,20 @@
                     if(dateStr === todayStr && lastArr) msJour += (new Date() - lastArr);
                     
                     if(msJour > 0) {
-                        const hDec = msJour / 3600000; const reqHours = userParams.base_horaire / 5;
+                        const totalMinutes = Math.round(msJour / 60000);
+                        const reqMinutes = Math.round((userParams.base_horaire / 5) * 60);
+                        
                         let color = '#10b981'; let textColor = '#047857'; // Vert par défaut
                         
-                        if (hDec > 10) { 
-                            color = '#ef4444'; textColor = '#b91c1c'; // Rouge (+ de 10h)
-                        } else if (hDec > 8.8) { 
-                            color = '#f97316'; textColor = '#c2410c'; // Orange (entre 8h48 et 10h)
-                        } else if (hDec < reqHours) { 
-                            color = '#3b82f6'; textColor = '#1d4ed8'; // Bleu (- que l'objectif)
+                        if (totalMinutes > 600) { 
+                            color = '#ef4444'; textColor = '#b91c1c'; // Rouge (> 10h00)
+                        } else if (totalMinutes >= 528) { 
+                            color = '#f97316'; textColor = '#c2410c'; // Orange (8h48 à 10h00)
+                        } else if (totalMinutes < reqMinutes) { 
+                            color = '#3b82f6'; textColor = '#1d4ed8'; // Bleu (< Objectif)
                         }
                         
+                        const hDec = msJour / 3600000;
                         let diameter = Math.min(50, Math.max(34, Math.round(hDec * 5)));
                         const container = document.createElement('div'); container.className = 'fit-bubble-container';
                         
@@ -1335,7 +1342,7 @@
                         container.appendChild(bubble);
                         
                         const textL = document.createElement('span');
-                        let h = Math.floor(hDec); let m = Math.floor((msJour % 3600000) / 60000);
+                        let h = Math.floor(totalMinutes / 60); let m = totalMinutes % 60;
                         textL.textContent = m === 0 ? `${h}h` : `${h}h${m.toString().padStart(2, '0')}`;
                         textL.style.position = 'absolute'; textL.style.fontSize = '0.65rem'; textL.style.fontWeight = '700'; textL.style.color = textColor;
                         container.appendChild(textL);

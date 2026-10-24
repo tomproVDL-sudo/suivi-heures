@@ -2258,18 +2258,38 @@
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    // La bibliothèque stocke les statistiques calculées dans context.parsed.y
-                                    const stats = context.parsed.y;
-                                    if (!stats) return '';
-
                                     const fmtTime = (v) => {
-                                        if (v === undefined || isNaN(v)) return '--h--';
+                                        if (v === undefined || isNaN(v) || v === null) return '--h--';
                                         let h = Math.floor(v); 
                                         let m = Math.round((v - h) * 60);
                                         if (m === 60) { h++; m = 0; }
                                         return h + 'h' + String(m).padStart(2, '0');
                                     };
                                     
+                                    // 1. Récupération des statistiques générées par le plugin BoxPlot
+                                    let stats = context.parsed;
+                                    
+                                    // 2. Fallback de sécurité : si le plugin ne les expose pas directement,
+                                    //    on les recalcule proprement à partir de vos données brutes.
+                                    if ((!stats || stats.min === undefined) && Array.isArray(context.raw) && context.raw.length > 0) {
+                                        const arr = [...context.raw].sort((a, b) => a - b);
+                                        const quantile = (q) => {
+                                            const pos = (arr.length - 1) * q;
+                                            const base = Math.floor(pos);
+                                            const rest = pos - base;
+                                            return arr[base + 1] !== undefined ? arr[base] + rest * (arr[base + 1] - arr[base]) : arr[base];
+                                        };
+                                        stats = {
+                                            min: arr[0],
+                                            q1: quantile(0.25),
+                                            median: quantile(0.5),
+                                            q3: quantile(0.75),
+                                            max: arr[arr.length - 1]
+                                        };
+                                    }
+
+                                    if (!stats || stats.min === undefined) return 'Pas de données';
+
                                     return [
                                         `Max (Plus tard) : ${fmtTime(stats.max)}`,
                                         `Q3 (75%) : ${fmtTime(stats.q3)}`,

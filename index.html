@@ -16,6 +16,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Ajouter cette ligne pour le BoxPlot -->
+    <script src="https://cdn.jsdelivr.net/npm/@sgratzl/chartjs-chart-boxplot@4/build/index.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
     <style>
@@ -250,7 +255,7 @@
                     <!-- Graphique : Distribution horaire par tranches de 20 min -->
                     <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
                         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-3 gap-2">
-                            <h3 class="text-sm font-bold text-gray-700">Répartition des horaires (Tranches de 10 min)</h3>
+                            <h3 class="text-sm font-bold text-gray-700">Répartition des horaires</h3>
                             <select id="select-type-distribution" onchange="genererTableauDeBord()" class="p-2 border border-gray-200 rounded-lg text-xs font-medium bg-gray-50 focus:ring-2 focus:ring-indigo-500 cursor-pointer">
                                 <option value="arrivee">🟢 Heure d'arrivée</option>
                                 <option value="depart">🔴 Heure de départ</option>
@@ -259,7 +264,15 @@
                                 <option value="duree_travail">⏱️ Durée de la journée</option>
                             </select>
                         </div>
-                        <div class="h-72 relative"><canvas id="chart-distribution"></canvas></div>
+                        
+                        <!-- Graphique en barres existant -->
+                        <div class="h-72 relative mb-6"><canvas id="chart-distribution"></canvas></div>
+                        
+                        <!-- NOUVEAU : Boxplot -->
+                        <div class="pt-4 border-t border-gray-100">
+                            <h3 class="text-sm font-bold text-gray-700 mb-3">Dispersion mensuelle (Boîtes à moustaches)</h3>
+                            <div class="h-72 relative"><canvas id="chart-boxplot"></canvas></div>
+                        </div>
                     </div>
 
                     <!-- Graphique : Absences posées -->
@@ -2267,6 +2280,7 @@
             });
 
         // --- 5. GRAPHIQUE DE DISTRIBUTION (TRANCHES DE 10 MIN) ---
+        // --- 5. GRAPHIQUE DE DISTRIBUTION ET BOXPLOT ---
             const typeDistEl = document.getElementById('select-type-distribution');
             const modeDist = typeDistEl ? typeDistEl.value : 'arrivee';
 
@@ -2274,8 +2288,11 @@
             let countsTranches = [];
             let dailyWorkMins = []; 
             
+            // Initialisation des données pour le Boxplot
+            let boxplotData = {};
+            statsKeys.forEach(k => boxplotData[k] = []);
+            
             if (modeDist !== 'duree_travail') {
-                // CORRECTION : On initialise 96 tranches (16 heures * 6 tranches de 10 min)
                 countsTranches = Array(96).fill(0);
                 for (let h = 6; h < 22; h++) {
                     for (let m = 0; m < 60; m += 10) {
@@ -2314,8 +2331,13 @@
                         }
                     });
 
+                    const keyMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
                     if (modeDist === 'duree_travail') {
-                        if (totalWorkMs > 0) dailyWorkMins.push(Math.floor(totalWorkMs / 60000));
+                        if (totalWorkMs > 0) {
+                            dailyWorkMins.push(Math.floor(totalWorkMs / 60000));
+                            if(boxplotData[keyMonth]) boxplotData[keyMonth].push(totalWorkMs / 3600000);
+                        }
                     } else {
                         let targetDates = [];
                         if (modeDist === 'arrivee' && firstArr) targetDates.push(firstArr);
@@ -2325,9 +2347,10 @@
 
                         targetDates.forEach(dt => {
                             let totalMins = dt.getHours() * 60 + dt.getMinutes();
-                            // CORRECTION : On divise par 10 (et plus par 20)
                             let trancheIdx = Math.floor((totalMins - 360) / 10); 
                             if (trancheIdx >= 0 && trancheIdx < countsTranches.length) countsTranches[trancheIdx]++;
+                            
+                            if(boxplotData[keyMonth]) boxplotData[keyMonth].push(dt.getHours() + (dt.getMinutes() / 60));
                         });
                     }
                 }
@@ -2337,7 +2360,6 @@
                 if (dailyWorkMins.length > 0) {
                     let minVal = Math.min(...dailyWorkMins);
                     let maxVal = Math.max(...dailyWorkMins);
-                    
                     let minBucket = Math.floor(minVal / 10) * 10;
                     let maxBucket = (Math.floor(maxVal / 10) + 1) * 10;
                     
@@ -2345,39 +2367,88 @@
                         let h1 = Math.floor(m / 60); let m1 = String(m % 60).padStart(2, '0');
                         let mEnd = m + 10;
                         let h2 = Math.floor(mEnd / 60); let m2 = String(mEnd % 60).padStart(2, '0');
-                        
                         labelsTranches.push(`${h1}h${m1}-${h2}h${m2}`);
-                        let count = dailyWorkMins.filter(val => val >= m && val < mEnd).length;
-                        countsTranches.push(count);
+                        countsTranches.push(dailyWorkMins.filter(val => val >= m && val < mEnd).length);
                     }
                 }
             }
 
             const colorsDist = {
-                'arrivee': '#14b8a6',
-                'depart': '#ef4444',
-                'pause_debut': '#f59e0b',
-                'pause_fin': '#ea580c',
-                'duree_travail': '#8b5cf6' 
+                'arrivee': '#14b8a6', 'depart': '#ef4444', 'pause_debut': '#f59e0b',
+                'pause_fin': '#ea580c', 'duree_travail': '#8b5cf6' 
             };
 
+            if(dashCharts.distribution) dashCharts.distribution.destroy();
             dashCharts.distribution = new Chart(document.getElementById('chart-distribution').getContext('2d'), {
                 type: 'bar',
                 data: {
                     labels: labelsTranches,
                     datasets: [{
                         label: modeDist === 'duree_travail' ? 'Nombre de jours' : 'Nombre d\'occurrences',
-                        data: countsTranches,
-                        backgroundColor: colorsDist[modeDist] || '#4f46e5',
-                        borderRadius: 4
+                        data: countsTranches, backgroundColor: colorsDist[modeDist] || '#4f46e5', borderRadius: 4
                     }]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
+                    responsive: true, maintainAspectRatio: false,
                     scales: {
                         x: { ticks: { maxRotation: 45, minRotation: 45, font: { size: 10 } } },
                         y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                    }
+                }
+            });
+
+            // --- NOUVEAU : CRÉATION DU BOXPLOT ---
+            if(dashCharts.boxplot) dashCharts.boxplot.destroy();
+            const boxplotDataset = statsKeys.map(k => boxplotData[k]);
+            
+            dashCharts.boxplot = new Chart(document.getElementById('chart-boxplot').getContext('2d'), {
+                type: 'boxplot',
+                data: {
+                    labels: labels, // Mois en abscisse (identique aux autres graphiques)
+                    datasets: [{
+                        label: modeDist === 'duree_travail' ? 'Durées' : 'Horaires',
+                        data: boxplotDataset,
+                        backgroundColor: colorsDist[modeDist] ? colorsDist[modeDist] + '60' : 'rgba(79, 70, 229, 0.5)',
+                        borderColor: colorsDist[modeDist] || '#4f46e5',
+                        borderWidth: 1.5,
+                        itemRadius: 3,
+                        outlierBackgroundColor: '#ef4444'
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            ticks: {
+                                callback: function(val) {
+                                    let h = Math.floor(val); let m = Math.round((val - h) * 60);
+                                    if(m===60){ h++; m=0; }
+                                    return h + 'h' + String(m).padStart(2, '0');
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    if (!context.raw) return '';
+                                    const fmtTime = (v) => {
+                                        let h = Math.floor(v); let m = Math.round((v - h) * 60);
+                                        if(m===60){ h++; m=0; }
+                                        return h + 'h' + String(m).padStart(2, '0');
+                                    };
+                                    // La bibliothèque calcule automatiquement ces valeurs
+                                    return [
+                                        `Max (Plus tard) : ${fmtTime(context.raw.max)}`,
+                                        `Q3 (75%) : ${fmtTime(context.raw.q3)}`,
+                                        `Médiane : ${fmtTime(context.raw.median)}`,
+                                        `Q1 (25%) : ${fmtTime(context.raw.q1)}`,
+                                        `Min (Plus tôt) : ${fmtTime(context.raw.min)}`
+                                    ];
+                                }
+                            }
+                        }
                     }
                 }
             });

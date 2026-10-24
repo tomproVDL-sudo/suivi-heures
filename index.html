@@ -2254,8 +2254,34 @@
                 options: { 
                     responsive: true, maintainAspectRatio: false,
                     scales: { y: { ticks: { callback: function(val) { let h = Math.floor(val); let m = Math.round((val - h) * 60); return h + 'h' + m.toString().padStart(2, '0'); } } } },
-                    plugins: { tooltip: { callbacks: { label: function(ctx) { let v = ctx.parsed.y; let h = Math.floor(v); let m = Math.round((v - h) * 60); return ctx.dataset.label + ': ' + h + 'h' + m.toString().padStart(2, '0'); } } } }
-                }
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    // La bibliothèque stocke les statistiques calculées dans context.parsed.y
+                                    const stats = context.parsed.y;
+                                    if (!stats) return '';
+
+                                    const fmtTime = (v) => {
+                                        if (v === undefined || isNaN(v)) return '--h--';
+                                        let h = Math.floor(v); 
+                                        let m = Math.round((v - h) * 60);
+                                        if (m === 60) { h++; m = 0; }
+                                        return h + 'h' + String(m).padStart(2, '0');
+                                    };
+                                    
+                                    return [
+                                        `Max (Plus tard) : ${fmtTime(stats.max)}`,
+                                        `Q3 (75%) : ${fmtTime(stats.q3)}`,
+                                        `Médiane : ${fmtTime(stats.median)}`,
+                                        `Q1 (25%) : ${fmtTime(stats.q1)}`,
+                                        `Min (Plus tôt) : ${fmtTime(stats.min)}`
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                    
             });
 
             // 4. Graphique Absences (Empilé)

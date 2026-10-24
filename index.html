@@ -2254,49 +2254,20 @@
                 options: { 
                     responsive: true, maintainAspectRatio: false,
                     scales: { y: { ticks: { callback: function(val) { let h = Math.floor(val); let m = Math.round((val - h) * 60); return h + 'h' + m.toString().padStart(2, '0'); } } } },
+                    // Remplacer dans dashCharts.horaires (vers la ligne 927)
                     plugins: {
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
                                     const fmtTime = (v) => {
                                         if (v === undefined || isNaN(v) || v === null) return '--h--';
-                                        let h = Math.floor(v); 
+                                        let h = Math.floor(v);
                                         let m = Math.round((v - h) * 60);
                                         if (m === 60) { h++; m = 0; }
                                         return h + 'h' + String(m).padStart(2, '0');
                                     };
-                                    
-                                    // 1. Récupération des statistiques générées par le plugin BoxPlot
-                                    let stats = context.parsed;
-                                    
-                                    // 2. Fallback de sécurité : si le plugin ne les expose pas directement,
-                                    //    on les recalcule proprement à partir de vos données brutes.
-                                    if ((!stats || stats.min === undefined) && Array.isArray(context.raw) && context.raw.length > 0) {
-                                        const arr = [...context.raw].sort((a, b) => a - b);
-                                        const quantile = (q) => {
-                                            const pos = (arr.length - 1) * q;
-                                            const base = Math.floor(pos);
-                                            const rest = pos - base;
-                                            return arr[base + 1] !== undefined ? arr[base] + rest * (arr[base + 1] - arr[base]) : arr[base];
-                                        };
-                                        stats = {
-                                            min: arr[0],
-                                            q1: quantile(0.25),
-                                            median: quantile(0.5),
-                                            q3: quantile(0.75),
-                                            max: arr[arr.length - 1]
-                                        };
-                                    }
-
-                                    if (!stats || stats.min === undefined) return 'Pas de données';
-
-                                    return [
-                                        `Max (Plus tard) : ${fmtTime(stats.max)}`,
-                                        `Q3 (75%) : ${fmtTime(stats.q3)}`,
-                                        `Médiane : ${fmtTime(stats.median)}`,
-                                        `Q1 (25%) : ${fmtTime(stats.q1)}`,
-                                        `Min (Plus tôt) : ${fmtTime(stats.min)}`
-                                    ];
+                                    // Affiche simplement "Nom de la courbe : 08h30"
+                                    return context.dataset.label + ' : ' + fmtTime(context.parsed.y);
                                 }
                             }
                         }
@@ -2475,23 +2446,43 @@
                             }
                         }
                     },
+                    // Remplacer dans dashCharts.boxplot (vers la ligne 1041)
                     plugins: {
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    if (!context.raw) return '';
                                     const fmtTime = (v) => {
+                                        if (v === undefined || isNaN(v) || v === null) return '--h--';
                                         let h = Math.floor(v); let m = Math.round((v - h) * 60);
-                                        if(m===60){ h++; m=0; }
+                                        if(m === 60){ h++; m = 0; }
                                         return h + 'h' + String(m).padStart(2, '0');
                                     };
-                                    // La bibliothèque calcule automatiquement ces valeurs
+                                    
+                                    // Les stats calculées par le plugin BoxPlot sont dans context.parsed
+                                    let stats = context.parsed;
+                                    
+                                    // Fallback si le plugin n'a pas encore calculé (context.raw est le tableau brut)
+                                    if ((!stats || stats.min === undefined) && Array.isArray(context.raw) && context.raw.length > 0) {
+                                        const arr = [...context.raw].sort((a, b) => a - b);
+                                        const quantile = (q) => {
+                                            const pos = (arr.length - 1) * q;
+                                            const base = Math.floor(pos);
+                                            const rest = pos - base;
+                                            return arr[base + 1] !== undefined ? arr[base] + rest * (arr[base + 1] - arr[base]) : arr[base];
+                                        };
+                                        stats = {
+                                            min: arr[0], q1: quantile(0.25), median: quantile(0.5), q3: quantile(0.75), max: arr[arr.length - 1]
+                                        };
+                                    }
+                    
+                                    if (!stats || stats.min === undefined) return 'Pas de données';
+                    
                                     return [
-                                        `Max (Plus tard) : ${fmtTime(context.raw.max)}`,
-                                        `Q3 (75%) : ${fmtTime(context.raw.q3)}`,
-                                        `Médiane : ${fmtTime(context.raw.median)}`,
-                                        `Q1 (25%) : ${fmtTime(context.raw.q1)}`,
-                                        `Min (Plus tôt) : ${fmtTime(context.raw.min)}`
+                                        `Max (Plus tard) : ${fmtTime(stats.max)}`,
+                                        `Q3 (75%) : ${fmtTime(stats.q3)}`,
+                                        `Médiane : ${fmtTime(stats.median)}`,
+                                        `Q1 (25%) : ${fmtTime(stats.q1)}`,
+                                        `Min (Plus tôt) : ${fmtTime(stats.min)}`
                                     ];
                                 }
                             }

@@ -19,6 +19,9 @@ create index if not exists sauvegardes_user_created_idx on public.sauvegardes (u
 
 alter table public.sauvegardes enable row level security;
 
+-- Droits d'accès pour les utilisateurs connectés (sans eux : « permission denied »)
+grant select, insert, delete on public.sauvegardes to authenticated;
+
 -- Chaque utilisateur ne voit et ne modifie que ses propres sauvegardes
 -- (créées seulement si elles n'existent pas : aucune suppression)
 do $$

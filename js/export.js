@@ -172,22 +172,31 @@ function reportCharts(R, width) {
   const H = (ms) => ms / HOUR;
   const evolSeries = [{ name: 'Heures travaillées', color: '#4f46e5', values: list.map((g) => H(g.work)) }, { name: 'Durée pauses', color: '#f97316', values: list.map((g) => H(g.pause)) }];
   const evolLines = [{ name: 'Objectif travail', color: '#9ca3af', dash: '6 5', values: list.map((g) => (g.past && (g.expected || g.work) ? H(g.expected) : null)) }, { name: `Réf. pause (${Math.round(pauseRefH * 60)} min)`, color: '#fdba74', dash: '3 3', width: 1.5, values: list.map((g) => (g.worked ? pauseRefH * g.worked : null)) }];
-  const evol = buildBar({ labels, width, height: 260, th, stacked: true, series: evolSeries, lines: evolLines, yFormat: (v) => fmtHM(v) });
-  const repSeries = [
-    { name: 'Heures normales', color: '#14b8a6', values: list.map((g) => H(Math.min(g.real, g.expected))) },
-    { name: 'Heures sup.', color: '#84cc16', values: list.map((g) => H(Math.max(0, g.real - g.expected))) },
-    { name: 'Heures manquantes', color: '#fca5a5', values: list.map((g) => H(Math.max(0, g.expected - g.real))) },
-  ];
-  const rep = buildBar({ labels, width, height: 260, th, stacked: true, series: repSeries, yFormat: (v) => fmtHM(v) });
+  const evol = buildBar({ labels, width, height: 290, th, stacked: true, series: evolSeries, lines: evolLines, yFormat: (v) => fmtHM(v) });
   const types = [...Object.keys(ABSENCE_TYPES)];
   const absSeries = [...types.map((t) => ({ name: t, color: absColor(t), values: list.map((g) => g.abs[t] || 0) })), { name: 'Jours fériés', color: FERIE_COLOR, values: list.map((g) => g.feries) }];
-  const abs = buildBar({ labels, width, height: 260, th, stacked: true, series: absSeries, yFormat: (v) => `${fmtNum(v)} j` });
+  const abs = buildBar({ labels, width, height: 290, th, stacked: true, series: absSeries, yFormat: (v) => `${fmtNum(v)} j` });
   return {
     byWeek,
     charts: [
-      { title: 'Évolution du temps de travail et des pauses', h: 260, svg: evol.svg, series: [...evolSeries, ...evolLines] },
-      { title: 'Répartition (heures normales, sup., manquantes)', h: 260, svg: rep.svg, series: repSeries },
-      { title: 'Répartition des absences (en jours)', h: 260, svg: abs.svg, series: absSeries.filter((s) => s.values.some((v) => v)) },
+      { title: 'Évolution du temps de travail et des pauses', h: 290, svg: evol.svg, series: [...evolSeries, ...evolLines] },
+      { title: 'Répartition des absences (en jours)', h: 290, svg: abs.svg, series: absSeries.filter((s) => s.values.some((v) => v)) },
+    ],
+  };
+}
+
+/** Tuiles des soldes de congés (année de fin de période, à la date du jour). */
+function reportSoldes(R) {
+  const so = R.soldes, P = R.e.params;
+  const lim = P.date_limite_reliquat ? parseDay(P.date_limite_reliquat).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : '';
+  return {
+    title: `Soldes de congés ${so.year} au ${new Date().toLocaleDateString('fr-FR')}`,
+    tiles: [
+      { label: 'Congés payés', value: `${fmtNum(so.cpRestants)} j`, sub: `${fmtNum(so.cons.CP)} pris sur ${fmtNum(+P.cp_initial || 0)}`, color: ABSENCE_TYPES.CP.color },
+      { label: 'Reliquat N-1', value: `${fmtNum(so.reliquatRestant)} j`, sub: so.reliquat ? (so.reliquatExpire ? 'expiré' : lim ? `à poser avant le ${lim}` : '') : 'aucun', color: '#94a3b8' },
+      { label: 'RTT', value: `${fmtNum(so.rttRestants)} j`, sub: `${fmtNum(so.cons.RTT)} pris sur ${fmtNum(+P.rtt_initial || 0)}`, color: ABSENCE_TYPES.RTT.color },
+      { label: 'CET', value: `${fmtNum(so.cetRestants)} j`, sub: so.cons.CET ? `${fmtNum(so.cons.CET)} utilisés` : 'disponibles', color: ABSENCE_TYPES.CET.color },
+      { label: 'Fractionnement', value: `+${so.jFrac} j`, sub: `${fmtNum(so.fractionnement)} j de CP hors mai-oct.`, color: '#ec4899' },
     ],
   };
 }
@@ -247,7 +256,22 @@ export async function exportPDF(start, end, { detail = false } = {}) {
       T(l, x + 3, yy + (c.value ? 5 : 4.2) + j * (c.value ? 4.2 : 3.8));
     });
   });
-  y += bh + 4;
+  y += bh + 6;
+  const SO = reportSoldes(R);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor('#374151'); T(SO.title, M, y + 1);
+  y += 4;
+  const tw = (CW - 4 * 3) / 5, th2 = 17;
+  SO.tiles.forEach((t, i) => {
+    const x = M + i * (tw + 3);
+    doc.setFillColor('#ffffff'); doc.setDrawColor('#e5e7eb'); doc.roundedRect(x, y, tw, th2, 2, 2, 'FD');
+    doc.setFillColor(t.color); doc.rect(x, y + 2, 1.3, th2 - 4, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.8); doc.setTextColor('#6b7280'); T(t.label.toUpperCase(), x + 4, y + 5);
+    doc.setFontSize(13); doc.setTextColor('#111827'); T(t.value, x + 4, y + 11.2);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.8); doc.setTextColor('#6b7280');
+    let sub = pdfText(t.sub); while (sub && doc.getTextWidth(sub) > tw - 6) sub = sub.slice(0, -2);
+    T(sub, x + 4, y + 14.8);
+  });
+  y += th2 + 5;
   doc.setFillColor('#eef2ff'); doc.roundedRect(M, y, CW, 8, 1.5, 1.5, 'F');
   doc.setFontSize(8.5); doc.setTextColor('#3730a3');
   doc.setFont('helvetica', 'bold'); T('Base de calcul :', M + 3, y + 5.3); doc.setFont('helvetica', 'normal'); T(`${fmtHM(K.hpdH)} / jour attendues.`, M + 27, y + 5.3);
@@ -322,6 +346,10 @@ export function printableReport(start, end, { detail = false } = {}) {
   .k { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; }
   .k .l { font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 700; margin-bottom: 4px; }
   .k .v { font-size: 22px; font-weight: 750; color: #4338ca; } .k .s { font-size: 11.5px; color: #6b7280; margin-top: 3px; } .k .s.p { color: #059669; font-weight: 700; }
+  .so-t { font-size: 13px; font-weight: 700; color: #374151; margin: 0 0 8px; }
+  .soldes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 16px; }
+  .sd { background: #fff; border: 1px solid #e5e7eb; border-left: 4px solid var(--c); border-radius: 10px; padding: 9px 11px; }
+  .sd .l { font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 700; } .sd .v { font-size: 19px; font-weight: 750; margin-top: 2px; } .sd .s { font-size: 10.5px; color: #6b7280; }
   .band { background: #eef2ff; color: #3730a3; padding: 9px 12px; border-radius: 8px; display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 12.5px; }
   h3 { font-size: 14px; color: #374151; margin: 14px 0 4px; }
   .lg { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; color: #4b5563; margin-bottom: 4px; } .lg i { display: inline-block; width: 12px; height: 8px; margin-right: 5px; }
@@ -336,6 +364,7 @@ export function printableReport(start, end, { detail = false } = {}) {
 <div class="actions"><button onclick="window.print()">Imprimer / Enregistrer en PDF</button></div>
 <div class="head"><h1>Rapport d'Activité RH</h1><div class="per">Période : du ${start.toLocaleDateString('fr-FR')} au ${end.toLocaleDateString('fr-FR')} (${byWeek ? 'Par semaine' : 'Par jour'})</div></div>
 <div class="kpis">${K.cards.map((c) => `<div class="k"><div class="l">${esc(c.label)}</div>${c.value ? `<div class="v" style="color:${c.color || '#4338ca'}">${esc(c.value)}</div>` : ''}${c.lines.filter(Boolean).map((l) => `<div class="s${l.startsWith('Ponts') ? ' p' : ''}"${l.startsWith('Soit') ? ` style="color:${k.balance >= 0 ? '#0f766e' : '#e11d48'};font-weight:700"` : ''}>${esc(l)}</div>`).join('')}</div>`).join('')}</div>
+${(() => { const SO = reportSoldes(R); return `<div class="so-t">${esc(SO.title)}</div><div class="soldes">${SO.tiles.map((t) => `<div class="sd" style="--c:${t.color}"><div class="l">${esc(t.label)}</div><div class="v">${esc(t.value)}</div><div class="s">${esc(t.sub)}</div></div>`).join('')}</div>`; })()}
 <div class="band"><span><b>Base de calcul :</b> ${fmtHM(K.hpdH)} / jour attendues.</span><span><b>Pause de référence :</b> ${R.e.prefs.pauseRefMin || 45} min le midi.</span></div>
 ${charts.map((c) => `<div class="chart"><h3>${esc(c.title)}</h3><div class="lg">${c.series.map((s) => `<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join('')}</div>${c.svg}</div>`).join('')}
 ${detail ? `<h3 style="break-before: page">Détail journalier</h3>

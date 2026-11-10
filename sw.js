@@ -1,6 +1,8 @@
 // Service worker : fonctionnement hors-ligne + mises à jour fiables.
-// ⚠️ Incrémentez VERSION à chaque déploiement : l'application proposera alors « Mettre à jour ».
-const VERSION = 'v2.0.0';
+// Les fichiers de l'application sont toujours demandés au réseau d'abord (une nouvelle
+// version déployée sur GitHub est donc prise en compte immédiatement) ; le cache ne sert
+// qu'en secours, hors-ligne ou si le réseau met plus de 3 s à répondre.
+const VERSION = 'v2.0.2';
 const CACHE = `suivi-heures-${VERSION}`;
 const CDN_CACHE = 'suivi-heures-cdn';
 
@@ -45,21 +47,21 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Fichiers de l'application : version figée par le cache (cohérence garantie)
+  // Fichiers de l'application : réseau d'abord, cache en secours
   if (url.origin === self.location.origin) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE);
-      const hit = await cache.match(req, { ignoreSearch: true });
-      if (hit) return hit;
+      const network = fetch(req, { cache: 'no-cache' }).then((res) => { if (res.ok) cache.put(req, res.clone()); return res; });
+      const timeout = new Promise((resolve) => setTimeout(resolve, 3000));
       try {
-        const res = await fetch(req);
-        if (res.ok) cache.put(req, res.clone());
-        return res;
-      } catch (e) {
-        if (req.mode === 'navigate') return (await cache.match('./index.html')) || Response.error();
-        throw e;
-      }
+        const res = await Promise.race([network, timeout]);
+        if (res) return res;
+      } catch { /* hors-ligne */ }
+      const hit = await cache.match(req, { ignoreSearch: true }) || (req.mode === 'navigate' ? await cache.match('./index.html') : null);
+      if (hit) return hit;
+      return network.catch(() => Response.error());
     })());
+    return;
   }
   // Tout le reste (API Supabase…) : réseau direct, non mis en cache
 });

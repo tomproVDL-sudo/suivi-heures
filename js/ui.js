@@ -55,7 +55,8 @@ export async function busy(btn, fn) {
 
 export function errMsg(e) {
   const m = e?.message || String(e);
-  if (/row-level security|permission denied/i.test(m)) return 'Accès refusé par Supabase (règles RLS).';
+  if (/permission denied/i.test(m)) return 'Droits manquants dans Supabase (permission denied).';
+  if (/row-level security/i.test(m)) return 'Accès refusé par Supabase (règles RLS).';
   if (/JWT|token/i.test(m)) return 'Session expirée : reconnectez-vous.';
   return m;
 }

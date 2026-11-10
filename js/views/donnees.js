@@ -215,7 +215,13 @@ async function renderCloud(el) {
   const zone = $('#cloud-zone', el); if (!zone) return;
   if (!navigator.onLine) { zone.innerHTML = '<div class="notice warn">Hors-ligne : les sauvegardes cloud seront visibles une fois reconnecté.</div>'; return; }
   let list;
-  try { list = await store.cloud.list(); } catch (e) { zone.innerHTML = `<div class="notice danger">${esc(errMsg(e))}</div>`; return; }
+  try { list = await store.cloud.list(); } catch (e) {
+    const perm = /permission denied|row-level/i.test(e.message || '');
+    zone.innerHTML = perm
+      ? `<div class="notice warn">${icon('alert')}<div><b>Il manque les droits d'accès à la table.</b> Dans Supabase → <i>SQL Editor</i>, exécutez :<br><code>grant select, insert, delete on public.sauvegardes to authenticated;</code><br>puis rechargez cette page.</div></div>`
+      : `<div class="notice danger">${esc(errMsg(e))}</div>`;
+    return;
+  }
   if (!zone.isConnected) return;
   if (list === null) {
     zone.innerHTML = `<div class="notice warn">${icon('alert')}<div><b>À activer une seule fois.</b> Les sauvegardes cloud ont besoin d'une table <code>sauvegardes</code> dans Supabase.

@@ -163,8 +163,10 @@ function registerSW() {
       });
     });
   }).catch((e) => console.warn('SW', e));
+  // Rechargement seulement lors d'une mise à jour (pas à la toute première installation)
+  const hadController = !!navigator.serviceWorker.controller;
   let reloading = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!reloading) { reloading = true; location.reload(); } });
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloading) { reloading = true; location.reload(); } });
 }
 
 async function boot() {

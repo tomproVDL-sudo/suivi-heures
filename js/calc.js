@@ -201,18 +201,7 @@ export class Engine {
     const cpRestants = (+P.cp_initial || 0) - (cons.CP - prisSurReliquat);
     const jFrac = fractionnement >= 8 ? 2 : fractionnement >= 5 ? 1 : 0;
 
-    // Ponts d'un jour (lundi avant mardi férié, vendredi après jeudi férié)
-    let pontsPossibles = 0, pontsPoses = 0;
-    for (const d of eachDay(y0, y1)) {
-      const wd = d.getDay();
-      if ((wd !== 1 && wd !== 5) || !this.isWorkingDay(d)) continue;
-      const adj = addDays(d, wd === 1 ? 1 : -1);
-      if (!this.ferie(dayKey(adj))) continue;
-      pontsPossibles++;
-      const off = this.absencesOn(dayKey(d)).filter((a) => a.type_absence !== 'Maladie' && a.type_absence !== 'Formation')
-        .reduce((s, a) => s + (isHalf(a) ? 0.5 : 1), 0);
-      if (off >= 1) pontsPoses++;
-    }
+    const { possibles: pontsPossibles, poses: pontsPoses } = this.ponts(y0, y1);
     const rttRestants = (+P.rtt_initial || 0) - cons.RTT;
     const nowD = new Date(now);
     return {
@@ -221,6 +210,21 @@ export class Engine {
       cetRestants: (+P.cet_initial || 0) - cons.CET, recup: +P.recup_initial || 0, don: +P.don_jours || 0,
       pontsPossibles, pontsPoses,
     };
+  }
+
+  /** Ponts d'un jour (lundi avant mardi férié, vendredi après jeudi férié) sur une période. */
+  ponts(start, end) {
+    let possibles = 0, poses = 0;
+    for (const d of eachDay(start, end)) {
+      const wd = d.getDay();
+      if ((wd !== 1 && wd !== 5) || !this.isWorkingDay(d)) continue;
+      if (!this.ferie(dayKey(addDays(d, wd === 1 ? 1 : -1)))) continue;
+      possibles++;
+      const off = this.absencesOn(dayKey(d)).filter((a) => a.type_absence !== 'Maladie' && a.type_absence !== 'Formation')
+        .reduce((s, a) => s + (isHalf(a) ? 0.5 : 1), 0);
+      if (off >= 1) poses++;
+    }
+    return { possibles, poses };
   }
 
   // ----- Heures sup -----

@@ -1,11 +1,11 @@
 // Exports : Excel (multi-feuilles), PDF (rapport), rapport imprimable, CSV, calendrier ICS.
 import { CDN } from './config.js';
 import {
-  loadScript, downloadBlob, fmtDur, fmtHM, fmtTime, fmtNum, parseDay, dayKey, excelDate, hoursOfDay, HOUR, DAY, MIN, pad, esc, equivalence, capitalize,
+  loadScript, downloadBlob, fmtDur, fmtHM, fmtTime, fmtNum, parseDay, dayKey, weekKey, isoWeek, excelDate, hoursOfDay, HOUR, DAY, MIN, pad, esc, equivalence, capitalize,
 } from './util.js';
 import { ABSENCE_TYPES, absColor, FERIE_COLOR, momentLabel } from './calc.js';
 import * as store from './store.js';
-import { buildBar, buildLine, theme, svgToPng } from './charts.js';
+import { buildBar, theme, svgToPng } from './charts.js';
 
 const ACTION_LABEL = { arrivee: 'Arrivée', pause: 'Pause', depart: 'Départ' };
 const stamp = (s, e) => `${dayKey(s)}_au_${dayKey(e)}`;
@@ -143,202 +143,208 @@ export async function downloadTemplate(kind) {
   X.writeFile(wb, `Modele_import_${kind}.xlsx`);
 }
 
-// ====================== Graphiques du rapport ======================
-function reportCharts(st, width) {
+// ====================== Rapport (modèle de la v1 : indicateurs + 3 graphiques) ======================
+/** Regroupe la période par jour (≤ 60 jours) ou par semaine, comme le rapport d'origine. */
+function reportGroups(R) {
+  const { st, e, start, end } = R;
+  const byWeek = (end - start) / DAY > 60;
+  const groups = new Map();
+  for (const d of st.days) {
+    const key = byWeek ? weekKey(d.date) : d.key;
+    if (!groups.has(key)) {
+      const w = isoWeek(d.date);
+      groups.set(key, { label: byWeek ? `S${pad(w.week)} ${String(w.year).slice(2)}` : d.date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }), work: 0, pause: 0, expected: 0, real: 0, worked: 0, past: false, abs: {}, feries: 0 });
+    }
+    const g = groups.get(key);
+    g.work += d.work; g.pause += d.pause; g.real += d.real;
+    if (d.past) { g.expected += d.expected; g.past = true; }
+    if (d.work) g.worked++;
+    if (d.ferie && !d.we) g.feries++;
+    if (!d.we && !d.ferie) for (const a of d.abs) g.abs[a.type_absence] = (g.abs[a.type_absence] || 0) + (a.moment === 'journee' ? 1 : 0.5);
+  }
+  return { byWeek, list: [...groups.values()], pauseRefH: (e.prefs.pauseRefMin || 45) / 60 };
+}
+
+function reportCharts(R, width) {
   const th = theme(true);
-  const byWeek = st.months.length <= 3;
-  const rows = byWeek ? st.weeks : st.months;
-  const vol = buildBar({
-    labels: rows.map((r) => r.label), width, height: 260, th, yFormat: (v) => `${Math.round(v)} h`,
-    series: [{ name: 'Travaillé', color: '#14b8a6', values: rows.map((r) => r.real / HOUR) }],
-    lines: [{ name: 'Attendu', color: '#64748b', dash: '6 4', values: rows.map((r) => (r.expected ? r.expected / HOUR : null)) }],
-  });
-  const step = Math.max(1, Math.ceil(st.cumul.length / 120));
-  const cum = st.cumul.filter((_, i) => i % step === 0 || i === st.cumul.length - 1);
-  const last = cum[cum.length - 1]?.value ?? 0;
-  const cumul = buildLine({
-    labels: cum.map((c) => parseDay(c.key).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })), width, height: 220, th,
-    series: [{ name: 'Solde', color: last >= 0 ? '#10b981' : '#ef4444', values: cum.map((c) => c.value), area: true, dots: false }], yFormat: (v) => fmtHM(v), includeZero: true,
-  });
-  const types = Object.keys(ABSENCE_TYPES);
-  const ms = st.months;
-  const absSeries = [...types.map((t) => ({ name: t, color: absColor(t), values: ms.map((m) => m.abs[t] || 0) })), { name: 'Fériés', color: FERIE_COLOR, values: ms.map((m) => m.feries) }].filter((s) => s.values.some((v) => v));
-  const abs = absSeries.length ? buildBar({ labels: ms.map((m) => m.label), width, height: 220, th, stacked: true, series: absSeries, yFormat: (v) => `${fmtNum(v)} j` }) : null;
-  return { vol: { ...vol, h: 260, series: [{ name: 'Travaillé', color: '#14b8a6' }, { name: 'Attendu', color: '#64748b' }] }, cumul: { ...cumul, h: 220 }, abs: abs ? { ...abs, h: 220, series: absSeries } : null, byWeek };
+  const { byWeek, list, pauseRefH } = reportGroups(R);
+  const labels = list.map((g) => g.label);
+  const H = (ms) => ms / HOUR;
+  const evolSeries = [{ name: 'Heures travaillées', color: '#4f46e5', values: list.map((g) => H(g.work)) }, { name: 'Durée pauses', color: '#f97316', values: list.map((g) => H(g.pause)) }];
+  const evolLines = [{ name: 'Objectif travail', color: '#9ca3af', dash: '6 5', values: list.map((g) => (g.past && (g.expected || g.work) ? H(g.expected) : null)) }, { name: `Réf. pause (${Math.round(pauseRefH * 60)} min)`, color: '#fdba74', dash: '3 3', width: 1.5, values: list.map((g) => (g.worked ? pauseRefH * g.worked : null)) }];
+  const evol = buildBar({ labels, width, height: 260, th, stacked: true, series: evolSeries, lines: evolLines, yFormat: (v) => fmtHM(v) });
+  const repSeries = [
+    { name: 'Heures normales', color: '#14b8a6', values: list.map((g) => H(Math.min(g.real, g.expected))) },
+    { name: 'Heures sup.', color: '#84cc16', values: list.map((g) => H(Math.max(0, g.real - g.expected))) },
+    { name: 'Heures manquantes', color: '#fca5a5', values: list.map((g) => H(Math.max(0, g.expected - g.real))) },
+  ];
+  const rep = buildBar({ labels, width, height: 260, th, stacked: true, series: repSeries, yFormat: (v) => fmtHM(v) });
+  const types = [...Object.keys(ABSENCE_TYPES)];
+  const absSeries = [...types.map((t) => ({ name: t, color: absColor(t), values: list.map((g) => g.abs[t] || 0) })), { name: 'Jours fériés', color: FERIE_COLOR, values: list.map((g) => g.feries) }];
+  const abs = buildBar({ labels, width, height: 260, th, stacked: true, series: absSeries, yFormat: (v) => `${fmtNum(v)} j` });
+  return {
+    byWeek,
+    charts: [
+      { title: 'Évolution du temps de travail et des pauses', h: 260, svg: evol.svg, series: [...evolSeries, ...evolLines] },
+      { title: 'Répartition (heures normales, sup., manquantes)', h: 260, svg: rep.svg, series: repSeries },
+      { title: 'Répartition des absences (en jours)', h: 260, svg: abs.svg, series: absSeries.filter((s) => s.values.some((v) => v)) },
+    ],
+  };
+}
+
+/** Les 4 indicateurs du rapport d'origine. */
+function reportKpis(R) {
+  const { st, e, start, end } = R, k = st.kpi;
+  const hpdH = e.hpdMs(dayKey(new Date())) / HOUR;
+  const perDay = (ms) => (k.workedDays ? `${fmtDur(ms / k.workedDays, { sign: ms < 0 })} / jour` : '--');
+  const avgPause = k.nbPauses ? Math.round(st.days.reduce((s, d) => s + d.pause, 0) / k.nbPauses / MIN) : 0;
+  const pts = e.ponts(start, end);
+  const abs = Object.entries(st.absTotals).map(([t, n]) => `${t} : ${fmtNum(n)} j`);
+  if (st.feriesCount) abs.push(`Férié : ${st.feriesCount} j`);
+  return {
+    hpdH, pts,
+    cards: [
+      { label: 'Heures travaillées', value: fmtDur(k.total), lines: [perDay(k.total)] },
+      { label: 'Écart (sup. / manquant)', value: fmtDur(k.balance, { sign: true }), color: k.balance >= 0 ? '#0d9488' : '#e11d48', lines: [perDay(k.balance), equivalence(k.balance / HOUR, hpdH) ? `Soit ${equivalence(k.balance / HOUR, hpdH)}` : ''] },
+      { label: 'Pauses (total)', value: String(k.nbPauses), color: '#f97316', lines: [`${avgPause >= 60 ? fmtDur(avgPause * MIN) : `${avgPause} min`} en moyenne`] },
+      { label: 'Absences posées', value: '', lines: [...(abs.length ? abs : ['Aucune absence']), ...(pts.possibles ? [`Ponts (1 j) : ${pts.poses} sur ${pts.possibles} poss.`] : [])] },
+    ],
+  };
 }
 
 // ====================== PDF (jsPDF, téléchargement direct) ======================
 const pdfText = (s) => String(s ?? '').replace(/[  ]/g, ' ').replace(/≈/g, '~').replace(/[▲▼]/g, '').replace(/→/g, '->').replace(/[^\x00-\xff€–—…‘’“”•]/g, '');
 
-export async function exportPDF(start, end) {
+export async function exportPDF(start, end, { detail = false } = {}) {
   await loadScript(CDN.jspdf);
   const { jsPDF } = window.jspdf;
   const R = reportData(start, end);
-  const { st, rows, soldes } = R, k = st.kpi;
+  const { st, rows } = R, k = st.kpi;
+  const { charts, byWeek } = reportCharts(R, 900);
+  const K = reportKpis(R);
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const W = 210, M = 14, CW = W - 2 * M;
+  const W = 210, M = 12, CW = W - 2 * M;
   const T = (s, x, y, o) => doc.text(pdfText(s), x, y, o);
-  const hpdH = R.e.hpdMs(dayKey(new Date())) / HOUR;
 
   // En-tête
-  doc.setFillColor('#0d9488'); doc.rect(0, 0, W, 30, 'F');
-  doc.setTextColor('#ffffff'); doc.setFont('helvetica', 'bold'); doc.setFontSize(18); T("Rapport d'activité", M, 14);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-  T(`Du ${start.toLocaleDateString('fr-FR')} au ${end.toLocaleDateString('fr-FR')}`, M, 21);
-  T(`${R.user} · généré le ${new Date().toLocaleDateString('fr-FR')}`, M, 26);
-  let y = 38;
+  doc.setTextColor('#1f2937'); doc.setFont('helvetica', 'bold'); doc.setFontSize(19); T("Rapport d'Activité RH", M, 16);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor('#6b7280');
+  T(`Période : du ${start.toLocaleDateString('fr-FR')} au ${end.toLocaleDateString('fr-FR')} (${byWeek ? 'par semaine' : 'par jour'})`, M, 22.5);
+  doc.setDrawColor('#4f46e5'); doc.setLineWidth(0.7); doc.line(M, 26, M + CW, 26); doc.setLineWidth(0.2);
+  let y = 31;
 
-  // Indicateurs
-  const kpis = [
-    ['Temps travaillé', fmtDur(k.total), `${k.workedDays} jours travaillés`],
-    ['Solde de la période', fmtDur(k.balance, { sign: true }), equivalence(k.balance / HOUR, hpdH) || `attendu ${fmtDur(k.expected)}`],
-    ['Moyenne / jour', fmtDur(k.avgDay), `base ${fmtHM(hpdH)} / jour`],
-    ['Pause moyenne / jour', `${Math.round(k.avgPauseDay / MIN)} min`, `${k.nbPauses} pauses`],
-    ['Arrivée médiane', fmtHM(k.medArrival), `plus tôt ${fmtHM(k.earliest)}`],
-    ['Départ médian', fmtHM(k.medDeparture), `plus tard ${fmtHM(k.latest)}`],
-    ['Amplitude moyenne', fmtDur(k.avgAmplitude), ''],
-    ['Journée la plus longue', k.longest ? fmtDur(k.longest.ms) : '--', k.longest ? parseDay(k.longest.key).toLocaleDateString('fr-FR') : ''],
-  ];
-  const bw = (CW - 9) / 4, bh = 20;
-  kpis.forEach(([label, val, sub], i) => {
-    const x = M + (i % 4) * (bw + 3), yy = y + Math.floor(i / 4) * (bh + 3);
-    doc.setFillColor('#f1f5f9'); doc.roundedRect(x, yy, bw, bh, 2, 2, 'F');
-    doc.setTextColor('#64748b'); doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); T(label.toUpperCase(), x + 3, yy + 5);
-    doc.setTextColor(i === 1 ? (k.balance >= 0 ? '#059669' : '#e11d48') : '#0f172a'); doc.setFontSize(13); doc.setFont('helvetica', 'bold'); T(val, x + 3, yy + 12.5);
-    doc.setTextColor('#64748b'); doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); T(sub, x + 3, yy + 17);
-  });
-  y += 2 * (bh + 3) + 4;
-
-  // Soldes & absences
-  doc.setFillColor('#f0fdfa'); doc.roundedRect(M, y, CW, 15, 2, 2, 'F');
-  doc.setFontSize(8.5); doc.setTextColor('#0f766e'); doc.setFont('helvetica', 'bold'); T(`Soldes ${soldes.year} à ce jour`, M + 3, y + 5.5);
-  doc.setFont('helvetica', 'normal'); doc.setTextColor('#334155');
-  T(`CP : ${fmtNum(soldes.cpRestants)} j  ·  Reliquat N-1 : ${fmtNum(soldes.reliquatRestant)} j  ·  RTT : ${fmtNum(soldes.rttRestants)} j  ·  CET : ${fmtNum(soldes.cetRestants)} j  ·  Fractionnement : +${soldes.jFrac} j`, M + 3, y + 11);
-  y += 19;
-  const absTxt = Object.entries(st.absTotals).map(([t, n]) => `${t} ${fmtNum(n)} j`).join('  ·  ');
-  doc.setFontSize(8.5); doc.setTextColor('#334155');
-  T(`Absences sur la période : ${absTxt || 'aucune'}${st.feriesCount ? `  ·  Fériés ${st.feriesCount} j` : ''}`, M, y); y += 5;
-  const c = st.compliance;
-  T(`Repères : ${c.over10.length} journée(s) > 10 h · ${c.over48.length} semaine(s) > 48 h · ${c.shortRest.length} repos < 11 h · ${c.shortPause.length} pause(s) < 20 min après 6 h`, M, y); y += 6;
-
-  // Graphiques
-  const charts = reportCharts(st, 900);
-  const addChart = async (title, ch) => {
-    if (!ch) return;
-    const hmm = (CW * ch.h) / 900;
-    if (y + hmm + 10 > 285) { doc.addPage(); y = 16; }
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor('#0f172a'); T(title, M, y + 4);
-    let lx = M + CW;
-    (ch.series || []).slice().reverse().forEach((s) => { const w = doc.getTextWidth(pdfText(s.name)) + 6; lx -= w; doc.setFillColor(s.color); doc.rect(lx, y + 1.5, 2.5, 2.5, 'F'); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor('#475569'); T(s.name, lx + 3.5, y + 3.8); });
-    const png = await svgToPng(ch.svg, 900, ch.h);
-    doc.addImage(png, 'PNG', M, y + 6, CW, hmm);
-    y += hmm + 10;
-  };
-  await addChart(`Heures travaillées / attendues (${charts.byWeek ? 'par semaine' : 'par mois'})`, charts.vol);
-  await addChart('Solde cumulé (heures)', charts.cumul);
-  await addChart('Absences et jours fériés (jours ouvrés)', charts.abs);
-
-  // Tableau journalier
-  doc.addPage(); y = 16;
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor('#0f172a'); T('Détail journalier', M, y); y += 6;
-  const cols = [['Date', 24], ['Arrivée', 15], ['Départ', 15], ['Pauses', 46], ['Travaillé', 17], ['Attendu', 17], ['Écart', 15], ['Absence / férié', 33]];
-  const head = () => {
-    doc.setFillColor('#0f766e'); doc.rect(M, y, CW, 7, 'F');
-    doc.setTextColor('#ffffff'); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
-    let x = M + 1.5; cols.forEach(([h, w]) => { T(h, x, y + 4.8); x += w; });
-    y += 7; doc.setFont('helvetica', 'normal');
-  };
-  head();
-  const list = rows.filter((r) => !(r.we && !r.work && !r.abs.length));
-  list.forEach((r, i) => {
-    if (y > 282) { doc.addPage(); y = 16; head(); }
-    if (i % 2) { doc.setFillColor('#f8fafc'); doc.rect(M, y, CW, 6, 'F'); }
-    const cells = [
-      r.date.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' }), r.first ? fmtTime(r.first) : '', r.last ? fmtTime(r.last) : '',
-      r.pausesTxt, r.work ? fmtDur(r.work) : '', r.expected ? fmtDur(r.expected) : '', r.delta != null && (r.work || r.expected) ? fmtDur(r.delta, { sign: true }) : '', r.absTxt,
-    ];
-    let x = M + 1.5;
-    doc.setFontSize(7.5);
-    cells.forEach((v, ci) => {
-      doc.setTextColor(ci === 6 && r.delta != null ? (r.delta >= 0 ? '#059669' : '#e11d48') : r.we ? '#94a3b8' : '#1e293b');
-      let s = pdfText(v); const maxW = cols[ci][1] - 2;
-      while (s && doc.getTextWidth(s) > maxW) s = s.slice(0, -2);
-      T(s, x, y + 4.2); x += cols[ci][1];
+  // 4 indicateurs
+  const bw = (CW - 9) / 4, bh = 30;
+  K.cards.forEach((c, i) => {
+    const x = M + i * (bw + 3);
+    doc.setFillColor('#f9fafb'); doc.setDrawColor('#e5e7eb'); doc.roundedRect(x, y, bw, bh, 2, 2, 'FD');
+    doc.setTextColor('#6b7280'); doc.setFont('helvetica', 'bold'); doc.setFontSize(6.8); T(c.label.toUpperCase(), x + 3, y + 5);
+    let yy = y + 5;
+    if (c.value) { doc.setTextColor(c.color || '#4338ca'); doc.setFontSize(15); T(c.value, x + 3, y + 13); yy = y + 13; }
+    doc.setFont('helvetica', c.value ? 'normal' : 'normal'); doc.setFontSize(c.value ? 7.8 : 7.6);
+    c.lines.filter(Boolean).slice(0, c.value ? 3 : 6).forEach((l, j) => {
+      doc.setTextColor(l.startsWith('Ponts') ? '#059669' : l.startsWith('Soit') ? (k.balance >= 0 ? '#0f766e' : '#e11d48') : '#6b7280');
+      T(l, x + 3, yy + (c.value ? 5 : 4.2) + j * (c.value ? 4.2 : 3.8));
     });
-    y += 6;
   });
-  if (y > 276) { doc.addPage(); y = 16; }
-  doc.setDrawColor('#0f766e'); doc.line(M, y + 1, M + CW, y + 1);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor('#0f172a');
-  T(`Total : ${fmtDur(k.total)} travaillées · ${fmtDur(k.expected)} attendues · solde ${fmtDur(k.balance, { sign: true })}`, M, y + 6);
+  y += bh + 4;
+  doc.setFillColor('#eef2ff'); doc.roundedRect(M, y, CW, 8, 1.5, 1.5, 'F');
+  doc.setFontSize(8.5); doc.setTextColor('#3730a3');
+  doc.setFont('helvetica', 'bold'); T('Base de calcul :', M + 3, y + 5.3); doc.setFont('helvetica', 'normal'); T(`${fmtHM(K.hpdH)} / jour attendues.`, M + 27, y + 5.3);
+  doc.setFont('helvetica', 'bold'); T('Pause de référence :', M + CW - 50, y + 5.3); doc.setFont('helvetica', 'normal'); T(`${R.e.prefs.pauseRefMin || 45} min le midi.`, M + CW - 18, y + 5.3);
+  y += 13;
 
-  // Pieds de page
+  // 3 graphiques
+  for (const ch of charts) {
+    const hmm = (CW * ch.h) / 900;
+    if (y + hmm + 9 > 290) { doc.addPage(); y = 14; }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor('#374151'); T(ch.title, M, y + 3);
+    let lx = M; y += 6;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.2);
+    ch.series.forEach((s) => { const w = doc.getTextWidth(pdfText(s.name)) + 7; if (lx + w > M + CW) { lx = M; y += 3.8; } doc.setFillColor(s.color); doc.rect(lx, y - 2.2, 4, 2.4, 'F'); doc.setTextColor('#4b5563'); T(s.name, lx + 5, y); lx += w + 2; });
+    const png = await svgToPng(ch.svg, 900, ch.h);
+    doc.addImage(png, 'PNG', M, y + 1.5, CW, hmm);
+    y += hmm + 6;
+  }
+
+  // Annexe optionnelle : détail journalier
+  if (detail) {
+    doc.addPage(); y = 16;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor('#0f172a'); T('Détail journalier', M, y); y += 6;
+    const cols = [['Date', 25], ['Arrivée', 15], ['Départ', 15], ['Pauses', 48], ['Travaillé', 17], ['Attendu', 17], ['Écart', 15], ['Absence / férié', 34]];
+    const head = () => {
+      doc.setFillColor('#4f46e5'); doc.rect(M, y, CW, 7, 'F');
+      doc.setTextColor('#ffffff'); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+      let x = M + 1.5; cols.forEach(([h, w]) => { T(h, x, y + 4.8); x += w; });
+      y += 7; doc.setFont('helvetica', 'normal');
+    };
+    head();
+    rows.filter((r) => !(r.we && !r.work && !r.abs.length)).forEach((r, i) => {
+      if (y > 282) { doc.addPage(); y = 16; head(); }
+      if (i % 2) { doc.setFillColor('#f8fafc'); doc.rect(M, y, CW, 6, 'F'); }
+      const cells = [r.date.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' }), r.first ? fmtTime(r.first) : '', r.last ? fmtTime(r.last) : '',
+        r.pausesTxt, r.work ? fmtDur(r.work) : '', r.expected ? fmtDur(r.expected) : '', r.delta != null && (r.work || r.expected) ? fmtDur(r.delta, { sign: true }) : '', r.absTxt];
+      let x = M + 1.5; doc.setFontSize(7.5);
+      cells.forEach((v, ci) => {
+        doc.setTextColor(ci === 6 && r.delta != null ? (r.delta >= 0 ? '#059669' : '#e11d48') : r.we ? '#94a3b8' : '#1e293b');
+        let t = pdfText(v); const maxW = cols[ci][1] - 2;
+        while (t && doc.getTextWidth(t) > maxW) t = t.slice(0, -2);
+        T(t, x, y + 4.2); x += cols[ci][1];
+      });
+      y += 6;
+    });
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor('#0f172a');
+    T(`Total : ${fmtDur(k.total)} travaillées · ${fmtDur(k.expected)} attendues · écart ${fmtDur(k.balance, { sign: true })}`, M, Math.min(y + 6, 290));
+  }
+
   const n = doc.internal.getNumberOfPages();
   for (let i = 1; i <= n; i++) {
-    doc.setPage(i); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor('#94a3b8');
-    T('Suivi Heures', M, 292); T(`Page ${i} / ${n}`, W - M, 292, { align: 'right' });
+    doc.setPage(i); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor('#9ca3af');
+    T(`${R.user} · généré le ${new Date().toLocaleDateString('fr-FR')}`, M, 292); T(`Page ${i} / ${n}`, W - M, 292, { align: 'right' });
   }
-  doc.save(`Rapport_${stamp(start, end)}.pdf`);
+  doc.save(`Rapport_SIRH_${stamp(start, end)}.pdf`);
 }
 
-// ====================== Rapport imprimable (HTML → Imprimer / Enregistrer en PDF) ======================
-export function printableReport(start, end) {
+// ====================== Rapport imprimable (même mise en page, HTML → Imprimer / PDF) ======================
+export function printableReport(start, end, { detail = false } = {}) {
   const R = reportData(start, end);
-  const { st, rows, soldes } = R, k = st.kpi;
-  const hpdH = R.e.hpdMs(dayKey(new Date())) / HOUR;
-  const charts = reportCharts(st, 900);
-  const kp = (l, v, s, cls = '') => `<div class="k"><div class="l">${esc(l)}</div><div class="v ${cls}">${esc(v)}</div><div class="s">${esc(s)}</div></div>`;
-  const legend = (ser) => (ser || []).map((s) => `<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join('');
+  const { st, rows } = R, k = st.kpi;
+  const { charts, byWeek } = reportCharts(R, 900);
+  const K = reportKpis(R);
   const list = rows.filter((r) => !(r.we && !r.work && !r.abs.length));
   const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Rapport ${dayKey(start)} - ${dayKey(end)}</title>
 <style>
-  @page { size: A4; margin: 12mm; }
-  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: #0f172a; margin: 0; font-size: 12px; }
-  header { background: #0d9488; color: #fff; padding: 16px 20px; border-radius: 10px; }
-  header h1 { margin: 0 0 4px; font-size: 22px; } header div { opacity: .9; }
-  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0; }
-  .k { background: #f1f5f9; border-radius: 8px; padding: 9px 11px; }
-  .k .l { font-size: 9.5px; text-transform: uppercase; color: #64748b; font-weight: 600; letter-spacing: .03em; }
-  .k .v { font-size: 18px; font-weight: 750; margin-top: 2px; } .k .s { font-size: 10.5px; color: #64748b; }
-  .pos { color: #059669; } .neg { color: #e11d48; }
-  .box { background: #f0fdfa; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px; }
-  h2 { font-size: 14px; margin: 16px 0 6px; display: flex; justify-content: space-between; align-items: center; }
-  .lg { font-size: 10.5px; font-weight: 500; color: #475569; display: flex; gap: 10px; }
-  .lg i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; }
-  svg { width: 100%; height: auto; }
-  .chart { break-inside: avoid; }
-  table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
-  th { background: #0f766e; color: #fff; text-align: left; padding: 5px 6px; } td { padding: 4px 6px; border-bottom: 1px solid #e2e8f0; }
-  tr:nth-child(even) td { background: #f8fafc; } td.we { color: #94a3b8; } .num { text-align: right; font-variant-numeric: tabular-nums; }
+  @page { size: A4; margin: 10mm; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: #1f2937; margin: 0 auto; max-width: 900px; padding: 24px; font-size: 12px; }
+  h1 { font-size: 26px; margin: 0; } .per { color: #6b7280; font-size: 15px; margin-top: 4px; }
+  .head { border-bottom: 3px solid #4f46e5; padding-bottom: 12px; margin-bottom: 18px; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+  .k { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; }
+  .k .l { font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 700; margin-bottom: 4px; }
+  .k .v { font-size: 22px; font-weight: 750; color: #4338ca; } .k .s { font-size: 11.5px; color: #6b7280; margin-top: 3px; } .k .s.p { color: #059669; font-weight: 700; }
+  .band { background: #eef2ff; color: #3730a3; padding: 9px 12px; border-radius: 8px; display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 12.5px; }
+  h3 { font-size: 14px; color: #374151; margin: 14px 0 4px; }
+  .lg { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; color: #4b5563; margin-bottom: 4px; } .lg i { display: inline-block; width: 12px; height: 8px; margin-right: 5px; }
+  svg { width: 100%; height: auto; } .chart { break-inside: avoid; }
+  table { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-top: 8px; }
+  th { background: #4f46e5; color: #fff; text-align: left; padding: 5px 6px; } td { padding: 4px 6px; border-bottom: 1px solid #e5e7eb; }
+  tr:nth-child(even) td { background: #f8fafc; } td.we { color: #94a3b8; } .num { text-align: right; font-variant-numeric: tabular-nums; } .pos { color: #059669; } .neg { color: #e11d48; }
   thead { display: table-header-group; } tr { break-inside: avoid; }
-  .actions { position: fixed; top: 12px; right: 12px; } .actions button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 0; background: #0f172a; color: #fff; cursor: pointer; }
-  @media print { .actions { display: none; } }
+  .actions { position: fixed; top: 12px; right: 12px; } .actions button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 0; background: #4f46e5; color: #fff; cursor: pointer; }
+  @media print { .actions { display: none; } body { padding: 0; } }
 </style></head><body>
 <div class="actions"><button onclick="window.print()">Imprimer / Enregistrer en PDF</button></div>
-<header><h1>Rapport d'activité</h1><div>Du ${start.toLocaleDateString('fr-FR')} au ${end.toLocaleDateString('fr-FR')} · ${esc(R.user)} · généré le ${new Date().toLocaleDateString('fr-FR')}</div></header>
-<div class="kpis">
-  ${kp('Temps travaillé', fmtDur(k.total), `${k.workedDays} jours travaillés`)}
-  ${kp('Solde de la période', fmtDur(k.balance, { sign: true }), equivalence(k.balance / HOUR, hpdH) || `attendu ${fmtDur(k.expected)}`, k.balance >= 0 ? 'pos' : 'neg')}
-  ${kp('Moyenne / jour', fmtDur(k.avgDay), `base ${fmtHM(hpdH)} / jour`)}
-  ${kp('Pause moyenne / jour', `${Math.round(k.avgPauseDay / MIN)} min`, `${k.nbPauses} pauses`)}
-  ${kp('Arrivée médiane', fmtHM(k.medArrival), `plus tôt ${fmtHM(k.earliest)}`)}
-  ${kp('Départ médian', fmtHM(k.medDeparture), `plus tard ${fmtHM(k.latest)}`)}
-  ${kp('Amplitude moyenne', fmtDur(k.avgAmplitude), '')}
-  ${kp('Journée la plus longue', k.longest ? fmtDur(k.longest.ms) : '--', k.longest ? parseDay(k.longest.key).toLocaleDateString('fr-FR') : '')}
-</div>
-<div class="box"><b>Soldes ${soldes.year} à ce jour</b> — CP ${fmtNum(soldes.cpRestants)} j · Reliquat N-1 ${fmtNum(soldes.reliquatRestant)} j · RTT ${fmtNum(soldes.rttRestants)} j · CET ${fmtNum(soldes.cetRestants)} j · Fractionnement +${soldes.jFrac} j</div>
-<div class="box" style="background:#f8fafc"><b>Absences</b> — ${Object.entries(st.absTotals).map(([t, n]) => `${esc(t)} ${fmtNum(n)} j`).join(' · ') || 'aucune'}${st.feriesCount ? ` · Fériés ${st.feriesCount} j` : ''}<br>
-<b>Repères</b> — ${st.compliance.over10.length} journée(s) &gt; 10 h · ${st.compliance.over48.length} semaine(s) &gt; 48 h · ${st.compliance.shortRest.length} repos &lt; 11 h · ${st.compliance.shortPause.length} pause(s) &lt; 20 min après 6 h</div>
-<div class="chart"><h2>Heures travaillées / attendues (${charts.byWeek ? 'par semaine' : 'par mois'})<span class="lg">${legend(charts.vol.series)}</span></h2>${charts.vol.svg}</div>
-<div class="chart"><h2>Solde cumulé</h2>${charts.cumul.svg}</div>
-${charts.abs ? `<div class="chart"><h2>Absences et jours fériés<span class="lg">${legend(charts.abs.series)}</span></h2>${charts.abs.svg}</div>` : ''}
-<h2 style="break-before: page">Détail journalier</h2>
+<div class="head"><h1>Rapport d'Activité RH</h1><div class="per">Période : du ${start.toLocaleDateString('fr-FR')} au ${end.toLocaleDateString('fr-FR')} (${byWeek ? 'Par semaine' : 'Par jour'})</div></div>
+<div class="kpis">${K.cards.map((c) => `<div class="k"><div class="l">${esc(c.label)}</div>${c.value ? `<div class="v" style="color:${c.color || '#4338ca'}">${esc(c.value)}</div>` : ''}${c.lines.filter(Boolean).map((l) => `<div class="s${l.startsWith('Ponts') ? ' p' : ''}"${l.startsWith('Soit') ? ` style="color:${k.balance >= 0 ? '#0f766e' : '#e11d48'};font-weight:700"` : ''}>${esc(l)}</div>`).join('')}</div>`).join('')}</div>
+<div class="band"><span><b>Base de calcul :</b> ${fmtHM(K.hpdH)} / jour attendues.</span><span><b>Pause de référence :</b> ${R.e.prefs.pauseRefMin || 45} min le midi.</span></div>
+${charts.map((c) => `<div class="chart"><h3>${esc(c.title)}</h3><div class="lg">${c.series.map((s) => `<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join('')}</div>${c.svg}</div>`).join('')}
+${detail ? `<h3 style="break-before: page">Détail journalier</h3>
 <table><thead><tr><th>Date</th><th>Arrivée</th><th>Départ</th><th>Pauses</th><th class="num">Travaillé</th><th class="num">Attendu</th><th class="num">Écart</th><th>Absence / férié</th></tr></thead><tbody>
 ${list.map((r) => `<tr><td class="${r.we ? 'we' : ''}">${r.date.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit', year: '2-digit' })}</td><td>${r.first ? fmtTime(r.first) : ''}</td><td>${r.last ? fmtTime(r.last) : ''}</td><td>${esc(r.pausesTxt)}</td><td class="num">${r.work ? fmtDur(r.work) : ''}</td><td class="num">${r.expected ? fmtDur(r.expected) : ''}</td><td class="num ${r.delta >= 0 ? 'pos' : 'neg'}">${r.delta != null && (r.work || r.expected) ? fmtDur(r.delta, { sign: true }) : ''}</td><td>${esc(r.absTxt)}</td></tr>`).join('')}
-<tr><td><b>Total</b></td><td></td><td></td><td></td><td class="num"><b>${fmtDur(k.total)}</b></td><td class="num"><b>${fmtDur(k.expected)}</b></td><td class="num ${k.balance >= 0 ? 'pos' : 'neg'}"><b>${fmtDur(k.balance, { sign: true })}</b></td><td></td></tr>
-</tbody></table></body></html>`;
+</tbody></table>` : ''}
+</body></html>`;
   const w = window.open('', '_blank');
-  if (!w) { downloadBlob(`Rapport_${stamp(start, end)}.html`, new Blob([html], { type: 'text/html' })); return; }
+  if (!w) { downloadBlob(`Rapport_${stamp(start, end)}.html`, new Blob([html], { type: 'text/html' })); return html; }
   w.document.open(); w.document.write(html); w.document.close();
   return html;
 }

@@ -20,7 +20,7 @@ function niceTicks(min, max, count = 5) {
   return { lo, hi, ticks };
 }
 
-const legendHtml = (items) => (items.length > 1 ? `<div class="legend">${items.map((s) => `<span><i class="dot-c" style="background:${s.color}"></i>${esc(s.name)}</span>`).join('')}</div>` : '');
+const legendHtml = (items) => (items.length > 1 ? `<div class="legend">${items.map((s) => `<span><i class="dot-c" style="background:${s.legendColor || (typeof s.color === 'function' ? '#14b8a6' : s.color)}"></i>${esc(s.name)}</span>`).join('')}</div>` : '');
 
 function frame({ width, height, labels, yMin, yMax, yFormat, th, yTitle, xEvery }) {
   const m = { l: 50, r: 12, t: 10, b: 26 };
@@ -186,15 +186,29 @@ const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver((entries) 
   }
 }) : null;
 
-/** Monte un graphique : kind = 'bar' | 'line' | 'box'. */
+const hiddenByChart = new Map(); // séries masquées via la légende, mémorisées par graphique
+const swatch = (s) => s.legendColor || (typeof s.color === 'function' ? '#14b8a6' : s.color);
+
+/** Monte un graphique : kind = 'bar' | 'line' | 'box'. Légende cliquable pour masquer/afficher une série. */
 export function mount(el, kind, opts) {
+  const id = el.id || '';
+  if (!hiddenByChart.has(id)) hiddenByChart.set(id, new Set());
+  const hidden = hiddenByChart.get(id);
+  const items = kind === 'box' ? [] : [...(opts.series || []), ...(opts.lines || [])].filter((s) => s.name);
   const draw = () => {
     const width = Math.max(260, el.clientWidth || 600);
     el._w = el.clientWidth;
     const hasData = opts.labels?.length && (kind !== 'box' ? true : opts.groups.some((g) => g.length));
     if (!hasData) { el.innerHTML = '<div class="chart-empty">Pas de données sur la période</div>'; return; }
-    const b = (kind === 'bar' ? buildBar : kind === 'line' ? buildLine : buildBox)({ ...opts, width, th: theme() });
-    el.innerHTML = `${b.legend}<div class="chart-svg">${b.svg}</div>`;
+    const o2 = { ...opts, series: (opts.series || []).filter((s) => !hidden.has(s.name)), lines: (opts.lines || []).filter((s) => !hidden.has(s.name)) };
+    const b = (kind === 'bar' ? buildBar : kind === 'line' ? buildLine : buildBox)({ ...o2, width, th: theme() });
+    const legend = items.length > 1 ? `<div class="legend">${items.map((s) => `<button type="button" class="lg-item${hidden.has(s.name) ? ' off' : ''}" data-name="${esc(s.name)}" aria-pressed="${!hidden.has(s.name)}" title="Afficher / masquer"><i class="dot-c" style="background:${swatch(s)}"></i>${esc(s.name)}</button>`).join('')}</div>` : '';
+    el.innerHTML = `${legend}<div class="chart-svg">${b.svg}</div>`;
+    el.querySelectorAll('.lg-item').forEach((btn) => btn.addEventListener('click', () => {
+      const n = btn.dataset.name;
+      if (hidden.has(n)) hidden.delete(n); else hidden.add(n);
+      draw();
+    }));
     const svg = el.querySelector('svg');
     const fmt = opts.tipFormat || opts.yFormat || ((v) => v);
     svg.addEventListener('pointermove', (ev) => {

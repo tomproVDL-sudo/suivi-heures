@@ -47,6 +47,7 @@ export function render(el) {
         <button class="btn" id="ex-csv">${icon('download')} CSV des pointages</button>
         <button class="btn" id="ex-ics">${icon('calendar')} Absences → agenda (.ics)</button>
       </div>
+      <label class="check small" style="margin-top:10px"><input type="checkbox" id="ex-detail" ${pr.reportDetail ? 'checked' : ''}> Ajouter au rapport PDF le détail jour par jour (pages supplémentaires)</label>
     </div>
 
     <div class="card">
@@ -103,8 +104,10 @@ export function render(el) {
     busy(ev.currentTarget, async () => { try { const out = await fn(...r); if (okMsg) toast(okMsg(out)); } catch (e) { toast(errMsg(e), { error: true }); } });
   });
   run('#ex-xlsx', exp.exportExcel, () => 'Fichier Excel téléchargé');
-  run('#ex-pdf', exp.exportPDF, () => 'Rapport PDF téléchargé');
-  run('#ex-print', async (s, e) => exp.printableReport(s, e));
+  const detail = () => $('#ex-detail', el).checked;
+  $('#ex-detail', el).addEventListener('change', () => store.savePrefs({ reportDetail: detail() }));
+  run('#ex-pdf', (s, e) => exp.exportPDF(s, e, { detail: detail() }), () => 'Rapport PDF téléchargé');
+  run('#ex-print', async (s, e) => exp.printableReport(s, e, { detail: detail() }));
   run('#ex-csv', async (s, e) => exp.exportCSV(s, e), (n) => `${n} pointages exportés`);
   run('#ex-ics', async (s, e) => exp.exportICS(s, e), (n) => `${n} absence(s) exportée(s)`);
 

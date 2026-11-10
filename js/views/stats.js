@@ -142,7 +142,7 @@ function drawVolume(el, st) {
   $('#vol-sub', el).textContent = byWeek ? 'Par semaine' : 'Par mois';
   mount($('#ch-volume', el), 'bar', {
     labels: rows.map((r) => r.label),
-    series: [{ name: 'Travaillé (+ formation)', color: (v, i) => (rows[i].real >= rows[i].expected && rows[i].expected ? '#10b981' : '#14b8a6'), values: rows.map((r) => r.real / HOUR) }],
+    series: [{ name: 'Travaillé (+ formation)', legendColor: '#14b8a6', color: (v, i) => (rows[i].real >= rows[i].expected && rows[i].expected ? '#10b981' : '#14b8a6'), values: rows.map((r) => r.real / HOUR) }],
     lines: [{ name: 'Attendu', color: '#64748b', dash: '6 4', values: rows.map((r) => (r.expected ? r.expected / HOUR : null)) }],
     yFormat: (v) => `${Math.round(v)} h`, tipFormat: (v) => fmtHM(v), height: 280,
   });

@@ -75,7 +75,8 @@ GitHub désactive les tâches planifiées après 60 jours sans activité sur le 
 **Nouveautés**
 - Jauge du jour, heure de départ estimée, frise de la journée, alerte double pointage.
 - Statistiques : comparaison N-1, solde cumulé, moyenne par jour de semaine, calendrier d'activité, repères réglementaires (10 h/jour, 48 h/semaine, 11 h de repos, pause de 20 min).
-- Exports : Excel 6 feuilles avec vrais formats horaires et totaux, PDF multi-pages, rapport imprimable, CSV, agenda `.ics`.
+- Exports : Excel 6 feuilles avec vrais formats horaires et totaux, rapport PDF d'une page reprenant la mise en page de la v1 (4 indicateurs + 3 graphiques, détail jour par jour en option), rapport imprimable, CSV, agenda `.ics`.
+- Graphiques : un clic sur un élément de la légende masque / réaffiche la série.
 - Mode sombre, navigation mobile en bas d'écran, vue semaine du planning, historique de base horaire paramétrable.
 
 ## Structure

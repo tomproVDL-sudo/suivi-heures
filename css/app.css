@@ -309,6 +309,14 @@ main { min-width: 0; padding: 22px 28px 40px; max-width: 1280px; width: 100%; ma
 .wk-blk.p { background: var(--pause); opacity: .85; }
 .wk-blk.a { background: var(--c); opacity: .9; left: 2px; right: 2px; }
 
+#cal.swipe-zone { touch-action: pan-y; transition: transform .15s ease-out; }
+#cal.slide-next { animation: slideNext .22s ease-out; }
+#cal.slide-prev { animation: slidePrev .22s ease-out; }
+@keyframes slideNext { from { opacity: .3; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+@keyframes slidePrev { from { opacity: .3; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
+.swipe-hint { display: none; text-align: center; margin-top: 8px; }
+@media (pointer: coarse) { .swipe-hint { display: block; } }
+
 /* ---------- Graphiques ---------- */
 .chart { position: relative; width: 100%; min-height: 220px; }
 .chart svg { display: block; width: 100%; overflow: visible; }
@@ -392,7 +400,9 @@ dialog[open] { animation: pop .18s ease-out; }
   main { padding: 14px 14px calc(84px + env(safe-area-inset-bottom)); }
   .topbar h1 { font-size: 21px; }
   .bottomnav { display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
-    background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(12px); border-top: 1px solid var(--border); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
+    background: var(--surface); border-top: 1px solid var(--border); padding: 6px 4px calc(7px + env(safe-area-inset-bottom)); }
+  /* Léger trait entre la barre de l'application et la barre de navigation Android */
+  .bottomnav::after { content: ""; position: absolute; left: 0; right: 0; bottom: env(safe-area-inset-bottom, 0px); height: 1px; background: var(--border); }
   .bottomnav .nav-item { flex-direction: column; gap: 3px; padding: 6px 2px; font-size: 11px; justify-content: center; text-align: center; }
   .bottomnav .nav-item svg { width: 22px; height: 22px; }
   .bottomnav .nav-item[aria-current="page"] { background: transparent; }

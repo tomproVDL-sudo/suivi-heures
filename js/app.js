@@ -24,7 +24,11 @@ let current = null;
 const mq = window.matchMedia('(prefers-color-scheme: dark)');
 export function applyTheme() {
   const t = store.state.prefs.theme || 'auto';
-  document.documentElement.dataset.theme = t === 'dark' || (t === 'auto' && mq.matches) ? 'dark' : 'light';
+  const dark = t === 'dark' || (t === 'auto' && mq.matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  // Barre d'état et de navigation Android de la couleur des encarts (blanc / noir)
+  document.getElementById('meta-theme')?.setAttribute('content', dark ? '#111827' : '#ffffff');
+  document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
 }
 mq.addEventListener?.('change', () => { applyTheme(); scheduleRender(); });
 

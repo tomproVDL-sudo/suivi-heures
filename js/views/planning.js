@@ -67,7 +67,8 @@ export function render(el) {
           <button data-v="week" aria-pressed="${mode === 'week'}">Semaine</button>
         </div>
       </div>
-      <div id="cal"></div>
+      <div id="cal" class="swipe-zone"></div>
+      <div class="xs faint swipe-hint">Balayez vers la gauche ou la droite pour changer de période</div>
       <div class="cal-legend">
         <span><i class="dot-c" style="background:#3b82f6"></i>Sous l'objectif</span>
         <span><i class="dot-c" style="background:#10b981"></i>Objectif atteint</span>
@@ -80,6 +81,7 @@ export function render(el) {
     </div>`;
   renderCounters(e, now);
   renderCal(e, now);
+  enableSwipe($('#cal', root));
   $('#cal-prev', root).onclick = () => { shift(-1); };
   $('#cal-next', root).onclick = () => { shift(1); };
   $('#cal-today', root).onclick = () => { cursor = new Date(); renderCal(store.engine(), Date.now()); };
@@ -99,6 +101,30 @@ function shift(n) {
   if (mode === 'month') cursor = new Date(cursor.getFullYear(), cursor.getMonth() + n, 1);
   else cursor = addDays(cursor, 7 * n);
   renderCal(store.engine(), Date.now());
+  const cal = $('#cal', root);
+  if (cal) { cal.classList.remove('slide-next', 'slide-prev'); void cal.offsetWidth; cal.classList.add(n > 0 ? 'slide-next' : 'slide-prev'); }
+}
+
+/** Balayage gauche / droite (doigt ou souris) pour changer de mois / semaine. */
+function enableSwipe(cal) {
+  let x0 = null, y0 = 0, t0 = 0, swiped = false;
+  cal.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse' && e.button !== 0) return; x0 = e.clientX; y0 = e.clientY; t0 = Date.now(); swiped = false; });
+  cal.addEventListener('pointermove', (e) => {
+    if (x0 == null || e.pointerType === 'mouse') return;
+    const dx = e.clientX - x0;
+    if (Math.abs(dx) > Math.abs(e.clientY - y0)) cal.style.transform = `translateX(${dx * 0.25}px)`;
+  });
+  const end = (e) => {
+    if (x0 == null) return;
+    const dx = e.clientX - x0, dy = e.clientY - y0;
+    cal.style.transform = '';
+    x0 = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - t0 < 800) { swiped = true; shift(dx < 0 ? 1 : -1); }
+  };
+  cal.addEventListener('pointerup', end);
+  cal.addEventListener('pointercancel', () => { x0 = null; cal.style.transform = ''; });
+  // Un balayage ne doit pas ouvrir le jour sous le doigt
+  cal.addEventListener('click', (e) => { if (swiped) { e.stopPropagation(); e.preventDefault(); swiped = false; } }, true);
 }
 
 // ---------- Compteurs ----------

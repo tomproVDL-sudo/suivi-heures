@@ -83,7 +83,7 @@ export function render(el) {
         </select></div>
       <div class="grid g2"><div class="chart" id="ch-dist"></div><div class="chart" id="ch-box"></div></div>
     </div>
-    <div class="card span2"><div class="card-head"><div><div class="card-title">Calendrier d'activité</div><div class="card-sub">Cliquez sur un jour pour l'ouvrir</div></div>
+    <div class="card span2"><div class="card-head"><div><div class="card-title">Calendrier d'activité</div><div class="card-sub">Touchez un jour pour voir ses heures, touchez-le à nouveau pour l'ouvrir</div></div>
       <div class="legend" style="margin:0"><span><i class="dot-c" style="background:#ccfbf1"></i>&lt; 4 h</span><span><i class="dot-c" style="background:#5eead4"></i>&lt; 7 h</span><span><i class="dot-c" style="background:#14b8a6"></i>&lt; 8 h 30</span><span><i class="dot-c" style="background:#0f766e"></i>&lt; 10 h</span><span><i class="dot-c" style="background:#ef4444"></i>&gt; 10 h</span></div></div>
       <div class="heatmap" id="ch-heat"></div></div>
     <div class="card"><div class="card-head"><div><div class="card-title">Absences et jours fériés</div><div class="card-sub">En jours ouvrés</div></div></div><div class="chart" id="ch-abs"></div><div class="row wrap small" style="gap:6px 14px;margin-top:6px">${absTotalsHtml(st)}</div></div>

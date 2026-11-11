@@ -35,8 +35,8 @@ let openKey = null;
 export function openDay(key) {
   openKey = key;
   $('#day-add-time').value = '';
-  renderDay();
   openDialog('#dlg-day');
+  renderDay();
 }
 export function renderDay() {
   if (!openKey || !$('#dlg-day').open) return;

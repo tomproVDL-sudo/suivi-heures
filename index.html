@@ -85,13 +85,13 @@
       <div id="day-events" class="events"></div>
       <div class="card flat" style="padding:12px">
         <div class="label" style="margin-bottom:8px">Ajouter un pointage</div>
-        <form id="day-add" class="row">
-          <select class="select sm" id="day-add-type" style="flex:1">
+        <form id="day-add" class="day-add">
+          <select class="select sm" id="day-add-type">
             <option value="arrivee">Arrivée / reprise</option>
             <option value="pause">Début de pause</option>
             <option value="depart">Départ</option>
           </select>
-          <input class="input sm" type="time" id="day-add-time" required style="width:110px">
+          <input class="input sm" type="time" id="day-add-time" required>
           <button class="btn btn-primary btn-sm" type="submit">Ajouter</button>
         </form>
       </div>

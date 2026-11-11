@@ -172,12 +172,18 @@ function showTip(ev, t, fmt) {
   el.innerHTML = `<div class="tt">${esc(t.title)}</div>${t.rows.map((r) => `<div class="tr"><i class="dot-c" style="background:${r.color || 'transparent'}"></i>${esc(r.name)}<b>${r.value == null ? '–' : esc(r.raw ? String(r.value) : fmt(r.value))}</b></div>`).join('')}`;
   el.classList.add('show');
   const w = el.offsetWidth, h = el.offsetHeight;
-  let x = ev.clientX + 14, y = ev.clientY - h - 10;
-  if (x + w > innerWidth - 8) x = ev.clientX - w - 14;
-  if (y < 8) y = ev.clientY + 16;
+  let x, y;
+  if (ev.pointerType && ev.pointerType !== 'mouse') { x = ev.clientX - w / 2; y = ev.clientY - h - 28; } // au-dessus du doigt
+  else { x = ev.clientX + 14; y = ev.clientY - h - 10; if (x + w > innerWidth - 8) x = ev.clientX - w - 14; }
+  x = Math.max(8, Math.min(x, innerWidth - w - 8));
+  if (y < 8) y = ev.clientY + 28;
   el.style.left = `${x}px`; el.style.top = `${y}px`;
 }
 const hideTip = () => tipEl()?.classList.remove('show');
+let tipTimer = 0;
+const hideTipLater = (ms = 3000) => { clearTimeout(tipTimer); tipTimer = setTimeout(hideTip, ms); };
+document.addEventListener('pointerdown', (e) => { if (!e.target.closest?.('.chart, .heatmap')) hideTip(); }, true);
+window.addEventListener('scroll', () => hideTip(), { passive: true });
 
 const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver((entries) => {
   for (const e of entries) {
@@ -211,14 +217,19 @@ export function mount(el, kind, opts) {
     }));
     const svg = el.querySelector('svg');
     const fmt = opts.tipFormat || opts.yFormat || ((v) => v);
-    svg.addEventListener('pointermove', (ev) => {
+    const at = (ev) => {
       const r = svg.getBoundingClientRect();
       const px = ((ev.clientX - r.left) / r.width) * width;
       const i = Math.floor((px - b.f.m.l) / b.f.band);
       if (i < 0 || i >= b.f.n) return hideTip();
       showTip(ev, b.tip(i), fmt);
-    });
-    svg.addEventListener('pointerleave', hideTip);
+    };
+    // Souris : survol. Doigt : poser le doigt affiche l'info, glisser horizontalement la fait suivre.
+    svg.addEventListener('pointerdown', (ev) => { if (ev.pointerType !== 'mouse') { clearTimeout(tipTimer); at(ev); } });
+    svg.addEventListener('pointermove', at);
+    svg.addEventListener('pointerup', (ev) => { if (ev.pointerType !== 'mouse') hideTipLater(); });
+    svg.addEventListener('pointercancel', () => hideTipLater());
+    svg.addEventListener('pointerleave', (ev) => { if (ev.pointerType === 'mouse') hideTip(); });
     if (opts.onClick) svg.addEventListener('click', (ev) => {
       const r = svg.getBoundingClientRect();
       const i = Math.floor((((ev.clientX - r.left) / r.width) * width - b.f.m.l) / b.f.band);
@@ -234,14 +245,30 @@ export function mountHeatmap(el, opts) {
   const b = buildHeatmap({ ...opts, th: theme() });
   el.innerHTML = b.svg;
   const svg = el.querySelector('svg');
-  svg.addEventListener('pointermove', (ev) => {
+  let selected = null;
+  const show = (ev) => {
     const i = ev.target.dataset?.i;
-    if (i == null) return hideTip();
+    if (i == null) return null;
     const c = b.cells[+i];
-    showTip(ev, { title: c.title, rows: c.rows || [] }, (v) => v);
+    showTip(ev, { title: c.title, rows: c.rows.length ? c.rows : [{ name: 'Aucun pointage', value: '', raw: true }] }, (v) => v);
+    return +i;
+  };
+  svg.addEventListener('pointermove', (ev) => { if (ev.pointerType === 'mouse' && show(ev) == null) hideTip(); });
+  svg.addEventListener('pointerleave', (ev) => { if (ev.pointerType === 'mouse') hideTip(); });
+  svg.addEventListener('click', (ev) => {
+    const i = ev.target.dataset?.i;
+    if (i == null) return;
+    // Au doigt : 1er appui = affiche les heures, 2e appui sur la même case = ouvre la journée
+    if (selected !== +i && matchMedia('(pointer: coarse)').matches) {
+      svg.querySelector('rect.sel')?.classList.remove('sel');
+      ev.target.classList.add('sel');
+      selected = show(ev);
+      hideTipLater(4000);
+      return;
+    }
+    hideTip();
+    if (opts.onClick) opts.onClick(b.cells[+i].key);
   });
-  svg.addEventListener('pointerleave', hideTip);
-  svg.addEventListener('click', (ev) => { const i = ev.target.dataset?.i; if (i != null && opts.onClick) opts.onClick(b.cells[+i].key); });
 }
 
 /** Convertit un SVG (chaîne) en PNG (data URL) pour l'export PDF. */

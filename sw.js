@@ -2,7 +2,7 @@
 // Les fichiers de l'application sont toujours demandés au réseau d'abord (une nouvelle
 // version déployée sur GitHub est donc prise en compte immédiatement) ; le cache ne sert
 // qu'en secours, hors-ligne ou si le réseau met plus de 3 s à répondre.
-const VERSION = 'v2.0.3';
+const VERSION = 'v2.0.4';
 const CACHE = `suivi-heures-${VERSION}`;
 const CDN_CACHE = 'suivi-heures-cdn';
 

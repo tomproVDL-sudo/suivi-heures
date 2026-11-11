@@ -382,6 +382,12 @@ dialog[open] { animation: pop .18s ease-out; }
 .dlg-foot .left { margin-right: auto; }
 .big-time { font-size: 34px !important; height: 64px !important; text-align: center; font-family: var(--mono); font-weight: 650; }
 
+.day-add { display: grid; grid-template-columns: 1fr 110px auto; gap: 8px; }
+@media (max-width: 480px) { .day-add { grid-template-columns: 1fr 1fr; } .day-add button { grid-column: 1 / -1; } }
+.chart svg { touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.heatmap rect[data-i] { cursor: pointer; }
+.heatmap rect.sel { stroke: var(--text); stroke-width: 2; }
+
 /* ---------- Notifications ---------- */
 .toasts { position: fixed; bottom: 20px; right: 20px; z-index: 95; display: grid; gap: 8px; max-width: calc(100vw - 32px); }
 .toast { display: flex; align-items: center; gap: 12px; background: var(--text); color: var(--surface); padding: 11px 14px; border-radius: 12px; box-shadow: var(--shadow-lg);
